@@ -1,0 +1,3 @@
+[submodule "zachopy"]
+	path = zachopy
+	url = https://github.com/zkbt/zachopy.git

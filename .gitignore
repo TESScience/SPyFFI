@@ -1,5 +1,5 @@
 ##############################
-# ignore compiled C files
+# ignore weird Mac OSX files
 ##############################
 
 .DS_Store
