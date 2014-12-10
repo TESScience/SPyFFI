@@ -4,7 +4,7 @@ import settings, catalogs
 import numpy as np, matplotlib.pyplot as plt
 import scipy.ndimage, scipy.signal, scipy.interpolate
 import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
-import zachopy.utils, crossfield
+import zachopy.utils, zachopy.borrowed.crossfield
 import os, copy
 import subprocess
 from cosmical._cosmical import cosmical
@@ -1227,7 +1227,7 @@ class Image:
 			# define coordinates (equatorial, Galactic, ecliptic) at every pixel in the image
 			ra, dec = self.imageAD()
 			gal = astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)).galactic
-			elon, elat = crossfield.euler(ra, dec, select=3)
+			elon, elat = zachopy.borrowed.crossfield.euler(ra, dec, select=3)
 
 			# add the zodiacal light, using the simple model from Josh and Peter on the TESS wiki
 			print "   including smooth model for zodiacal light."

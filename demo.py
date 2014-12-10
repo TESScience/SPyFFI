@@ -22,7 +22,7 @@ def create(ra=270, dec=66.56070833333332, cadence=2, n=900):
 	C.point(ra, dec)
 	I = tess.Image(C)
 	for i in range(n):
-		I.expose()
+		I.expose(write=True)
 
 def subtractPairs(ra=82, dec=1,cadence=2):
 	C = tess.Camera()

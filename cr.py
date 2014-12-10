@@ -23,7 +23,7 @@ workingDirectory = '/Users/zkbt/Cosmos/Data/TESS/CR/'
 
 class timeseries():
 
-	def __init__(self, nexposures=1000, nsubexposures=900, amplitude=2.0):
+	def __init__(self, nexposures=1324, nsubexposures=900, amplitude=2.0):
 		self.nsubexposures = nsubexposures
 	 	self.nexposures = nexposures
 		self.shape = (self.nexposures, self.nsubexposures)
@@ -309,6 +309,36 @@ class central(strategy):
 		corrected = np.mean((sum - max - min)/self.m,1)
 		return corrected #- np.mean(corrected)
 
+class outlierwithdecay(strategy):
+	def __init__(self, t, n=None, threshold=10, decay=0.10):
+		strategy.__init__(self, t, n)
+		self.threshold = threshold
+		self.decay = decay
+		self.name = r'Rejecting {threshold}$\sigma$ Outliers; with $\sigma$ from {decay}% decay per exposure.'.format(threshold=self.threshold, decay=self.decay*100)
+
+	def filter(self):
+		shape = self.timeseries.flux.shape
+		finaltimeseries = np.zeros(shape[0])
+		running_std = np.std(self.timeseries.flux[0,:]) + np.zeros(shape[0])
+		running_mean = np.mean(self.timeseries.flux[0,:]) + np.zeros(shape[0])
+		finaltimeseries[0] = running_mean[0]
+		for i in np.arange(1,shape[0]):
+			flux = self.timeseries.flux[i,:]
+			outlier = flux > running_mean[i-1] + self.threshold*running_std[i-1]
+			this_mean = np.mean(flux[outlier == False])
+			this_std = np.std(flux[outlier == False])
+			finaltimeseries[i] = this_mean
+
+			running_mean[i] = running_mean[i-1]*(1.0 - self.decay) + this_mean*self.decay
+			running_std[i] = running_std[i-1]*(1.0 - self.decay) + this_std*self.decay
+
+		plt.figure('diagnostics for {0}'.format(self.__class__), figsize=(7,4), dpi=150)
+		plt.cla()
+		pargs = dict(linewidth=3, alpha=0.5)
+		plt.plot(running_mean, linestyle='--', label='mean', **pargs)
+		plt.plot(running_std, label='standard deviation', **pargs)
+		plt.legend()
+		return finaltimeseries
 
 
 class hybrid(strategy):
