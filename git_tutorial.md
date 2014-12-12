@@ -1,9 +1,7 @@
 Using the SPyFFI git repository
 ===============================
-(a 5-minute introduction)
--------------------------
 
-If you don't have it already, [install git](http://git-scm.com/book/en/v2/Getting-Started-Installing-Git) to your local machine. You should be able to run "git version" from your command line without any problems.
+If you don't have it already, [install git](http://git-scm.com/book/en/v2/Getting-Started-Installing-Git) to your local machine.
 
 Things to Do Once
 -----------------
