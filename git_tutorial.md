@@ -5,8 +5,10 @@ If you don't have it already, [install git](http://git-scm.com/book/en/v2/Gettin
 
 Things to Do Once
 -----------------
-To get started, change into the directory in which you'd like to store the code and run:
+To get started, change into the directory in which you'd like to store the code and run
+
 `git clone https://github.com/zkbt/SPyFFI.git`
+
 This will download all the code in the repository, and start a local branch on your computer.
 
 Configure your local git account (using your own name, e-mail, and preferred editor):
