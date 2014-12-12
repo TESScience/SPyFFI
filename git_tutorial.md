@@ -10,10 +10,15 @@ To get started, change into the directory in which you'd like to store the code 
 This will download all the code in the repository, and start a local branch on your computer.
 
 Configure your local git account (using your own name, e-mail, and preferred editor):
+
 `git config --global user.name "Cecilia Payne-Gaposchkin"`
+
 `git config --global user.email cpg@badass.com`
+
 `git config --global core.editor nano`
+
 `git config --global color.ui true`
+
 
 To Get the Most Recent Code
 ---------------------------
@@ -25,7 +30,7 @@ To Upload Your Updates to the Code
 ----------------------------------
 It's a two-step process. First, you need to add and commit your changed files to your local repository. Second, you push your local repository up to be merged into the online one.
 
-To add your modified files to a staging area (getting them ready to be committed), do something like:
+To add your modified files to a staging area (getting them ready to be committed), do something like
 `git add myupdatedfile.c`
 or more generally
 `git add *.py`
