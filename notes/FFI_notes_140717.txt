@@ -1,0 +1,30 @@
+John Doty is interested in the frame transfer. Power supply becomes difficult for short frame transfer times. 
+
+Is 50 milliseconds too long for the frame transfer? What are the requirements on streaking? (A few milliseconds up to 50.)
+
+50 ms can be done without terrible difficulty
+shorter will require auxiliary power supply
+
+
+Lateral diffusion of about 3-4 microns. Will depend on depth. Deb’s PSF’s take into account. 
+
+zmax model
+million rays
+into matlab model, propagate rays through silicon, probabilistic absorption model show depth at which captures, then apply charge diffusion at that depth. (may be refined as more measurements come in from CCDs, bias voltages, etc…)
+
+PSF
+charge diffusion
+intrapixels sensitivity
+RMS motion within exposure
+pixelization
+PRF
+
+
+linear filter to describe imperfect electronic effects
+
+
+right now, Kerri might be able to store 8 images for cosmic algorithms
+
+
+
+atomic PRF’s
