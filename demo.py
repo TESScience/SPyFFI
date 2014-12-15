@@ -1,8 +1,6 @@
 '''A few simple tests of the TESS image simulation tools.'''
 import tess
-import glob
-import numpy as np
-import matplotlib.pyplot as plt
+from imports import *
 
 
 

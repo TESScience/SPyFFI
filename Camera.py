@@ -1,3 +1,7 @@
+from imports import *
+import settings, catalogs
+from PSF import PSF
+
 # define a camera class
 class Camera:
   def __init__(self, stamp=None, cadence=1800, ra=270,dec=66.56070833333332):

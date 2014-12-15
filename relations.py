@@ -1,7 +1,6 @@
 '''Handy relations, mostly interpolations out of paper tables.'''
 import settings
-import astropy.io
-import scipy.interpolate, numpy as np
+from imports import *
 
 # convert colors, using the Sloan stellar locus
 def davenport(color, input='r-J', output='r-i'):

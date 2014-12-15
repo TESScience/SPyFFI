@@ -1,5 +1,4 @@
 '''Generate pixel-lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
-import zachopy.utils
 import tess
 import glob
 import numpy as np

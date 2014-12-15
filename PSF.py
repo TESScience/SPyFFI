@@ -1,5 +1,5 @@
 from imports import *
-import pixels
+import pixels, settings
 
 # define everything related to PSFs
 class PSF:
@@ -26,13 +26,13 @@ class PSF:
         self.dy_subpixelsforintegrating_axis = self.dx_subpixelsforintegrating_axis
         self.dx_subpixelsforintegrating, self.dy_subpixelsforintegrating = np.meshgrid(self.dx_subpixelsforintegrating_axis, self.dy_subpixelsforintegrating_axis)
 
-        if False:   # (do I actually use any of these?)
+        if True:   # (do I actually use any of these?) -- yes, in Image, to paint on stars
             # create a grid of full pixels that would contain at least some subpixels, centered on 0.0, 0.0
             left, right = self.subpixel2pixel((np.min(self.dx_subpixelsforintegrating), np.max(self.dx_subpixelsforintegrating)))
             bottom, top = self.subpixel2pixel((np.min(self.dy_subpixelsforintegrating), np.max(self.dy_subpixelsforintegrating)))
             self.dx_pixels_axis = np.arange(left, right+1)
-            self.dx_pixels_axis = np.arange(right, top+1)
-            self.dx_pixels, self.dy_pixels = np.meshgrid(self.dx_pixels_axis, self.dx_pixels_axis)
+            self.dy_pixels_axis = np.arange(bottom, top+1)
+            self.dx_pixels, self.dy_pixels = np.meshgrid(self.dx_pixels_axis, self.dy_pixels_axis)
 
         # fill in an intrapixel sensitivity
         # self.intrapixel = pixels.prnu(self.dx_subpixelsforintegrating, self.dx_subpixelsforintegrating)
@@ -53,10 +53,10 @@ class PSF:
         self.header['PRF'] = ''
         self.header['PRFNOTE'] = ('','Pixel Response Function library parameters')
         self.header['PLIBDTEM'] = (self.dtemperature, '[K] d(effective temperature)')
-        self.header['PLIBNOFF'] = (self.noffset, '# of subpixelsforintegratingel shifts, in both x and y')
+        self.header['PLIBNOFF'] = (self.noffset, '# of subpixel offsets, in both x and y')
         self.header['PLIBDROT'] = (self.drotation, '[deg] d(rotation around center)')
         self.header['PLIBNRAD'] = (self.nradii, '# of radial distances from field center')
-        self.header['PSUBSIZE'] = (self.subpixelsforintegrating_size, '[pix] subpixel grid size used in initial PSF integration')
+        self.header['PSUBSIZE'] = (self.subpixelsforintegrating_size, '[pix] subpixel size in PSF integral')
         #self.header['PNSUBPIX'] = (self.numberof_subpixelsforintegrating, '[pix] # of subpixels used for initial PSF integration')
         #self.header['PPIXSIZE'] = (self.pixsize, '[pix] pixel size')
 
@@ -189,37 +189,43 @@ class PSF:
                         for w in np.arange(weighting.shape[1]):
                             # loop over powers in the polynomial for weight vs. teff
                             this_weight = 0.0
+
+                            # loop over the terms of the temperature polynomial (this is stupidly slow, but it only has to happen once)
                             for p in np.arange(weighting.shape[0]):
                                 this_weight += weighting[p,w]*(4000.0/temperature)**p
                                 psf += this_weight*self.monochromaticlibrary[focalplanetradius][self.wavelengths[w]]
                                 print "         {0} X [{1}]".format(this_weight, self.wavelengths[w])
 
-                                filename = "integrated_psf_for_{0}Kat{1}".format(temperature, focalplanetradius*100).replace(' ', '').replace('.','p') + '.pdf'
-                                self.temperaturelibrary[focalplanetradius][temperature] = psf/np.sum(psf)
-                                if plot:
-                                    self.plot(psf, title="{0}K star at focalplanetradius (0,{1})".format(temperature, focalplanetradius),output=settings.prefix + 'plots/' + filename)
-                                    print ''
-                                    np.save(temperature_filename, (self.temperaturelibrary, self.temperatures, self.focalplaneradii))
+                        # after having calculated PSF image, store it in the library
+                        self.temperaturelibrary[focalplanetradius][temperature] = psf/np.sum(psf)
 
-                                    # convolve the high resolution PSFs with the jitter expected for the camera's cadence
-                                    def populateJitteredLibrary(self):
-                                        print "Populating the high-resolution PSF library for an expected jitter for a {0:04.0f}s cadence.".format(self.camera.cadence)
-                                        jittered_filename = settings.prefix + 'intermediates/jittered_psfs_{0:04.0f}s.npy'.format(self.camera.cadence)
-                                        try:
-                                            self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime = np.load(jittered_filename)
-                                        except:
-                                            try:
-                                                self.temperaturelibrary
-                                            except:
-                                                self.populateHighResolutionTemperatureLibrary()
+                        # save a plot of the PSF
+                        filename = "integrated_psf_for_{0}Kat{1}".format(temperature, focalplanetradius*100).replace(' ', '').replace('.','p') + '.pdf'
+                        if plot:
+                            self.plot(psf, title="{0}K star at focalplanetradius (0,{1})".format(temperature, focalplanetradius),output=settings.prefix + 'plots/' + filename)
+                            print ''
+                            np.save(temperature_filename, (self.temperaturelibrary, self.temperatures, self.focalplaneradii))
 
-                                                self.jitteredlibrary = copy.copy(self.temperaturelibrary)
-                                                for focalplanetradius in self.focalplaneradii:
-                                                    for temperature in self.temperatures:
-                                                        self.jitteredlibrary[focalplanetradius][temperature] = scipy.signal.convolve2d(self.temperaturelibrary[focalplanetradius][temperature], self.camera.jittermap[0]/np.sum(self.camera.jittermap[0]), 'same', 'fill', 0)
-                                                        self.jitteredlibrarytime = self.camera.cadence
-                                                        np.save(jittered_filename, (self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime))
-                                                        assert(self.jitteredlibrarytime == self.camera.cadence)
+    # convolve the high resolution PSFs with the jitter expected for the camera's cadence
+    def populateJitteredLibrary(self):
+        print " -populating the high-resolution PSF library for an expected jitter for a {0:04.0f}s cadence.".format(self.camera.cadence)
+        jittered_filename = settings.prefix + 'intermediates/jittered_psfs_{0:04.0f}s.npy'.format(self.camera.cadence)
+        try:
+            # maybe the jittered library can be loaded straightaway?
+            self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime = np.load(jittered_filename)
+        except:
+            try:
+                self.temperaturelibrary
+            except:
+                self.populateHighResolutionTemperatureLibrary()
+
+                self.jitteredlibrary = copy.copy(self.temperaturelibrary)
+                for focalplanetradius in self.focalplaneradii:
+                    for temperature in self.temperatures:
+                        self.jitteredlibrary[focalplanetradius][temperature] = scipy.signal.convolve2d(self.temperaturelibrary[focalplanetradius][temperature], self.camera.jittermap[0]/np.sum(self.camera.jittermap[0]), 'same', 'fill', 0)
+                        self.jitteredlibrarytime = self.camera.cadence
+                        np.save(jittered_filename, (self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime))
+                        assert(self.jitteredlibrarytime == self.camera.cadence)
 
     # populate a library of binned PRFS, using the jittered high-resolution library
     def populateBinned(self):
@@ -276,53 +282,53 @@ class PSF:
     def binnedhighrespsf(self, x, y, temperature):
         subgrid_psf = self.highrespsf(x, y, temperature)
         assert(subgrid_psf.shape == self.intrapixel.shape)
-        thisbinned = zachopy.utils.rebin_total(subgrid_psf*self.intrapixel,2*self.gridpixels,2*self.gridpixels)
+        thisbinned = zachopy.utils.rebin_total(subgrid_psf*self.intrapixel,2*self.dx_pixels,2*self.dy_pixels)
         return thisbinned
 
     def binnedpsf(self, x, y, temperature, verbose=False, interpolation='linear'):
 
         try:
+            # make sure the binned PSF library is already loaded
             self.binned
         except:
             self.populateBinned()
-            r = np.sqrt(x**2 + y**2)
-            focalplanetradius = zachopy.utils.find_nearest(self.radii, r, verbose=verbose)
-            temperature = zachopy.utils.find_nearest(self.temperatures, temperature, verbose=verbose)
-            rot = self.rotation(x,y)*180/np.pi
+
+        # figure which focal plane radii and rotation angle to use
+        r = np.sqrt(x**2 + y**2)
+        focalplanetradius = zachopy.utils.find_nearest(self.radii, r, verbose=verbose)
+        temperature = zachopy.utils.find_nearest(self.temperatures, temperature, verbose=verbose)
+        rot = self.rotation(x,y)*180/np.pi % 360
+        rotation = zachopy.utils.find_nearest(self.rotations, rot , verbose=verbose)
+        if verbose:
+            print ""
+            print "{0},{1},{2},{3}".format(x, y, temperature, rot)
+
+
+        if interpolation == 'nearest':
+            xoffset = zachopy.utils.find_nearest(self.xoffsets, x % 1, verbose=verbose)
+            yoffset = zachopy.utils.find_nearest(self.yoffsets, y % 1, verbose=verbose)
+            return self.binned[focalplanetradius][temperature][rotation][xoffset][yoffset]
+
+        if interpolation == 'linear':
+            xfrac, yfrac = x % 1, y % 1
+            xbelow, xabove = zachopy.utils.find_two_nearest(self.xoffsets, xfrac, verbose=verbose)
+            xspan = xabove - xbelow
+            xbelow_weight, xabove_weight = (xabove - xfrac)/xspan, (xfrac - xbelow)/xspan
+            assert(xbelow_weight > 0)
             if verbose:
-                print ""
-                print "{0},{1},{2},{3}".format(x, y, temperature, rot)
-                while rot > 360 or rot < 0:
-                    if rot < 0:
-                        rot += 360
-                        if rot > 360:
-                            rot -= 360
+                print "  weights are ", xbelow_weight, xabove_weight
+            ybelow, yabove = zachopy.utils.find_two_nearest(self.yoffsets, yfrac, verbose=verbose)
+            yspan = yabove - ybelow
+            ybelow_weight, yabove_weight =  (yabove - yfrac)/yspan, (yfrac - ybelow)/yspan
+            if verbose:
+                print "  weights are ", ybelow_weight, yabove_weight
+            assert(xbelow_weight + xabove_weight ==1)
+            assert(ybelow_weight + yabove_weight ==1)
 
-                            rotation = zachopy.utils.find_nearest(self.rotations, rot , verbose=verbose)
-                            if interpolation == 'nearest':
-                                xoffset = zachopy.utils.find_nearest(self.xoffsets, x % 1, verbose=verbose)
-                                yoffset = zachopy.utils.find_nearest(self.yoffsets, y % 1, verbose=verbose)
-                                return self.binned[focalplanetradius][temperature][rotation][xoffset][yoffset]
-                                if interpolation == 'linear':
-                                    xfrac, yfrac = x % 1, y % 1
-                                    xbelow, xabove = zachopy.utils.find_two_nearest(self.xoffsets, xfrac, verbose=verbose)
-                                    xspan = xabove - xbelow
-                                    xbelow_weight, xabove_weight = (xabove - xfrac)/xspan, (xfrac - xbelow)/xspan
-                                    assert(xbelow_weight > 0)
-                                    if verbose:
-                                        print "  weights are ", xbelow_weight, xabove_weight
-                                        ybelow, yabove = zachopy.utils.find_two_nearest(self.yoffsets, yfrac, verbose=verbose)
-                                        yspan = yabove - ybelow
-                                        ybelow_weight, yabove_weight =  (yabove - yfrac)/yspan, (yfrac - ybelow)/yspan
-                                        if verbose:
-                                            print "  weights are ", ybelow_weight, yabove_weight
-                                            assert(xbelow_weight + xabove_weight ==1)
-                                            assert(ybelow_weight + yabove_weight ==1)
-
-                                            return 	xbelow_weight*ybelow_weight*self.binned[focalplanetradius][temperature][rotation][xbelow][ybelow] + \
-                                            xabove_weight*ybelow_weight*self.binned[focalplanetradius][temperature][rotation][xabove][ybelow] + \
-                                            xabove_weight*yabove_weight*self.binned[focalplanetradius][temperature][rotation][xabove][yabove] + \
-                                            xbelow_weight*yabove_weight*self.binned[focalplanetradius][temperature][rotation][xbelow][yabove]
+            return 	xbelow_weight*ybelow_weight*self.binned[focalplanetradius][temperature][rotation][xbelow][ybelow] + \
+            xabove_weight*ybelow_weight*self.binned[focalplanetradius][temperature][rotation][xabove][ybelow] + \
+            xabove_weight*yabove_weight*self.binned[focalplanetradius][temperature][rotation][xabove][yabove] + \
+            xbelow_weight*yabove_weight*self.binned[focalplanetradius][temperature][rotation][xbelow][yabove]
 
 
     def setCamera(self, camera):

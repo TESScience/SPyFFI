@@ -1,5 +1,5 @@
 '''Keeps track of settings required needed for TESS simulations, particularly dirs.'''
-import os, zachopy.utils
+from imports import *
 
 # define a folder that all data is held
 prefix = "/Users/zkbt/Cosmos/Data/TESS/FFIs/"

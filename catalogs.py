@@ -1,6 +1,5 @@
 '''Keep track of catalogs of objects, usually stars.'''
-import numpy as np, matplotlib.pyplot as plt
-import astroquery.vizier, astropy.coordinates
+from imports import *
 import settings, relations
 
 class Star(object):
@@ -13,6 +12,12 @@ class Star(object):
 		self.tmag = tmag
 		for k in kwargs.keys():
 			self.__dict__[k] = kwargs[k]
+
+class Catalog(object):
+	'''an object to keep track of lots of stars'''
+	def __init__(self):
+		pass
+
 
 # a function to load stars from Vizier
 def stars(ra=0.0, dec=90.0, radius=0.2, catalog='UCAC4', write=True):

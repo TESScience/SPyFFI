@@ -1,7 +1,17 @@
 '''Things that will probably need to be imported into most of the TESS code chunks.'''
 
+# some basics
 import numpy as np, matplotlib.pyplot as plt
-import scipy.ndimage, scipy.signal, scipy.interpolate
-import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
-import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical
 import os, copy, subprocess
+
+# some scipy tools for interpolation and image filtering
+import scipy.ndimage, scipy.signal, scipy.interpolate
+
+# lots from astropy
+import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
+
+# online access to catalogs
+import astroquery.vizier
+
+# general tools from my library
+import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical
