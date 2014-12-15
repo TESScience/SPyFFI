@@ -1,6 +1,5 @@
 Using the SPyFFI git repository
 ===============================
-<<<<<<< HEAD
 (a 5-minute introduction)
 -------------------------
 
@@ -41,7 +40,6 @@ Configure your local git account (using your own name, e-mail, and preferred edi
 `git config --global color.ui true`
 
 
->>>>>>> master
 To Get the Most Recent Code
 ---------------------------
 From within the repository's directory, run
@@ -52,11 +50,8 @@ To Upload Your Updates to the Code
 ----------------------------------
 It's a two-step process. First, you need to add and commit your changed files to your local repository. Second, you push your local repository up to be merged into the online one.
 
-<<<<<<< HEAD
-To add your modified files to a staging area (getting them ready to be committed), do something like:
-=======
+
 To add your modified files to a staging area (getting them ready to be committed), do something like
->>>>>>> master
 `git add myupdatedfile.c`
 or more generally
 `git add *.py`
