@@ -18,6 +18,38 @@ class Catalog(object):
 	def __init__(self):
 		pass
 
+	def plot(self):
+		plt.ion()
+		plt.figure('star chart')
+		self.ax = plt.subplot()
+		self.ax.cla()
+		deltamag = 20.0 - self.tmag
+		size = deltamag**2*5
+		self.ax.scatter(self.ra, self.dec, s=size, marker='o', color='grey', alpha=0.3, edgecolors='black')
+		for i in range(len(self.ra)):
+			self.ax.text(self.ra[i], self.dec[i], '{0:.2f}'.format(self.tmag[i]),horizontalalignment='center', verticalalignment='center', alpha=0.5, size=8, color='green',weight='bold')
+		self.ax.set_aspect(1)
+		self.ax.set_xlabel('Right Ascension')
+		self.ax.set_ylabel('Declination')
+		plt.show()
+
+class TestPattern(Catalog):
+	'''a test pattern catalog, creating a grid of stars to fill an image'''
+	def __init__(self, size=9, spacing=60.0, magnitudes=[7,17], ra=0.0, dec=0.0):
+		'''create a size x size square test pattern of stars,
+		with spacing arcsecs between each element and
+		magnitudes spanning the range of magnitudes'''
+
+		# how many stars do we need?
+		n = size**2
+
+		# construct a linear grid of magnitudes
+		self.tmag = np.linspace(np.min(magnitudes), np.max(magnitudes),n)[::-1]
+		ras, decs = np.meshgrid(np.arange(size)*spacing, np.arange(size)*spacing)
+		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten()
+		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra
+
+
 
 # a function to load stars from Vizier
 def stars(ra=0.0, dec=90.0, radius=0.2, catalog='UCAC4', write=True):
