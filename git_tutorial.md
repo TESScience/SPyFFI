@@ -12,9 +12,13 @@ To get started, change into the directory in which you'd like to store the code 
 This will download all the code in the repository, and start a local branch on your computer.
 
 Configure your local git account (using your own name, e-mail, and preferred editor):
+
 `git config --global user.name "Cecilia Payne-Gaposchkin"`
+
 `git config --global user.email cpg@badass.com`
+
 `git config --global core.editor nano`
+
 `git config --global color.ui true`
 
 =======
