@@ -3,26 +3,6 @@ Using the SPyFFI git repository
 (a 5-minute introduction)
 -------------------------
 
-If you don't have it already, [install git](http://git-scm.com/book/en/v2/Getting-Started-Installing-Git) to your local machine. You should be able to run "git version" from your command line without any problems.
-
-Things to Do Once
------------------
-To get started, change into the directory in which you'd like to store the code and run:
-`git clone https://github.com/zkbt/SPyFFI.git`
-This will download all the code in the repository, and start a local branch on your computer.
-
-Configure your local git account (using your own name, e-mail, and preferred editor):
-
-`git config --global user.name "Cecilia Payne-Gaposchkin"`
-
-`git config --global user.email cpg@badass.com`
-
-`git config --global core.editor nano`
-
-`git config --global color.ui true`
-
-=======
-
 If you don't have it already, [install git](http://git-scm.com/book/en/v2/Getting-Started-Installing-Git) to your local machine.
 
 Things to Do Once
