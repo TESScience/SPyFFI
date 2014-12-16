@@ -4,8 +4,14 @@ from PSF import PSF
 
 # define a camera class
 class Camera:
-  def __init__(self, stamp=None, cadence=1800, ra=270,dec=66.56070833333332):
+  def __init__(self, stamp=None, cadence=1800, ra=270,dec=66.56070833333332,testpattern=False):
     print "Initializing a new TESS camera object."
+
+    self.testpattern = testpattern
+    if self.testpattern:
+        self.ra = 0.0
+        self.dec = 0.0
+
     self.pixelscale = 24.0/4096*60*60							# arcsec!!
     self.offset_from_ecliptic = 6.0									# degrees
     self.number_of_segments = 13
@@ -38,7 +44,12 @@ class Camera:
     self.setCadence(self.longcadence)
     self.psf.setCamera(self)
     self.stamp = stamp
-    self.point(ra, dec)
+
+    if self.testpattern:
+        self.catalog = catalogs.TestPattern(size=self.npix*self.pixelscale)
+    else:
+        self.catalog = catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=self.fov/np.sqrt(2)*1.01)
+    self.point(self.ra, self.dec)
 
   def populateHeader(self):
     self.header = astropy.io.fits.Header()
@@ -276,12 +287,16 @@ class Camera:
     self.point()
 
   def pos_string(self):
-    coords = astropy.coordinates.ICRS(ra=self.ra*astropy.units.degree, dec=self.dec*astropy.units.degree)
-    return "{0:02}h{1:02}m{2:02}s{3:+03}d{4:02}m{5:02}s".format(np.int(coords.ra.hms[0]),np.int(coords.ra.hms[1]),np.int(coords.ra.hms[2].round()), np.int(coords.dec.dms[0]),np.int(np.abs(coords.dec.dms[1])),np.int(np.abs(coords.dec.dms[2].round())))
+    if self.testpattern:
+        return "testpattern"
+    else:
+        coords = astropy.coordinates.ICRS(ra=self.ra*astropy.units.degree, dec=self.dec*astropy.units.degree)
+        return "{0:02}h{1:02}m{2:02}s{3:+03}d{4:02}m{5:02}s".format(np.int(coords.ra.hms[0]),np.int(coords.ra.hms[1]),np.int(coords.ra.hms[2].round()), np.int(coords.dec.dms[0]),np.int(np.abs(coords.dec.dms[1])),np.int(np.abs(coords.dec.dms[2].round())))
 
   def project(self, plot=False, write=False):
     print "Creating a starmap for this TESS field."
-    ras, decs, rmag, jmag, imag, temperatures = catalogs.stars(ra=self.ra, dec=self.dec, radius=self.fov/np.sqrt(2)*1.01, catalog='UCAC4')
+    #ras, decs, rmag, jmag, imag, temperatures = catalogs.stars(ra=self.ra, dec=self.dec, radius=self.fov/np.sqrt(2)*1.01, catalog='UCAC4')
+    ras, decs, imag, temperatures = self.catalog.arrays()
     deltamag = np.max(imag) - imag
     size = deltamag**2/16.0
 

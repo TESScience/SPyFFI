@@ -497,28 +497,32 @@ class Image:
 
 		# if the background image already exists, just load it
 		try:
-			self.backgroundimage = self.loadFromFITS(backgroundsfilename)
-		# otherwise compute the backgrounds from scratch, and save them for next time
+			self.backgroundimage
 		except:
-			# define a blank background image
-			self.backgroundimage = self.zeros()
-			# define coordinates (equatorial, Galactic, ecliptic) at every pixel in the image
-			ra, dec = self.imageAD()
-			gal = astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)).galactic
-			elon, elat = zachopy.borrowed.crossfield.euler(ra, dec, select=3)
 
-			# add the zodiacal light, using the simple model from Josh and Peter on the TESS wiki
-			print "   including smooth model for zodiacal light."
-			self.backgroundimage += self.zodicalBackground(elat, elon)*self.camera.cadence
-			self.header['IZODIACA'] = ('True', 'zodiacal light, treated as smooth')
+			try:
+				self.backgroundimage = self.loadFromFITS(backgroundsfilename)
+			# otherwise compute the backgrounds from scratch, and save them for next time
+			except:
+				# define a blank background image
+				self.backgroundimage = self.zeros()
+				# define coordinates (equatorial, Galactic, ecliptic) at every pixel in the image
+				ra, dec = self.imageAD()
+				gal = astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)).galactic
+				elon, elat = zachopy.borrowed.crossfield.euler(ra, dec, select=3)
 
-			# add unresolved background light, using the simple model from Josh and Peter on the TESS wiki
-			print "   including smooth model for unresolved stars in the Galaxy."
-			self.backgroundimage += self.unresolvedBackground(gal.b.degree, gal.l.degree)*self.camera.cadence
-			self.header['IUNRESOL'] = ('True', 'unresolved stars, treated as smooth background')
+				# add the zodiacal light, using the simple model from Josh and Peter on the TESS wiki
+				print "   including smooth model for zodiacal light."
+				self.backgroundimage += self.zodicalBackground(elat, elon)*self.camera.cadence
+				self.header['IZODIACA'] = ('True', 'zodiacal light, treated as smooth')
 
-			# write the image, so it can just be loaded easily next time
-			self.writeToFITS(self.backgroundimage, backgroundsfilename)
+				# add unresolved background light, using the simple model from Josh and Peter on the TESS wiki
+				print "   including smooth model for unresolved stars in the Galaxy."
+				self.backgroundimage += self.unresolvedBackground(gal.b.degree, gal.l.degree)*self.camera.cadence
+				self.header['IUNRESOL'] = ('True', 'unresolved stars, treated as smooth background')
+
+				# write the image, so it can just be loaded easily next time
+				self.writeToFITS(self.backgroundimage, backgroundsfilename)
 
 		# add the background image to the total image
 		self.image += self.backgroundimage
@@ -601,7 +605,7 @@ class Image:
 		except:
 			self.camera.counter = 0'''
 
-	def expose(self, plot=False, jitter=False, write=False, split=False):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True):
 		self.plot = plot
 
 		print "-------_-------_-------_-------_-------_-------_-------_-------"
@@ -616,7 +620,7 @@ class Image:
 			self.camera.jitter(header=self.header)
 
 		# add stars to the image
-		self.addStars(jitter=jitter)
+		self.addStars(jitter=jitter, remake=remake)
 
 		# add galaxies to the image
 		self.addGalaxies()
@@ -635,7 +639,8 @@ class Image:
 		cosmics = self.addCosmicsAl(split=split, write=write)
 
 		# add smear from the finite frame transfer time
-		self.addSmear()
+		if smear:
+			self.addSmear()
 
 		# create saturation bleed trails
 		self.bleedSaturated()
