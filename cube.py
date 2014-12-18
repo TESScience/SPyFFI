@@ -1,11 +1,6 @@
 '''Generate TESS pixel lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
-import tess
-import glob
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import matplotlib.cm as cm
-import zachopy.star
+from imports import *
+import tess, cr
 
 class Cube(object):
 	'''Cube to handle simulated postage stamp pixel light curves;
@@ -61,7 +56,11 @@ class Cube(object):
 		self.I.image = self.I.zeros()
 
 		# create empty (xpixels, ypixels, n)
-		self.photons, self.cosmics, self.noiseless = np.zeros(self.shape), np.zeros(self.shape), np.zeros(self.shape)
+		if self.cadence == 2:
+			bits = np.float32
+		else:
+			bits = np.float64
+		self.photons, self.cosmics, self.noiseless = np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits)
 
 		# create a dictionary to store a bunch of summaries
 		self.summaries = {}
@@ -69,6 +68,36 @@ class Cube(object):
 		# populate the cube with simulated pixel data
 		# self.simulate()
 		# self.plot()
+
+	def bin(self, nsubexposures=60, strategy=cr.central(n=10)):
+		'''Bin together 2-second exposures, using some cosmic strategy.'''
+
+		# make sure that we're starting with a
+		assert(self.cadence == 2)
+
+		binned = Cube(subject=self.subject, size=self.size, cadence=self.cadence*nsubexposures, n=(np.int(self.n/nsubexposures)) )
+		binned.unmitigated = np.zeros_like(binned.photons)
+		for x in np.arange(self.shape[0]):
+			for y in np.arange(self.shape[1]):
+				print '{x}, {y} out of ({size}, {size})'.format(x=x, y=y, size=self.size)
+				timeseries = cr.timeseries(self, (x,y), nsubexposures=nsubexposures)
+				strategy.calculate(timeseries)
+				strategy.plot()
+				binned.photons[x,y] = strategy.binned['flux']
+				binned.cosmics[x,y] = strategy.binned['naive'] - strategy.binned['nocosmics']
+				binned.unmitigated[x,y] = strategy.binned['naive']
+		return binned
+
+
+
+	def display(self, cube=None, name='cube'):
+		if cube is None:
+			cube = self.photons
+		try:
+			self.ds9
+		except:
+			self.ds9 = zachopy.display.ds9(name)
+		self.ds9.many(cube)
 
 	@property
 	def directory(self):
@@ -89,7 +118,7 @@ class Cube(object):
 	def simulate(self):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
 		for i in range(self.n):
-			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0)
+			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True)
 
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''
@@ -111,39 +140,60 @@ class Cube(object):
 		'''Slightly reshape an image, so it can be cast into operations on the whole cube.'''
 		return image.reshape(self.xpixels, self.ypixels, 1)
 
-	@property
-	def median(self):
+	def median(self, which='photons'):
 		'''The median image.'''
+		array = self.__dict__[which].astype(np.float64)
 		key = 'median'
 		try:
-			self.summaries[key]
+			self.summaries[key+which]
 		except:
-			self.summaries[key] = np.median(self.photons, 2)
-		return self.summaries[key]
+			self.summaries[key+which] = np.median(array, 2)
+		return self.summaries[key+which]
 
-	@property
-	def mad(self):
+	def mean(self, which='photons'):
+		'''The median image.'''
+		array = self.__dict__[which].astype(np.float64)
+		key = 'mean'
+		try:
+			self.summaries[key+which]
+		except:
+			self.summaries[key+which] = np.mean(array, 2)
+		return self.summaries[key+which]
+
+
+	def mad(self, which='photons'):
 		'''The median of the absolute deviation image.'''
+		array = self.__dict__[which].astype(np.float64)
 		key = 'mad'
 		try:
-			self.summaries[key]
+			self.summaries[key+which]
 		except:
-			self.summaries[key] = np.median(np.abs(self.photons - self.cubify(self.median)), 2)
-		return self.summaries[key]
+			self.summaries[key+which] = np.median(np.abs(array - self.cubify(self.median(which))), 2)
+		return self.summaries[key+which]
 
-	@property
-	def master(self):
-		'''The (completely noiseless and unsaturated) raw master frame.'''
-		key = 'master'
+	def std(self, which='photons'):
+		'''The standard deviation image.'''
+		array = self.__dict__[which].astype(np.float64)
+		key = 'std'
 		try:
-			self.summaries[key]
+			self.summaries[key+which]
 		except:
-			self.summaries[key] = np.mean(self.noiseless, 2)
-		return self.summaries[key]
+			self.summaries[key+which] = np.std(array, 2)
+		return self.summaries[key+which]
 
-	def nsigma(self):
-		sigma = 1.48*self.cubify(self.mad)
-		return (self.photons - self.cubify(self.median))/sigma
+	def sigma(self, which='photons', robust=True):
+		if robust:
+			return 1.4826*self.mad(which)
+		else:
+			return self.std(which)
+
+	def master(self, which='photons'):
+		'''The (calculated) master frame.'''
+		return self.median(which)
+
+	def nsigma(self, which='photons', robust=True):
+		array = self.__dict__[which].astype(np.float64)
+		return (array - self.cubify(self.median(which)))/self.cubify(self.sigma(which, robust=robust))
 
 	def write(self, normalization='none'):
 		'''Save all the images to FITS, inside the cube directory.'''
@@ -186,12 +236,12 @@ class Cube(object):
 			zero = np.min(np.log(self.master()))
 			span = np.max(np.log(self.master())) - zero
 			normalized = (np.log(x) -  zero)/span
-			return cm.YlGn(normalized)
+			return plt.matplotlib.cm.YlGn(normalized)
 
 		# create a plot
 		scale = 1.5
 		plt.figure(figsize = (np.minimum(self.xpixels*scale,10),np.minimum(self.ypixels*scale, 10)))
-		gs = gridspec.GridSpec(self.xpixels,self.ypixels, wspace=0, hspace=0)
+		gs = plt.matplotlib.gridspec.GridSpec(self.xpixels,self.ypixels, wspace=0, hspace=0)
 
 		# loop over pixels (in x and y directions)
 		for i in range(self.ypixels):

@@ -2,7 +2,7 @@
 
 # some basics
 import numpy as np, matplotlib.pyplot as plt
-import os, copy, subprocess
+import os, copy, subprocess, glob
 
 # some scipy tools for interpolation and image filtering
 import scipy.ndimage, scipy.signal, scipy.interpolate
@@ -14,4 +14,4 @@ import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
 import astroquery.vizier
 
 # general tools from my library
-import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical
+import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.display, zachopy.star

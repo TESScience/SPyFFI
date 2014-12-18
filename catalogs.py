@@ -38,7 +38,7 @@ class Catalog(object):
 
 class TestPattern(Catalog):
 	'''a test pattern catalog, creating a grid of stars to fill an image'''
-	def __init__(self, size=3000.0, spacing=150.0, magnitudes=[7,12], ra=0.0, dec=0.0):
+	def __init__(self, size=3000.0, spacing=150.0, magnitudes=[7,16], ra=0.0, dec=0.0):
 		'''create a size x size square (in arcsecs) test pattern of stars,
 		with spacing (in arcsecs) between each element and
 		magnitudes spanning the range of magnitudes'''

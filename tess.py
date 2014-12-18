@@ -285,7 +285,10 @@ class Image:
 		self.starimage[xindex[ok], yindex[ok]] += binned[ok]
 
 	def addStars(self, remake=False, jitter=False):
-		print "Adding stars."
+		try:
+			assert(self.terse)
+		except:
+			print "Adding stars."
 
 		if jitter:
 			remake=True
@@ -357,8 +360,10 @@ class Image:
 
 	def addCosmicsAl(self, split=False, gradient=False, write=False):
 
-
-		print "Adding cosmic rays."
+		try:
+			assert(self.terse)
+		except:
+			print "Adding cosmic rays."
 		rate = 5 # cts cm^-2 s^-1
 		self.note = 'cosmics_{0:.1f}persecond_{1}seconds_{2:06.0f}'.format(rate,self.camera.cadence, self.camera.counter).replace('.', 'p')
 		cosmicsfilename = self.directory + self.note + '.fits'
@@ -382,7 +387,10 @@ class Image:
 		return image
 
 	def addCosmics(self, split=False):
-		print "Adding cosmic rays."
+		try:
+			assert(self.terse)
+		except:
+			print "Adding cosmic rays."
 
 
 		rate = 5 # cts cm^-2 s^-1
@@ -433,7 +441,10 @@ class Image:
 		self.header['ICOSMICS'] = ('True', 'cosmic rays injected')
 
 	def bleedSaturated(self, plot=False):
-		print "Bleeding saturated pixels."
+		try:
+			assert(self.terse)
+		except:
+			print "Bleeding saturated pixels."
 		untouched = self.image + 0.0
 		original = np.sum(self.image)
 		# set the saturation limit based on the number of individual reads included
@@ -478,7 +489,10 @@ class Image:
 									self.image[x,leftedge] += leftoverflux/2.0
 							except:
 								print "    this star seems to saturate the entire detector!"
-			print "      on pass #{0} through saturation filter,  \n        the max saturation fraction is {1} \n        and the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original)
+			try:
+				assert(self.terse)
+			except:
+				print "      on pass #{0} through saturation filter,  \n        the max saturation fraction is {1} \n        and the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original)
 			# KLUDGE!
 			stilloversaturated = (self.image > saturation_limit).any() and count < 10
 		self.note = 'saturation_{0}K'.format(self.camera.saturation).replace('.', 'p')
@@ -493,7 +507,10 @@ class Image:
 		# set up filenames for saving background, if need be
 		self.note = 'backgrounds'
 		backgroundsfilename = self.directory + self.note + '.fits'
-		print "Adding backgrounds."
+		try:
+			assert(self.terse)
+		except:
+			print "Adding backgrounds."
 
 		# if the background image already exists, just load it
 		try:
@@ -528,8 +545,11 @@ class Image:
 		self.image += self.backgroundimage
 
 	def addPhotonNoise(self):
-		print "Adding photon noise."
-		print "    sqrt(photons from stars and various backgrounds)"
+		try:
+			assert(self.terse)
+		except:
+			print "Adding photon noise."
+			print "    sqrt(photons from stars and various backgrounds)"
 		noise_variance = self.image
 		ok = noise_variance > 0
 
@@ -546,8 +566,11 @@ class Image:
 		self.header['IPHOTNOI'] = ('True', 'photon noise')
 
 	def addReadNoise(self):
-		print "Adding read noise."
-		print "    = quadrature sum of [{0} seconds]/[{1} seconds] = {2} reads with {3} e- each.".format(self.camera.cadence,self.camera.singleread, self.camera.cadence/self.camera.singleread, self.camera.read_noise)
+		try:
+			assert(self.terse)
+		except:
+			print "Adding read noise."
+			print "    = quadrature sum of [{0} seconds]/[{1} seconds] = {2} reads with {3} e- each.".format(self.camera.cadence,self.camera.singleread, self.camera.cadence/self.camera.singleread, self.camera.read_noise)
 		noise_variance = self.camera.cadence/self.camera.singleread*self.camera.read_noise**2
 		self.image += np.sqrt(noise_variance)*np.random.randn(self.xsize, self.ysize)
 		self.note = 'readnoise'
@@ -564,14 +587,20 @@ class Image:
 		return mask
 
 	def addGaps(self):
-		print "Removing the pixels in the CCD gaps."
+		try:
+			assert(self.terse)
+		except:
+			print "Removing the pixels in the CCD gaps."
 		self.image[self.xgapstart:self.xgapend,:] = 0
 		self.image[:, self.ygapstart:self.ygapend] = 0
 
 
 	def addSmear(self):
-		print "Adding readout smear."
-		print "    assuming {0} second readout times on {1} second exposures.".format(self.camera.readouttime,self.camera.singleread)
+		try:
+			assert(self.terse)
+		except:
+			print "Adding readout smear."
+			print "    assuming {0} second readout times on {1} second exposures.".format(self.camera.readouttime,self.camera.singleread)
 		height = 2048
 		untouched = self.image + 0.0
 		chunk = self.image[:,:2048]
@@ -605,12 +634,10 @@ class Image:
 		except:
 			self.camera.counter = 0'''
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False):
 		self.plot = plot
+		self.terse = terse
 
-		print "-------_-------_-------_-------_-------_-------_-------_-------"
-		print "CREATING IMAGE #{0:06d}".format(self.camera.counter)
-		print "----_----_----_----_----_----_----_----_----_----_----_----_---"
 
 		# create a blank image
 		self.image = self.zeros()
@@ -657,6 +684,13 @@ class Image:
 		# write the image
 		if write:
 			self.writeFinal(split=split)
+
+		if terse:
+			print "[tess] created image #{counter:07d} of {pos_string} with {cadence:.0f}s cadence".format(counter=self.camera.counter, pos_string=self.camera.pos_string(), cadence=self.camera.cadence)
+		else:
+			print "-------_-------_-------_-------_-------_-------_-------_-------"
+			print "CREATING IMAGE #{0:07d}".format(self.camera.counter)
+			print "----_----_----_----_----_----_----_----_----_----_----_----_---"
 
 		self.advanceCounter()
 
