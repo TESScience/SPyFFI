@@ -1,9 +1,9 @@
 /* cosmical[full]|[small].c
- * 
+ *
  * Alan M. Levine
  * July 14, 2014
  * Heritage: cr_img3.c
- *  
+ *
  *  on August 21, 2014, Zach Berta-Thompson modified to allow wrapping with Python
  *   (also, renamed to prevent confusion an honor its developer)
  */
@@ -15,8 +15,8 @@
 //#define NY 32
 ///////////////////////////////////////////////////////////////
 
- 
-/* cosmic ray interaction in a CCD simulation code 
+
+/* cosmic ray interaction in a CCD simulation code
  *
  * assume track is straight and infinitely thin, and that the average energy
  * deposition is that of a minimum-ionizing particle, about 80 e's/micron.
@@ -25,7 +25,7 @@
  *
  * (x - x0)/a = (y - y0)/b = (z - Z0)/c
  *
- * where x0, y0, z0, a, b, and c are given having been obtained from a 
+ * where x0, y0, z0, a, b, and c are given having been obtained from a
  * routine that calls a random number generator.
  *
  * The CCD is NX by NY pixels with each pixel dx x dy x dz in size.
@@ -56,7 +56,7 @@ int npix[3];   // Set to NX, NY, 1 in initialization
  * exp_time_high_row = exposure time in imaging region + max in frame store
  *                     (more or less twice the imaging time)
  *
- * The frame store region has pixels that are the same in size as those in the 
+ * The frame store region has pixels that are the same in size as those in the
  * primary image pixels.
  */
 
@@ -92,7 +92,7 @@ double gasdev()
 }
 
 /******************************************************************************/
-/* Find intersection point of a line and plane in the case there is one such 
+/* Find intersection point of a line and plane in the case there is one such
  * point exactly - the number of such points
  * may be, in general, 0, 1, or infinity.
  * This routine only does planes normal to a coordinate axis
@@ -127,7 +127,7 @@ void line_plane(double v0[3], double a[3], int iplax, double plval,
 	pt[iax] = v0[iax] + ((a[iax]/a[iplax])*(plval - v0[iplax]));
     }
   }
-  
+
 }
 
 /******************************************************************************/
@@ -208,7 +208,7 @@ double path_len(double pts[2][3])
 }
 
 /******************************************************************************/
-// Find intersection points of ray with CCD surfaces. 
+// Find intersection points of ray with CCD surfaces.
 // Use these to do a range in jx or jy (whichever is smaller).
 // Find intersection points of the ray with the outer surfaces of the row
 // or column of pixels.
@@ -245,7 +245,7 @@ void do_cosmic_ray(double v0[3], double a[3], double *image, long NX, long NY)
   if (iyb >= NY) iyb = NY - 1;
   // fprintf(stdout,"  %f %f %d %d\n",xr[0],xr[1],ixa,ixb);
   // fprintf(stdout,"  %f %f %d %d\n",yr[0],yr[1],iya,iyb);
-  
+
   // Do each column in the range of intersection
   for(i=ixa;i<=ixb;++i) {
     corn[0][0] = origin[0] + (i*dx[0]);
@@ -384,7 +384,7 @@ double * cosmical(double exptm1, double exptm2, long ncr, long NX, long NY)
   double* image = malloc(NX*NY*sizeof(double));
   int i, j, icr;
   unsigned long seed;
-  
+
   rfac = exptm2/exptm1;
   exptm = 0.5*(exptm1 + exptm2);
 
@@ -463,7 +463,7 @@ int main(int argc, char *argv[])
   double *test = cosmical(exptm1,exptm2,ncr,NX,NY);
   //for(int i=0;i<NX*NX;i++)
   //	printf("*(test + %d) = %f ", i, *(test + i));
-  
+
 
 }
 

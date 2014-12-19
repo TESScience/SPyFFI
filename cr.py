@@ -206,7 +206,7 @@ class strategy(object):
 		'''Display the image from which this light curve came, and indicate which pixel.'''
 
 		# make sure the light curve was actually derived from an image cube
-		assert(self.toy == False)
+		assert(self.timeseries.toy == False)
 
 		# pull out the median image for plotting
 		image = self.timeseries.cube.median()

@@ -11,7 +11,7 @@ def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, stamp=100, jitter=False, 
 	#C.point(ra, dec)
 	I = tess.Image(C)
 	for i in range(n):
-		I.expose(write=True, split=False, jitter=jitter, remake = remake &(i == 0) )
+		I.expose(write=True, split=False, jitter=jitter, remake = remake &(i == 0), smear=False, terse=True)
 	return C, I
 
 

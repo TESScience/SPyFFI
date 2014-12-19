@@ -4,7 +4,7 @@ import settings
 from imports import *
 from PSF import PSF
 from Camera import Camera
-from cosmical._cosmical import cosmical
+from cosmical_realistic._cosmical import cosmical
 
 # setup basic output options for this Python session
 np.set_printoptions(threshold = 1e6, linewidth = 300)
@@ -358,13 +358,13 @@ class Image:
 		pass
 		# looks like I should use http://vizier.cfa.harvard.edu/viz-bin/Cat?VII/155 for a source catalog?
 
-	def addCosmicsAl(self, split=False, gradient=False, write=False):
+	def addCosmicsAl(self, split=False, gradient=False, write=False, version='fancy'):
 
 		try:
 			assert(self.terse)
 		except:
 			print "Adding cosmic rays."
-		rate = 5 # cts cm^-2 s^-1
+		rate = 5.0 # cts cm^-2 s^-1
 		self.note = 'cosmics_{0:.1f}persecond_{1}seconds_{2:06.0f}'.format(rate,self.camera.cadence, self.camera.counter).replace('.', 'p')
 		cosmicsfilename = self.directory + self.note + '.fits'
 
@@ -375,9 +375,16 @@ class Image:
 		else:
 			smallexptime = self.camera.cadence*1.5
 			bigexptime = smallexptime
-		nexpected = (self.camera.physicalpixelsize*self.camera.npix)**2*(0.5*smallexptime + 0.5*bigexptime)*rate
-		ndrawn = np.random.poisson(nexpected)
-		image = np.transpose(cosmical(smallexptime, bigexptime, ndrawn, self.camera.npix, self.camera.npix))
+
+		if version == 'original':
+			# you'll also need to change the import statement up at the start
+			nexpected = (self.camera.physicalpixelsize*self.camera.npix)**2*(0.5*smallexptime + 0.5*bigexptime)*rate
+			ndrawn = np.random.poisson(nexpected)
+			image = np.transpose(cosmical(smallexptime, bigexptime, ndrawn, self.camera.npix, self.camera.npix))
+		elif version == 'fancy':
+			diffusion = 0
+			image = np.transpose(cosmical(rate, smallexptime, bigexptime, self.camera.npix, self.camera.npix, diffusion))
+
 
 		if write:
 			self.writeToFITS(image, cosmicsfilename, split=split)
