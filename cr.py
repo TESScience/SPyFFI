@@ -10,17 +10,17 @@ mpl.rcParams['font.size'] = 8#'small'
 #mpl.rcParams['mathtext.sf'] = 'sans'
 #mpl.rcParams['mathtext.default'] = 'sf'
 from imports import *
-
+import zachopy.transit
 plt.ion()
 #plt.rc('text', usetex=False)
 #plt.rc('font', family='serif')
 
-workingDirectory = '/Users/zkbt/Cosmos/Data/TESS/CR/'
+
 
 
 class timeseries():
 	'''Object to store a light curve, both unbinned and binned.'''
-	def __init__(self, cube=None, pixel=(0,0), nexposures=1324, nsubexposures=900, amplitude=2.0):
+	def __init__(self, cube=None, pixel=(0,0), nexposures=1324, nsubexposures=900, amplitude=2.0, snr=1000.0, subexposurecadence=2.0):
 		'''Initialize timeseries object, either as a toy model or from a pixel drawn from a simulated image cube.
 
 		(for toy model):
@@ -35,11 +35,13 @@ class timeseries():
 		# either make a toy light curve based on input parameters
 		if cube is None:
 		 	self.nexposures = nexposures
-			self.exposurenoise = 1.0
+			self.exposurenoise = 1.0/snr
 			self.subexposurenoise = self.exposurenoise*np.sqrt(self.nsubexposures)
 			self.cosmicsamplitude = amplitude*self.exposurenoise
 			self.cosmicsperexposure = 0.5
 			self.cosmicspersubexposure = self.cosmicsperexposure/self.nsubexposures
+			self.subexposurecadence=subexposurecadence
+			self.exposurecadence = self.nsubexposures*self.subexposurecadence
 			self.createSimple()
 		else:
 			self.createFromCube(cube, pixel)
@@ -71,13 +73,31 @@ class timeseries():
 		self.pixel = pixel
 
 
-	def createSimple(self):
+	def createSimple(self, cosmics=True, noise=True):
 		'''Populate this timeseries with a simple toy model.'''
-		self.flux = np.zeros(self.shape)
-		self.addNoise()
-		self.addCosmics()
+		self.flux = np.ones(self.shape)
+		if noise:
+			self.addNoise()
+		if cosmics:
+			self.addCosmics()
 		self.x = np.arange(0, self.nexposures, 1.0/self.nsubexposures).reshape(self.shape)
 		self.toy = True
+
+	def createTransit(self, cosmics=False):
+		period = np.random.uniform()
+		self.createSimple(noise=False, cosmics=False)
+		p = zachopy.transit.Planet(period=period, t0=period/2.0)
+		s = zachopy.transit.Star()
+		i = zachopy.transit.Instrument()
+
+		self.tm = zachopy.transit.TM(planet=p, star=s, instrument=i)
+		self.tlc = zachopy.transit.TLC(self.x*self.exposurecadence/60.0/60.0/24.0, self.flux, self.subexposurenoise*np.ones_like(self.flux))
+		self.tlc.linkModel(self.tm)
+		self.flux = self.tm.model()
+		self.addNoise()
+		if cosmics:
+			self.addCosmics()
+
 
 	def addNoise(self):
 		'''For toy model, include Gaussian noise.'''
@@ -90,8 +110,13 @@ class timeseries():
 
 	def plot(self):
 		'''Simple plot of this timeseries.'''
+		plt.figure('unbinned')
 		plt.cla()
-		plt.plot(self.flux.flatten())
+		try:
+			x = self.x % self.tm.planet.period.value*60*60*24.0
+		except:
+			x = self.x
+		plt.plot(x.flatten(), self.flux.flatten(), linewidth=0, marker='.', alpha=0.3)
 		plt.draw()
 
 	def __str__(self):
@@ -114,8 +139,21 @@ class strategy(object):
 
 	def directory(self):
 		'''Define directory in which to store plots and files related to this strategy.'''
-		dir = workingDirectory + self.name.replace(' ', '') + '/'
+		try:
+			self.workingDirectory = self.timeseries.cube.directory
+		except:
+			self.workingDirectory = '/Users/zkbt/Cosmos/Data/TESS/CR/'
+
+
+		dir = self.workingDirectory + self.name.replace(' ', '') + '/'
 		zachopy.utils.mkdir(dir)
+
+		try:
+			dir = dir + '{0:.0f}_{1:.0f}/'.format(self.timeseries.pixel[0], self.timeseries.pixel[1])
+			zachopy.utils.mkdir(dir)
+			print dir
+		except:
+			pass
 		return dir
 
 	def fileprefix(self):
@@ -211,12 +249,12 @@ class strategy(object):
 		# pull out the median image for plotting
 		image = self.timeseries.cube.median()
 
-		ax.imshow(np.log(image), interpolation='nearest', cmap='gray_r')
+		ax.imshow(np.log(np.transpose(image)), interpolation='nearest', cmap='gray_r')
 		ax.plot(self.timeseries.pixel[0], self.timeseries.pixel[1],marker='o',markerfacecolor='None',markersize=10, alpha=0.5, markeredgecolor='gray')
 		ax.text(self.timeseries.pixel[0], self.timeseries.pixel[1], '     {0}'.format(self.timeseries.pixel), horizontalalignment='left', verticalalignment='center', color='gray', alpha=0.5, weight='bold', size=4)
 
 
-	def test(self, remake=False):
+	def test(self, t, remake=False):
 		'''Test strategy over a range of input cosmic ray amplitudes (using toy model light curves).'''
 
 		print "testing {0}".format(self.name)
@@ -236,10 +274,10 @@ class strategy(object):
 
 
 				# create a new timeseries
-				self.timeseries = timeseries(nexposures=self.timeseries.nexposures, nsubexposures=self.timeseries.nsubexposures, amplitude=self.amplitudes[i])
+				self.timeseries = timeseries(nexposures=t.nexposures, nsubexposures=t.nsubexposures, amplitude=self.amplitudes[i])
 
 				# bin it, using the strategy
-				self.calculate()
+				self.calculate(t)
 
 				# create a demo plot of this light curve
 				self.plot()
@@ -248,7 +286,7 @@ class strategy(object):
 				print self.prefix + "{0}".format(self.timeseries)
 
 				# store the achieve noise
-				self.noise[i] = self.achieved/self.exposurenoise
+				self.noise[i] = self.achieved/self.timeseries.exposurenoise
 
 			# save this calculation, so we can use again if need be
 			np.save(self.strategyprefix() + '.npy', (self.amplitudes, self.noise))
@@ -523,6 +561,8 @@ class outlierwithdecay(strategy):
 
 				# determine which points are not outliers, by being less than [threshold] sigma over the mean
 				notoutlier = flux < (best_mean + self.threshold*best_std)
+				if np.sum(notoutlier) == 0:
+					notoulier = np.ones_like(flux)
 				# determine the mean and standard deviation of the good points in this chunk
 				this_mean = np.mean(flux[notoutlier])
 				this_std = np.sqrt(np.sum((flux[notoutlier] - this_mean)**2)/(n - 1.0))
@@ -580,6 +620,16 @@ class hybrid(strategy):
 		return np.mean((mean*(nisntmax + nismax*maxisbad) + nismax*(maxisbad == False)*max)/self.n, 1)
 
 
+def transit(s):
+	plt.figure('transit')
+	plt.cla()
+	t = s.unbinned['x']/24.0/60.0/60.0*s.timeseries.exposurecadence
+	flux = s.unbinned['flux']
+	plt.plot(t % s.timeseries.tm.planet.period.value, flux, linewidth=0, marker='o', color='gray', alpha=0.2, markersize=1, )
+
+	t = s.binned['x']/24.0/60.0/60.0*s.timeseries.exposurecadence
+	flux = s.binned['flux']
+	plt.plot(t % s.timeseries.tm.planet.period.value, flux, linewidth=0, marker='o', color='red', alpha=0.2, markersize=5, )
 
 
 def compare(nexposures=1000, t=None):
@@ -653,4 +703,4 @@ def compare(nexposures=1000, t=None):
 			count +=1
 		plt.tight_layout()
 		plt.draw()
-		plt.savefig(workingDirectory + 'cosmicrayrejectioncomparisons_{0}.pdf'.format(labels[i]))
+		plt.savefig(self.workingDirectory + 'cosmicrayrejectioncomparisons_{0}.pdf'.format(labels[i]))

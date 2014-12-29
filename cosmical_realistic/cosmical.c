@@ -69,7 +69,7 @@ double difker[3][3] = { 0.0034, 0.0516, 0.0034,
                         0.0516, 0.7798, 0.0516,
                         0.0034, 0.0516, 0.0034 };
 int npix[3];   // Set to NX, NY, 1 in initialization
-int ncr, idodif;
+int ncr;
 double ncrmn, rfac;
 double *image, *imaged, *temp;
 
@@ -615,7 +615,7 @@ void print_cr(FILE *fp, double v0[3], double a[3])
 /******************************************************************************/
 // Tasks that we don't want to do unnecessarily when doing multiple images
 
-void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY)
+void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY, int idodif)
 {
   double exptm, tot;
   int ip, jp;
@@ -703,9 +703,9 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY)
 // ZKBT says: cosmic generation moved from main() to a separate function,
 //    which can be called directly from Python and returns a 1D image array
 
-double * cosmical(double crfl, double exptm1, double exptm2, long NX, long NY, long idodif)
+double * cosmical(double crfl, double exptm1, double exptm2, long NX, long NY, int idodif)
 {
-  cosmical_setup(crfl, exptm1, exptm1, NX, NY);
+  cosmical_setup(crfl, exptm1, exptm1, NX, NY, idodif);
 
   double v0[3], a[3], th, ph, exptm, rfac;
   int i, j, icr;
@@ -743,7 +743,7 @@ int main(int argc, char *argv[])
 {
   char fileout[64];
   double exptm1, exptm2, crfl;
-  int i, iimg, nimg;
+  int i, iimg, nimg, idodif;
   long NX, NY;
   FILE *fp;
   clock_t t;
@@ -761,7 +761,7 @@ int main(int argc, char *argv[])
   nimg = atoi(argv[4]);
   idodif = atoi(argv[5]);  // = 0 or 1 => no or yes, to diffusion modelling
 
-  cosmical_setup(crfl,exptm1,exptm2,NX,NY);
+  cosmical_setup(crfl,exptm1,exptm2,NX,NY, idodif);
 
   // loop here to end to do multiple images (nimg) with one setup
   for(iimg=0;iimg<nimg;++iimg) {

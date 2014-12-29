@@ -4,7 +4,8 @@ import settings
 from imports import *
 from PSF import PSF
 from Camera import Camera
-from cosmical_realistic._cosmical import cosmical
+import cosmical_original._cosmical
+import cosmical_realistic._cosmical
 
 # setup basic output options for this Python session
 np.set_printoptions(threshold = 1e6, linewidth = 300)
@@ -358,7 +359,8 @@ class Image:
 		pass
 		# looks like I should use http://vizier.cfa.harvard.edu/viz-bin/Cat?VII/155 for a source catalog?
 
-	def addCosmicsAl(self, split=False, gradient=False, write=False, version='fancy'):
+
+	def addCosmicsAl(self, split=False, gradient=False, write=False, version='fancy', diffusion=False):
 
 		try:
 			assert(self.terse)
@@ -380,10 +382,10 @@ class Image:
 			# you'll also need to change the import statement up at the start
 			nexpected = (self.camera.physicalpixelsize*self.camera.npix)**2*(0.5*smallexptime + 0.5*bigexptime)*rate
 			ndrawn = np.random.poisson(nexpected)
-			image = np.transpose(cosmical(smallexptime, bigexptime, ndrawn, self.camera.npix, self.camera.npix))
+			image = np.transpose(cosmical_original._cosmical.cosmical(smallexptime, bigexptime, ndrawn, self.camera.npix, self.camera.npix))
 		elif version == 'fancy':
-			diffusion = 0
-			image = np.transpose(cosmical(rate, smallexptime, bigexptime, self.camera.npix, self.camera.npix, diffusion))
+			intdiffusion=np.int(diffusion)
+			image = np.transpose(cosmical_realistic._cosmical.cosmical(rate, smallexptime, bigexptime, self.camera.npix, self.camera.npix, intdiffusion))
 
 
 		if write:
@@ -641,10 +643,9 @@ class Image:
 		except:
 			self.camera.counter = 0'''
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False):
 		self.plot = plot
 		self.terse = terse
-
 
 		# create a blank image
 		self.image = self.zeros()
@@ -670,7 +671,7 @@ class Image:
 		self.addPhotonNoise()
 
 		# add cosmic rays to the image (after noise, because the *sub-Poisson* noise is already modeled with the Fano factor)
-		cosmics = self.addCosmicsAl(split=split, write=write)
+		cosmics = self.addCosmicsAl(split=split, write=write, version=cosmics, diffusion=diffusion)
 
 		# add smear from the finite frame transfer time
 		if smear:

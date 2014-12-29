@@ -3,15 +3,16 @@ import tess
 from imports import *
 
 
+def foral(diffusion=False, testpattern=False):
+	sub(n=90000, stamp=100, cadence=2, jitter=False, testpattern=testpattern, remake=True, diffusion=diffusion)
 
-
-def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, stamp=100, jitter=False, testpattern=True, remake=True):
+def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, stamp=100, jitter=False, testpattern=True, remake=True, diffusion=False):
 	C = tess.Camera(stamp=stamp,testpattern=testpattern)
 	C.setCadence(cadence)
 	#C.point(ra, dec)
 	I = tess.Image(C)
 	for i in range(n):
-		I.expose(write=True, split=False, jitter=jitter, remake = remake &(i == 0), smear=False, terse=True)
+		I.expose(write=True, split=False, jitter=jitter, remake = remake &(i == 0), smear=False, terse=True, diffusion=diffusion)
 	return C, I
 
 
@@ -21,7 +22,7 @@ def create(ra=270, dec=66.56070833333332, cadence=2, n=900):
 	C.point(ra, dec)
 	I = tess.Image(C)
 	for i in range(n):
-		I.expose(write=True)
+		I.expose(write=True, split=True, cosmics='original')
 
 def subtractPairs(ra=82, dec=1,cadence=2):
 	C = tess.Camera()

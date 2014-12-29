@@ -118,7 +118,7 @@ class Cube(object):
 	def simulate(self):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
 		for i in range(self.n):
-			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True)
+			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='original')
 
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''

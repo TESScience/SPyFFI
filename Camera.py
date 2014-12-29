@@ -48,8 +48,8 @@ class Camera:
     if self.testpattern:
         self.catalog = catalogs.TestPattern(size=self.npix*self.pixelscale)
     else:
-        self.catalog = catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=self.fov/np.sqrt(2)*1.01)
-    self.point(self.ra, self.dec)
+        self.catalog = catalogs.UCAC4(ra=ra, dec=dec, radius=self.fov/np.sqrt(2)*1.01)
+    self.point(ra, dec)
 
   def populateHeader(self):
     self.header = astropy.io.fits.Header()
