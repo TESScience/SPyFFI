@@ -6,7 +6,14 @@ class PSF:
 
     # initialize the PSF class
     def __init__(self, camera=None):
-        print "Initializing the TESS point spread function painter."
+
+        # decide whether or not this PSF is chatty
+        Talker.__init__(self, mute=False, pithy=False)
+
+        self.speak("Initializing the TESS point spread function painter.")
+
+        # link this PSF to a Camera (hopefully one with a Cartographer)
+        self.setCamera(camera)
 
         # details related to the orginal PSF files from Deb, by way of Peter.
         self.initial_binning = 4                            # how much to bin the original (very high resolution, from Deb) PSFs before integrating over the pixels

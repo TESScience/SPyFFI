@@ -1,124 +1,158 @@
 from imports import *
 import settings, catalogs
 from PSF import PSF
+from Cartographer import Cartographer
+from CCD import CCD
 
 # define a camera class
-class Camera:
-  def __init__(self, stamp=None, cadence=1800, ra=270,dec=66.56070833333332,testpattern=False):
-    print "Initializing a new TESS camera object."
+class Camera(Talker):
+    '''Keep track of one camera's entire field of view.'''
+    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None):
+        '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
 
-    self.testpattern = testpattern
-    if self.testpattern:
-        self.ra = 0.0
-        self.dec = 0.0
+        # decide whether or not this Camera is chatty
+        Talker.__init__(self, mute=False, pithy=False)
 
-    self.pixelscale = 24.0/4096*60*60							# arcsec!!
-    self.offset_from_ecliptic = 6.0									# degrees
-    self.number_of_segments = 13
-    self.entrance_pupil_diameter = 10.5								# cm
-    self.effective_area = 67.5										# cm^2
-    self.physicalpixelsize = 15.0/1e4								# cm
-    self.physicalpixeldepth = 100.0/1e4								# cm
-    self.read_noise = 10.0											# electrons per read
-    self.saturation = 150000.0										# electrons per read
-    self.shortcadence = 2.0*60.0									# seconds
-    self.longcadence = cadence										# seconds
-    self.cadence = self.longcadence
-    self.singleread = 2.0											# seconds
-    self.readouttime = 0.005										# seconds
+        # [self.speak will only report for this object if mute and pithy are turned off]
+        self.speak("Turning on a new TESS camera object.")
 
-    if stamp is None:
-      self.physicalgap = 0.2											# cm
-      self.gapinpixels = np.round(self.physicalgap/self.physicalpixelsize).astype(np.int)		# pixels
-      self.npix = 4096 + self.gapinpixels
-    else:
-      self.physicalgap = 0.0
-      self.gapinpixels = 0
-      self.npix = stamp
+        # assign the cadence for this camera
+        self.singleread = 2.0											# seconds
+        self.readouttime = 0.005										# seconds
+        self.setCadence(cadence)                                        # seconds
 
-    self.fov = self.npix*self.pixelscale/60.0/60.0					# degrees
-    self.nudge = {'x':0.0, 'y':0.0, 'z':0.0}						# nudge relative to nominal spacecraft pointing (arcsec)
-    self.counter = 0
-    self.pixel_solid_area = (self.pixelscale)**2 		# arcsec^2
-    self.psf = PSF(camera=self)
-    self.setCadence(self.longcadence)
-    self.psf.setCamera(self)
-    self.stamp = stamp
+        # define scales for the Camera
+        self.pixelscale = 21.1#24.0/4096*60*60							# arcsec!! (from Peter's paper)
+        self.entrance_pupil_diameter = 10.5								# cm (from Peter's paper)
+        self.effective_area = 69.1										# cm^2 (from Peter's paper)
+        self.physicalpixelsize = 15.0/1e4								# cm
+        self.physicalpixeldepth = 100.0/1e4								# cm
+        self.read_noise = 10.0											# electrons per read
+        self.saturation = 150000.0										# electrons per read
 
-    if self.testpattern:
-        self.catalog = catalogs.TestPattern(size=self.npix*self.pixelscale)
-    else:
-        self.catalog = catalogs.UCAC4(ra=ra, dec=dec, radius=self.fov/np.sqrt(2)*1.01)
-    self.point(ra, dec)
+        # define the gaps between the CCDs (numbers still in flux, as of late 2014)
+        self.physicalgap = 0.2											# cm
+        self.gapinpixels = self.physicalgap/self.physicalpixelsize  	# pixels (not necessarily integer)
 
-  def populateHeader(self):
-    self.header = astropy.io.fits.Header()
-    self.header['CAMERA'] = ''
-    self.header['CAMNOTE'] = ('', 'properties of the Camera')
-    self.header['FOV'] = (self.fov, '[deg] field of view')
-    self.header['SCALE'] = (self.pixelscale, '["/pix] pixel scale')
-    self.header['DIAMETER'] = (self.entrance_pupil_diameter, '[cm] entrace pupil diameter')
-    self.header['EFFAREA'] = (self.effective_area, '[cm^2] effective area (at ref. wavelength)')
-    self.header['PIXSIZE'] = (self.physicalpixelsize, '[cm] physical pixel size')
-    self.header['PIXDEPTH'] = (self.physicalpixeldepth, '[cm] physical pixel depth')
-    self.header['PHYSIGAP'] = (self.physicalgap, '[cm] gap between CCDs')
-    self.header['PIXELGAP'] = (self.gapinpixels, '[pix] gap size in pixels (rough)')
+        # define the field of view of the Camera (one side of the CCD square)
+        self.fov = (4096 + self.gapinpixels)*self.pixelscale/60.0/60.0					# degrees
+        self.pixel_solid_area = (self.pixelscale)**2 		             # arcsec^2
 
-    self.header['WCS'] = ''
-    self.header['WCSNOTE'] = ('', 'World Cooridinate System for this image')
-    if self.stamp is not None:
-      self.header['STAMP'] = (self.stamp, 'THIS IMAGE IS JUST {0}x{1} POSTAGE STAMP!'.format(self.stamp, self.stamp))
+        # turn on the necessary CCDs in this Camera
+        if subarray is None:
+            # if we're not dealing with a subarray, then turn on CCD's 1,2,3,4
+            self.ccdnumbers = np.arange(4) + 1
+        else:
+            # if this is a subarray, then turn on one (imaginary) CCD and call it 0
+            self.ccdnumbers = np.arange(1)
+        self.ccds = [CCD(n,subarray=subarray,camera=self) for n in self.ccdnumbers]
 
-    self.header.extend(self.wcs.to_header())
+        # point the Camera either at real stars (from the sky) or at a test pattern (a grid of stars)
+        self.testpattern = testpattern
+        if self.testpattern:
+            # pretend a test pattern is pointed at (ra, dec) = (0.0, 0.0)
+            self.ra = 0.0
+            self.dec = 0.0
+        else:
+            # if real stars, use the input (ra, dec)
+            self.ra = ra
+            self.dec = dec
+        self.point(self.ra, self.dec)
 
-    self.header['MOTION'] = ''
-    self.header['MOTNOTE'] = ('', 'properties of the image motion applied')
-    self.header['JITTERX'] = (0, '["] jitter-induced nudge')
-    self.header['JITTERY'] = (0, '["] jitter-induced nudge')
+        # assign a cartographer to this Camera and start it out on the first CCD
+        self.cartographer = Cartographer(camera=self, ccd=self.ccds[0])
 
-  def setCadence(self, cadence=1800.0):
-    self.cadence = cadence
-    print "Setting cadence to {0} seconds = {1} reads.".format(self.cadence, self.cadence/self.singleread)
-    self.loadJitterBall()
+        # start the camera out unjittered from its nominal position
+        self.nudge = {'x':0.0, 'y':0.0, 'z':0.0}						# nudge relative to nominal spacecraft pointing (arcsec)
 
-  def point(self, ra=None, dec=None):
-    print "Pointing TESS at the sky."
-    # point TESS, to be used both for initial pointing, and for jitters
-    if ra is not None and dec is not None:
-      self.ra = ra
-      self.dec = dec
+        # keep track of which exposure is being simulated
+        self.counter = 0
 
-    try:
-      self.ra
-      self.dec
-    except:
-      print "Please point your telescope somewhere. No RA or DEC defined."
+        # load the PSF for this Camera
+        self.psf = PSF(camera=self)
 
 
-    # the number of dimensions
-    w = astropy.wcs.WCS(naxis=2)
+    def populateHeader(self):
+        '''Populate the header structure with information about the Camera, and its WCS.'''
 
-    # the pixel coordinates of the reference position (taken to be center of field)
-    w.wcs.crpix = [self.npix/2.0,self.npix/2.0]
+        # create an empty header
+        self.header = astropy.io.fits.Header()
 
-    # the pixel scale, in degrees, taken to be FOV/number of pixels
-    w.wcs.cdelt = [-self.fov/self.npix,self.fov/self.npix]
+        # fill it with some Camera details
+        self.header['CAMERA'] = ''
+        self.header['CAMNOTE'] = ('', 'properties of the Camera')
+        self.header['FOV'] = (self.fov, '[deg] field of view')
+        self.header['SCALE'] = (self.pixelscale, '["/pix] pixel scale')
+        self.header['DIAMETER'] = (self.entrance_pupil_diameter, '[cm] entrace pupil diameter')
+        self.header['EFFAREA'] = (self.effective_area, '[cm^2] effective area (at ref. wavelength)')
+        self.header['PIXSIZE'] = (self.physicalpixelsize, '[cm] physical pixel size')
+        self.header['PIXDEPTH'] = (self.physicalpixeldepth, '[cm] physical pixel depth')
+        self.header['PHYSIGAP'] = (self.physicalgap, '[cm] gap between CCDs')
+        self.header['PIXELGAP'] = (self.gapinpixels, '[pix] gap size in pixels (rough)')
+        if self.subarray is not None:
+            self.header['SUBARRAY'] = (self.subarray, 'THIS IMAGE IS JUST {0}x{1} POSTAGE STAMP!'.format(self.subarray, self.subarray))
 
-    # the celestial coordinates at the reference position (input by user)
-    nudged_ra, nudged_dec = zachopy.spherical.rotate(self.ra, self.dec,  self.nudge['x']/60.0/60.0, self.nudge['y']/60.0/60.0)
-    print "!!!!!!!!!!!!!!!"
-    w.wcs.crval = [nudged_ra, nudged_dec]
+        # fill it with the WCS information
+        self.header['WCS'] = ''
+        self.header['WCSNOTE'] = ('', 'World Cooridinate System for this image')
+        self.header.extend(self.wcs.to_header())
 
-    # the rotation of the field (currently just a pure rotation, no shear)
-    #rot = self.nudge['z']/60.0/60.0*np.pi/180.0
-    #w.wcs.pc = [[np.cos(rot), -np.sin(rot)],[np.sin(rot), np.cos(rot)]]
+        # note the jitter motions that have been applied to this image
+        self.header['MOTION'] = ''
+        self.header['MOTNOTE'] = ('', 'properties of the image motion applied')
+        self.header['JITTERX'] = (0, '["] jitter-induced nudge')
+        self.header['JITTERY'] = (0, '["] jitter-induced nudge')
 
-    # the coordinate system type - what should I use?
-    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    def setCadence(self, cadence=1800.0):
+        '''Set the cadence of this Camera, in seconds.'''
 
-    # set this to be the WCS
-    self.wcs = w
-    self.populateHeader()
+        # set the cadence
+        self.cadence = cadence
+        self.speak("Setting cadence to {0} seconds = {1} reads.".format(self.cadence, self.cadence/self.singleread))
+
+        # update the jitterball to one that has been binned to this cadence
+        self.loadJitterBall()
+
+    def point(self, ra=None, dec=None):
+        '''Point this Camera at the sky, by using the field-specified (ra,dec) and (if active) the jitter nudge for this exposure.'''
+
+
+        # if (ra,dec) given, then point the whole Camera there
+        if ra is not None and dec is not None:
+            self.ra, self.dec = ra, dec
+
+        # make sure an (ra,dec) are defined
+        try:
+            self.ra
+            self.dec
+            self.speak('Pointing the camera at (ra,dec) = {0:.6f},{1:.6f}'.format(self.ra, self.dec))
+        except:
+            self.report("Please point your telescope somewhere. No RA or DEC defined.")
+
+        # create a blank WCS object, for converting between (ra,dec) and (x,y)
+        self.wcs = astropy.wcs.WCS(naxis=2)
+
+        # the focalxy coordinates of the reference position [taken to be center of field, which is (x,y) = (0.0, 0.0) in focalxy coordinates]
+        self.wcs.wcs.crpix = [0.0, 0.0]
+
+        # the pixel scale, in degrees, taken to be FOV/number of pixels
+        w.wcs.cdelt = [-self.fov/self.npix,self.fov/self.npix]
+
+        # the celestial coordinates at the reference position (input by user)
+        nudged_ra, nudged_dec = zachopy.spherical.rotate(self.ra, self.dec,  self.nudge['x']/60.0/60.0, self.nudge['y']/60.0/60.0)
+        print "!!!!!!!!!!!!!!!"
+        w.wcs.crval = [nudged_ra, nudged_dec]
+
+        # the rotation of the field (currently just a pure rotation, no shear)
+        #rot = self.nudge['z']/60.0/60.0*np.pi/180.0
+        #w.wcs.pc = [[np.cos(rot), -np.sin(rot)],[np.sin(rot), np.cos(rot)]]
+
+        # the coordinate system type - what should I use?
+        w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+
+        # set this to be the WCS
+        self.wcs = w
+        self.populateHeader()
 
   def loadJitterBall(self):
     print "Loading jitterball for {0} second cadences.".format(self.cadence)
@@ -306,6 +340,10 @@ class Camera:
     #	fi, self.ax_radec = plt.subplots(1,1)
     #self.ax_radec.scatter(ras, decs, s=size, marker='.', color='black', alpha=0.3)
 
+
+    #focalxy = self.cartographer.focalxy(ras, decs, 'radec')
+    #xcenter, ycenter = self.wcs.crpix
+    #x, y = focalxy.x + xcenter, focalxy.y + ycenter
     x, y = self.wcs.wcs_world2pix(ras, decs, 1)
     starsfilename = settings.prefix + 'plots/' +  "starfield_{ra}_{dec}".format(ra=self.ra, dec=self.dec).replace(' ', '') + '.pdf'
     if not os.path.exists(starsfilename):

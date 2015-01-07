@@ -14,4 +14,7 @@ import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
 import astroquery.vizier
 
 # general tools from my library
-import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.display, zachopy.star
+import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.display, zachopy.star, zachopy.oned
+
+# a parent class that allows text reporting to be muted/unmuted
+from Talker import Talker

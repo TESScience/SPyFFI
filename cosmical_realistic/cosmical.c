@@ -515,6 +515,7 @@ void get_ran_cr(double origin[3], double v0[3], double a[3], double ratefac)
 {
   double cth, sth, ph, x, y, c1, c2, xc;
   int i;
+  //fprintf(stdout," %lf\n",ratefac);
 
   c1 = 2.0/(1.0 + ratefac);
   c2 = 2.0*(1.0 - c1);
@@ -689,12 +690,12 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY,
   */
 
   seed = get_tw_seed();
-  /*fprintf(stderr," using CosmicAl to generate simulated cosmic rays for a %ldx%ld pixel image, assuming:\n",
+  fprintf(stderr," using CosmicAl to generate simulated cosmic rays for a %ldx%ld pixel image, assuming:\n",
 	  NX,NY);
   fprintf(stderr,"     exposure times spanning %f to %f s\n", exptm1, exptm2);
   fprintf(stderr,"     a mean of %f events \n", ncrmn);
   fprintf(stderr,"     Fano factor of %f\n", SQRT_FANO_SI*SQRT_FANO_SI);
-  fprintf(stderr,"     and a seed of %lu \n",seed);*/
+  fprintf(stderr,"     and a seed of %lu \n",seed);
   seedMT(seed);
 }
 
@@ -705,10 +706,11 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY,
 
 double * cosmical(double crfl, double exptm1, double exptm2, long NX, long NY, int idodif)
 {
-  cosmical_setup(crfl, exptm1, exptm1, NX, NY, idodif);
+  cosmical_setup(crfl, exptm1, exptm2, NX, NY, idodif);
 
   double v0[3], a[3], th, ph, exptm, rfac;
   int i, j, icr;
+  rfac = exptm2/exptm1;
 
   for(i=0;i<NX;++i) {
     for(j=0;j<NY;++j) {

@@ -1,4 +1,4 @@
-'''Keep track of what pixels do.'''
+'''Keep track of what pixels can do.'''
 from imports import *
 
 def prnu(x,y,type='boxcar'):

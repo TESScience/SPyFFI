@@ -14,9 +14,27 @@ plt.ion()
 
 
 
-class Image:
-	def __init__(self, camera):
+class CCD:
+	def __init__(self, number=1, camera=None, subarray=None ):
+		'''Turn on a TESS CCD:
+
+			camera 			: the parent TESS camera for this CCD, required for *any* conversion from (RA, Dec) to (x,y)
+			number = 1 		: which CCD in the field is it? (1-4, like mathematical quadrants)'''
+
+		# keep track of where this image is
+		self.number = number
 		self.camera = camera
+
+		if subarray is None:
+			self.npix = 2048
+
+		else:
+			self.npix =
+        self.npix = 4096 + self.gapinpixels
+
+!!!! NEED TO TRANSFER ALL IMAGE GENERATION STUFF FROM CAMERA CLASS INTO HERE
+		(give Camera an expose() method, which would expose on all four CCD's)
+
 		self.xsize = self.camera.npix
 		self.ysize = self.camera.npix
 		self.gapinpixels = camera.gapinpixels
@@ -44,6 +62,11 @@ class Image:
 		self.nstars =0
 		self.populateHeader()
 
+	def getStars(self)
+        if self.camera.testpattern:
+            self.catalog = catalogs.TestPattern(size=self.npix*self.pixelscale)
+        else:
+            self.catalog = catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=self.fov/np.sqrt(2)*1.01)
 
 	def populateHeader(self, ccd=None):
 		try:
@@ -240,7 +263,7 @@ class Image:
 		#ysubpixel = self.camera.psf.ysubgrid + np.long(y)
 
 		xrel, yrel = self.relativeposition(x,y)
-		if verbose and self.starcounter % 10000 == 0:
+		if verbose and self.starcounter % 10 == 0:
 			print "         adding star at ({0}, {1}) with magnitude of {2}".format(x, y, mag)
 			print "            assuming ({0}, {1}) relitve position and temperature of {2}".format(xrel, yrel, temp)
 			print "               ({0}/{1})".format(self.starcounter,self.nstars)
@@ -378,15 +401,23 @@ class Image:
 			smallexptime = self.camera.cadence*1.5
 			bigexptime = smallexptime
 
+
 		if version == 'original':
 			# you'll also need to change the import statement up at the start
 			nexpected = (self.camera.physicalpixelsize*self.camera.npix)**2*(0.5*smallexptime + 0.5*bigexptime)*rate
 			ndrawn = np.random.poisson(nexpected)
 			image = np.transpose(cosmical_original._cosmical.cosmical(smallexptime, bigexptime, ndrawn, self.camera.npix, self.camera.npix))
+			if diffusion:
+				kernal = np.array([	[0.0034, 0.0516, 0.0034],
+									[0.0516, 0.7798, 0.0516],
+									[0.0034, 0.0516, 0.0034]])
+				image = scipy.signal.convolve2d(image, kernal, mode='same')
+				print "convolved with {0}".format(kernal)
 		elif version == 'fancy':
 			intdiffusion=np.int(diffusion)
 			image = np.transpose(cosmical_realistic._cosmical.cosmical(rate, smallexptime, bigexptime, self.camera.npix, self.camera.npix, intdiffusion))
-
+			print '=========================='
+			print smallexptime, bigexptime
 
 		if write:
 			self.writeToFITS(image, cosmicsfilename, split=split)
