@@ -13,4 +13,5 @@ class Talker(object):
         '''If verbose=True, this will print to terminal. Otherwise, it won't.'''
         if self.mute == False:
             self.prefix = '{spacing}[{name}] '.format(name = self.__class__.__name__.lower(), spacing = ' '*level)
-            print self.prefix + string
+            equalspaces = ' '*len(self.prefix)
+            print self.prefix + string.replace('\n', '\n' + equalspaces)

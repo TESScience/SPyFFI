@@ -2,10 +2,8 @@ from imports import *
 import cosmical_original._cosmical
 import cosmical_realistic._cosmical
 
-def cosmicImage(exptime=1800.0, size=2048, gradient=False, version='fancy', diffusion=False):
+def cosmicImage(exptime=1800.0, size=2048, rate=5.0, gradient=False, version='fancy', diffusion=False, buffer=100):
     '''Generate a cosmic ray image, using Al Levine's fast C code.'''
-    # the cosmic ray rate
-    rate = 5.0
 
     # if a gradient is set, allow the exposure times to be different
     if gradient:
@@ -14,6 +12,9 @@ def cosmicImage(exptime=1800.0, size=2048, gradient=False, version='fancy', diff
     else:
       smallexptime = exptime*1.5
       bigexptime = exptime*1.5
+
+    # add margin around image, because Al's code doesn't start cosmic ray images off the screen
+    bufferedsize = size + 2*buffer
 
     # call different codes, depending
     if version == 'original':
@@ -24,7 +25,7 @@ def cosmicImage(exptime=1800.0, size=2048, gradient=False, version='fancy', diff
         ndrawn = np.random.poisson(nexpected)
 
         # call the original cosmic ray code
-        image = np.transpose(cosmical_original._cosmical.cosmical(smallexptime, bigexptime, ndrawn, size, size))
+        image = np.transpose(cosmical_original._cosmical.cosmical(smallexptime, bigexptime, ndrawn, bufferedsize, bufferedsize))
 
         # if we need to diffuse the image, use Al's kernal (from the fancy code)
         if diffusion:
@@ -38,8 +39,11 @@ def cosmicImage(exptime=1800.0, size=2048, gradient=False, version='fancy', diff
         intdiffusion=np.int(diffusion)
 
         # call the fancy cosmic ray code
-        image = np.transpose(cosmical_realistic._cosmical.cosmical(rate, smallexptime, bigexptime, size, size, intdiffusion))
-    print smallexptime, bigexptime
+        image = np.transpose(cosmical_realistic._cosmical.cosmical(rate, smallexptime, bigexptime, bufferedsize, bufferedsize, intdiffusion))
+
+    if buffer > 0:
+        image = image[buffer:-buffer,buffer:-buffer]
+        
     # return the image
     return image
 

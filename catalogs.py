@@ -13,10 +13,11 @@ class Star(object):
 		for k in kwargs.keys():
 			self.__dict__[k] = kwargs[k]
 
-class Catalog(object):
+class Catalog(Talker):
 	'''an object to keep track of lots of stars'''
 	def __init__(self):
-		pass
+		# decide whether or not this Catalog is chatty
+		Talker.__init__(self, mute=False, pithy=False)
 
 	def arrays(self):
 		return self.ra, self.dec, self.tmag, self.temperature
@@ -42,6 +43,7 @@ class TestPattern(Catalog):
 		'''create a size x size square (in arcsecs) test pattern of stars,
 		with spacing (in arcsecs) between each element and
 		magnitudes spanning the range of magnitudes'''
+		Catalog.__init__(self)
 
 		# how many stars do we need?
 		pixels = np.maximum(np.int(size/spacing), 1)
@@ -56,6 +58,7 @@ class TestPattern(Catalog):
 
 class UCAC4(Catalog):
 	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True):
+		Catalog.__init__(self)
 		self.load(ra=ra, dec=dec, radius=radius, write=write)
 
 	def load(self, ra=0.0, dec=90.0, radius=0.2, write=True):
@@ -79,10 +82,10 @@ class UCAC4(Catalog):
 		brightstarsfilename = settings.prefix + 'intermediates/' +  "{catalog}_{ra}_{dec}_{radius}".format(catalog=bcatalog, ra=ra, dec=dec, radius=radius).replace(' ', '') + '.npy'
 		try:
 			t = np.load(starsfilename)
-			print "   loading a catalog of stars from ", starsfilename
+			self.speak("loading a catalog of stars from {0}".format(starsfilename))
 		except:
-			print "   querying {catalog} for ra = {ra}, dec = {dec}, radius = {radius}".format(catalog=catalog, ra=ra, dec=dec, radius=radius)
-			t = v.query_region(astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)), radius='{:f}d'.format(radius))[0]
+			self.speak("querying {catalog} for ra = {ra}, dec = {dec}, radius = {radius}".format(catalog=catalog, ra=ra, dec=dec, radius=radius))
+			t = v.query_region(astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)), radius='{:f}d'.format(radius), verbose=True)[0]
 			np.save(starsfilename, t)
 
 		'''try:
@@ -133,8 +136,7 @@ class UCAC4(Catalog):
 		assert(False)'''
 		#assert(np.sum(np.isfinite(imag)==False) == 0)
 		ok = np.isfinite(imag)
-		print "      found {0} stars with {1} < V < {2}".format(np.sum(ok), np.min(rmag[ok]), np.max(rmag[ok]))
-
+		self.speak("found {0} stars with {1} < V < {2}".format(np.sum(ok), np.min(rmag[ok]), np.max(rmag[ok])))
 		self.ra = ras[ok]
 		self.dec = decs[ok]
 		self.tmag = imag[ok]

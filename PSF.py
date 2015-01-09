@@ -2,7 +2,7 @@ from imports import *
 import pixels, settings
 
 # define everything related to PSFs
-class PSF:
+class PSF(Talker):
 
     # initialize the PSF class
     def __init__(self, camera=None):
