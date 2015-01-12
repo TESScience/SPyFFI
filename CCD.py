@@ -2,7 +2,6 @@
 # import necessary packages
 import settings
 from imports import *
-from PSF import PSF
 import Cosmics
 
 # setup basic output options for this Python session

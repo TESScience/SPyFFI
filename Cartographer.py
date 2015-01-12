@@ -177,8 +177,8 @@ class focalxy(position):
     @property
     def ccdxy(self):
         xcenter, ycenter = self.ccd.center
-        x = self.x - xcenter + self.ccd.xsize/2.0
-        y = self.y - ycenter + self.ccd.ysize/2.0
+        x = self.x - xcenter + (self.ccd.xsize-1)/2.0
+        y = self.y - ycenter + (self.ccd.ysize-1)/2.0
         return ccdxy(x,y,self.cartographer)
 
     @property
@@ -213,6 +213,14 @@ class ccdxy(position):
         position.__init__(self,a,b,cartographer)
         self.aname, self.bname, self.name = 'x','y', 'ccd{0:.0f}'.format(self.ccd.number)
         self.x, self.y = self.a, self.b
+
+    @property
+    def integerpixels(self):
+        return np.round(self.x).astype(np.int), np.round(self.y).astype(np.int)
+
+    @property
+    def fractionalpixels(self):
+        return self.x - np.round(self.x), self.y - np.round(self.y)
 
     # use properties to define conversions (at least focalxy and self)
     @property
