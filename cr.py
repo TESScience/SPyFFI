@@ -10,7 +10,7 @@ mpl.rcParams['font.size'] = 8#'small'
 #mpl.rcParams['mathtext.sf'] = 'sans'
 #mpl.rcParams['mathtext.default'] = 'sf'
 from imports import *
-import zachopy.transit
+import transit
 import scipy.stats
 plt.ion()
 #plt.rc('text', usetex=False)
@@ -110,11 +110,11 @@ class timeseries():
 		# add in a transit
 
 		self.createSimple(noise=False, cosmics=False)
-		p = zachopy.transit.Planet(period=period, t0=period/2.0)
-		s = zachopy.transit.Star()
-		i = zachopy.transit.Instrument()
-		self.tm = zachopy.transit.TM(planet=p, star=s, instrument=i)
-		self.tlc = zachopy.transit.TLC(self.x*self.exposurecadence/60.0/60.0/24.0, self.flux, self.subexposurenoise*np.ones_like(self.flux))
+		p = transit.Planet(period=period, t0=period/2.0)
+		s = transit.Star()
+		i = transit.Instrument()
+		self.tm = transit.TM(planet=p, star=s, instrument=i)
+		self.tlc = transit.TLC(self.x*self.exposurecadence/60.0/60.0/24.0, self.flux, self.subexposurenoise*np.ones_like(self.flux))
 		self.tlc.linkModel(self.tm)
 		self.flux = self.tm.model()
 

@@ -12,7 +12,7 @@ plt.ion()
 quadrants = {1:(1,1), 2:(-1,1), 3:(-1,-1), 4:(1,-1), 0:None}
 
 class CCD(Talker):
-	def __init__(self, number=1, camera=None, subarray=None, label='', display=True):
+	def __init__(self, number=1, camera=None, subarray=None, label='', display=False):
 		'''Turn on a TESS CCD, which can be used to make simulated images.
 
 			camera=None is parent TESS camera for this CCD, required for *any* conversion from (RA, Dec) to (x,y)
@@ -306,8 +306,9 @@ class CCD(Talker):
 		ccdxy = self.camera.cartographer.point(ccdx,ccdy,'ccdxy')
 		focalx, focaly = ccdxy.focalxy.tuple
 
-		unnormed = self.camera.psf.binnedpsf(focalx,focaly,temp)
-		binned = unnormed*self.camera.cadence*self.photons(mag)/np.sum(unnormed)
+		normalized, xindex, yindex = self.camera.psf.pixelizedPSF(ccdxy,temp)
+		binned = normalized*self.camera.cadence*self.photons(mag)
+		#binned = unnormed*self.camera.cadence*self.photons(mag)/np.sum(unnormed)
 
 		'''if plot:
 			try:
@@ -329,14 +330,7 @@ class CCD(Talker):
 			self.ax_prf.figure.savefig(settings.prefix + 'plots/prnu_demo.pdf')
 			plt.draw()'''
 
-
-		xindex =  -self.camera.psf.dx_pixels + np.long(ccdx) - self.xmin
-		yindex =  -self.camera.psf.dy_pixels + np.long(ccdy) - self.ymin
-
 		ok = (xindex >= self.xmin) * (xindex < self.xsize) * (yindex >= self.ymin) * (yindex < self.ysize)
-
-		# NEED TO MAKE SURE THIS IS DOING THE RIGHT THING!?!!???
-		ok = ok[:-1,:-1]
 		self.starimage[yindex[ok], xindex[ok]] += binned[ok]
 
 	def addStars(self, remake=False, jitter=False):

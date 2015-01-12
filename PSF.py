@@ -497,8 +497,10 @@ class PSF(Talker):
             plt.suptitle("Pixelizing the TESS Point Spread Function\n{temperature:.0f}K star, jittered for {jitter:.0f}s, intrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, temperature=temperature, jitter=self.jitteredlibrarytime, intrapixel=self.intrapixel.name))
             plt.draw()
 
+        centralx, centraly = position.ccdxy.integerpixels
+
         # return the pixelized,
-        return recenteredBinnedPSF
+        return recenteredBinnedPSF, centralx + self.dx_pixels, centraly + self.dy_pixels
 
 
     # populate a library of binned PRFS, using the jittered high-resolution library
@@ -559,32 +561,34 @@ class PSF(Talker):
 
 
 
-    def comparePSFs(self, position, temperature=4000, verbose=False, plot=True, justnew=False):
+    def comparePSFs(self, position, temperature=4000, verbose=False, plot=True, justnew=False, center=None):
         '''Compare the PSF pulled out of the library to a newly pixelized one.'''
 
-        librarypsf = self.pixelizedPSF(position, temperature)
-        newpsf = self.newlyPixelizedPSF(position, temperature)
+        newpsf, newx, newy = self.newlyPixelizedPSF(position, temperature)
+        librarypsf, libraryx, libraryy = self.pixelizedPSF(position, temperature)
 
         if plot:
             # set up the plotting figure
             plt.figure('How Good is the PSF Library?', figsize=(7.5,7.5), dpi=100)
             plt.clf()
-            gs = plt.matplotlib.gridspec.GridSpec(2,2,wspace=0.05,hspace=0.25, top=0.83)
+            gs = plt.matplotlib.gridspec.GridSpec(2,2,wspace=0.05,hspace=0.05, top=0.8, height_ratios=[1, 0.75])
             self.axLibrary = plt.subplot(gs[0,0])
             self.axNew = plt.subplot(gs[0,1], sharex=self.axLibrary, sharey=self.axLibrary)
             self.axLightcurve = plt.subplot(gs[1,:])
             axes = [self.axLibrary, self.axNew]
 
+            #if center is None:
+            #    center = position
+
             # plot the intrapixel sensitivity
             unshiftedx, unshiftedy = self.dx_subpixelsforintegrating, self.dy_subpixelsforintegrating
+            integerx, integery = center.ccdxy.integerpixels
             for a in axes:
-                a.imshow(self.intrapixel.prnu(unshiftedx, unshiftedy), extent=extent(unshiftedx, unshiftedy), cmap='Oranges_r', alpha=0.25, interpolation='nearest')
+                a.imshow(self.intrapixel.prnu(unshiftedx, unshiftedy), extent=extent(unshiftedx+integerx, unshiftedy+integery), cmap='Oranges_r', alpha=0.25, interpolation='nearest')
 
-            ccdx, ccdy = position.ccd.center
-            kw = dict( interpolation='nearest', cmap='gray_r', alpha=0.75)
-            vmax=np.maximum(np.max(np.sum(newpsf)), np.max(np.sum(librarypsf)))
-            self.axLibrary.imshow(librarypsf, extent=extent(self.dx_pixels + ccdx, self.dy_pixels +ccdy), **kw)
-            self.axNew.imshow(newpsf, extent=extent(self.dx_pixels+ccdx, self.dy_pixels + ccdy), **kw)
+            kw = dict( interpolation='nearest', cmap='gray_r', alpha=0.75, vmin=0, vmax=0.5)
+            self.axLibrary.imshow(librarypsf, extent=extent(libraryx, libraryy), **kw)
+            self.axNew.imshow(newpsf, extent=extent(newx, newy), **kw)
 
 
             # draw the pixel boundries
@@ -595,18 +599,19 @@ class PSF(Talker):
                 for y in self.dy_pixels_edges:
                     a.axhline(y, **pixeledgekw)'''
 
+            ccdx, ccdy = center.ccdxy.tuple
             plotsize = 3.5
-            self.axLibrary.set_xlim(-plotsize,plotsize)
-            self.axLibrary.set_ylim(-plotsize,plotsize)
-            self.axLibrary.set_title('Library', fontsize=12)
+            self.axLibrary.set_autoscale_on(False)
+            self.axLibrary.set_xlim(-plotsize+ccdx,plotsize+ccdx)
+            self.axLibrary.set_ylim(-plotsize+ccdy,plotsize+ccdy)
+            self.axLibrary.set_title('Interpolated from Library', fontsize=12)
             self.axNew.set_title('Just Pixelized', fontsize=12)
-            self.axLibrary.set_xlabel('(in pixels)', fontsize=9)
-            self.axNew.set_xlabel('(in pixels)', fontsize=9)
-            plt.setp(self.axNew.get_yticklabels(), visible=False)
-
+            for a in axes:
+                plt.setp(a.get_xticklabels(), visible=False)
+                plt.setp(a.get_yticklabels(), visible=False)
             dx, dy = position.ccdxy.fractionalpixels
             plt.suptitle("Comparing Recently Recalculated PSF to the Library\n{temperature:.0f}K star, jittered for {jitter:.0f}s, intrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, temperature=temperature, jitter=self.jitteredlibrarytime, intrapixel=self.intrapixel.name))
-            plt.draw()
+            #plt.draw()
         return np.sum(librarypsf), np.sum(newpsf)
 
     def newlyPixelizedPSF(self, position, temperature=4000, verbose=False):
@@ -633,6 +638,7 @@ class PSF(Talker):
 
         ccdx, ccdy = position.ccdxy.tuple
         xoffset, yoffset = position.ccdxy.fractionalpixels
+        centralx, centraly = position.ccdxy.integerpixels
 
 
         xoffsetbounds = zachopy.utils.find_two_nearest(self.xoffsets, xoffset, verbose=verbose)
@@ -648,7 +654,7 @@ class PSF(Talker):
             xabove_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xabove][yabove] + \
             xbelow_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xbelow][yabove]
 
-        return interpolatedPSF
+        return interpolatedPSF, centralx + self.dx_pixels, centraly + self.dy_pixels
 
 def extent(x,y):
     return [x.min(), x.max(), y.min(), y.max()]

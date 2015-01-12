@@ -1,6 +1,6 @@
 '''Generate TESS pixel lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
 from imports import *
-import tess, cr
+import SPyFFI, cr
 
 class Cube(object):
 	'''Cube to handle simulated postage stamp pixel light curves;
@@ -49,10 +49,10 @@ class Cube(object):
 		self.shape = (self.xpixels, self.ypixels, self.n)
 
 		# create a TESS camera and point it at the subject
-		self.C=tess.Camera(stamp=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.C = SPyFFI.Camera(subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
 
 		# create a blank image with the camera
-		self.I = tess.Image(self.C)
+		self.I = self.C.ccds[0]
 		self.I.image = self.I.zeros()
 
 		# create empty (xpixels, ypixels, n)
@@ -117,8 +117,9 @@ class Cube(object):
 
 	def simulate(self):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
+		self.I.display =0
 		for i in range(self.n):
-			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='original')
+			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
 
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''

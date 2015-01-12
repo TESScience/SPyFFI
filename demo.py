@@ -4,10 +4,10 @@ from imports import *
 
 
 def foral(diffusion=False, testpattern=False):
-	sub(n=90000, stamp=100, cadence=2, jitter=False, testpattern=testpattern, remake=True, diffusion=diffusion)
+	sub(n=90000, subarray=100, cadence=2, jitter=False, testpattern=testpattern, remake=True, diffusion=diffusion)
 
-def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, stamp=100, jitter=False, testpattern=True, remake=True, diffusion=False):
-	C = tess.Camera(stamp=stamp,testpattern=testpattern)
+def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, subarray=100, jitter=False, testpattern=True, remake=True, diffusion=False):
+	C = tess.Camera(subarray=subarray,testpattern=testpattern)
 	C.setCadence(cadence)
 	#C.point(ra, dec)
 	I = tess.Image(C)

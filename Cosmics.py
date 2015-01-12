@@ -43,12 +43,11 @@ def cosmicImage(exptime=1800.0, size=2048, rate=5.0, gradient=False, version='fa
 
     if buffer > 0:
         image = image[buffer:-buffer,buffer:-buffer]
-        
+
     # return the image
     return image
 
 import zachopy.display
-
 def display(**kwargs):
     i = cosmicImage(**kwargs)
     d = zachopy.display.ds9('cosmics')

@@ -33,6 +33,7 @@ class Intrapixel(Talker):
         axSmoothed.imshow(interpolator(x,y), **kw)
         plt.draw()
         a = raw_input('?\n')
+
 class Perfect(Intrapixel):
     '''Perfect pixel has uniform sensitivity everywhere.'''
     def __init__(self, nsubpixels=240, supersample=8):

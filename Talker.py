@@ -1,3 +1,4 @@
+'''Every thing inherits from Talker, so we can print text to the terminal in a relatively standard way.'''
 import textwrap
 
 class Talker(object):

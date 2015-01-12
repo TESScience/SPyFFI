@@ -1,117 +1,170 @@
 from imports import *
-import Camera, settings
+import Camera, Cosmics, settings
+
+class Track(object):
+    '''Quick way to make a path for a pixel to follow. Must be created with a Cartographer.'''
+    def __init__(self, cartographer=None, n=100):
+        assert(cartographer is not None)
+        self.n = n
+        self.cartographer = cartographer
+        self.indices = np.arange(n)
+        self.steps = np.linspace(0, 1, n)
+
+        self.make()
+        self.findCenter()
+
+    def xy(self):
+        return self.focalxy.tuple
+
+    def findCenter(self):
+        x, y = self.positions.focalxy.tuple
+        self.center = self.cartographer.point(np.mean(x), np.mean(y), 'focalxy')
 
 
-def cartographer():
-    C = Camera.Camera(testpattern=True, subarray=100)
-    I = C.ccds[0]
-    B = C.cartographer
-    for i in B.possibleinputs:
-        B.point(0,0,i)
-        for o in B.possibleoutputs:
-            B.quote(o)
+class Spiral(Track):
+    def __init__(self, x=0, y=0, **kwargs):
+        Track.__init__(self, **kwargs)
 
-def image():
-    C = Camera.Camera(testpattern=True, subarray=100)
-    I = C.ccds[0]
-    I.expose(write=True)
+        #self.center(x,y)
 
-def psfshifts():
-    C = Camera.Camera()
-    P = C.psf
+    def make(self, rmax=2.5, thetamax=7*np.pi):
+        r, theta = self.steps*rmax, self.steps*thetamax
+        self.positions = self.cartographer.point(r, theta, 'focalrtheta')
 
-    directory = settings.prefix + 'plots/psfs/'
-    zachopy.utils.mkdir(directory)
-    resolution = 60
+class Line(Track):
+    def __init__(self, x=0, y=0, **kwargs):
+        Track.__init__(self, **kwargs)
+        self.make()
+        #self.center(x,y)
 
-    # nudgeds
-    this = directory + 'nudges/'
-    print "testing " + this
-    zachopy.utils.mkdir(this)
-    counter = 0
-    for theta in np.linspace(0,7*np.pi,resolution):
-        position = P.cartographer.point(0, 0,'focalxy')
-        radius = theta/7/np.pi
-        P.binHighResolutionPSF(position,dx=radius*np.cos(theta),dy=radius*np.sin(theta),temperature=5000)
-        filename = this + '{0:04.0f}.pdf'.format(counter)
-        plt.savefig(filename)
-        print " saved plot to " + filename
-        counter += 1
+    def make(self, xmax=2.5, ymax=1.0):
+        x, y = xmax*np.linspace(-1, 1, self.n), ymax*np.linspace(-1, 1, self.n)
+        self.positions = self.cartographer.point(x, y, 'focalxy')
 
 
-    # translation
-    this = directory + 'translation/'
-    print "testing " + this
-    zachopy.utils.mkdir(this)
-    counter = 0
-    for x in np.linspace(-2500,2500,resolution):
-        position = P.cartographer.point(x,0.0,'focalxy')
-        P.binHighResolutionPSF(position,dx=0,dy=0,temperature=5000)
-        filename = this + '{0:04.0f}.pdf'.format(counter)
-        plt.savefig(filename)
-        print " saved plot to " + filename
-        counter += 1
+class Tester(Talker):
+    '''Tester object, to test various SPyFFI components
+        (and also leave variables and attributes availbe to play with interactively.)'''
+    def __init__(self, subarray=200, testpattern=True):
+        Talker.__init__(self)
+        self.camera = Camera.Camera(subarray=subarray, testpattern=testpattern)
+        self.buster = self.camera.cartographer
 
-    # rotation
-    this = directory + 'rotation/'
-    print "testing " + this
-    zachopy.utils.mkdir(this)
-    counter = 0
-    for theta in np.linspace(0,2*np.pi,resolution):
-        position = P.cartographer.point(1500, theta,'focalrtheta')
-        P.binHighResolutionPSF(position,dx=0,dy=0,temperature=5000)
-        filename = this + '{0:04.0f}.pdf'.format(counter)
-        plt.savefig(filename)
-        print " saved plot to " + filename
-        counter += 1
+    def cartographer(self):
+        '''Make sure the Cartographer can convert coordinates back and forth.'''
+        B = self.buster
+        for i in B.possibleinputs:
+            B.point(0,0,i)
+            for o in B.possibleoutputs:
+                B.quote(o)
+
+    def image(self):
+        '''Make sure the CCDs can exposure new images.'''
+        C = self.camera
+        I = C.ccds[0]
+        I.expose(write=True, remake=True)
+
+    def shiftPSF(self):
+        '''Make sure we can shift PSFs around.'''
+        C = self.camera
+        P = C.psf
+
+        directory = settings.prefix + 'plots/psfs/'
+        zachopy.utils.mkdir(directory)
+        resolution = 60
+
+        # nudgeds
+        this = directory + 'shiftByNudges/'
+        print "testing " + this
+        zachopy.utils.mkdir(this)
+        counter = 0
+        for theta in np.linspace(0,7*np.pi,resolution):
+            position = P.cartographer.point(0, 0,'focalxy')
+            radius = theta/7/np.pi
+            P.binHighResolutionPSF(position,dx=radius*np.cos(theta),dy=radius*np.sin(theta),temperature=5000)
+            filename = this + '{0:04.0f}.pdf'.format(counter)
+            plt.savefig(filename)
+            print " saved plot to " + filename
+            counter += 1
 
 
-def psflightcurve():
+        # translation
+        this = directory + 'shiftByTranslation/'
+        print "testing " + this
+        zachopy.utils.mkdir(this)
+        counter = 0
+        for x in np.linspace(-2500,2500,resolution):
+            position = P.cartographer.point(x,0.0,'focalxy')
+            P.binHighResolutionPSF(position,dx=0,dy=0,temperature=5000)
+            filename = this + '{0:04.0f}.pdf'.format(counter)
+            plt.savefig(filename)
+            print " saved plot to " + filename
+            counter += 1
 
-    C = Camera.Camera()
-    P = C.psf
-    resolution=300
-    flux = np.zeros(resolution)
-    plt.figure('lightcurve test')
-    x = np.linspace(0.0, 2.0,resolution)
-    for i in np.arange(resolution) :
-        position = P.cartographer.point(1 - (1-x[i])**2,np.pi*2*x[i],'focalrtheta')
-        pixelized = P.newlyPixelizedPSF(position, verbose=True)
-        flux[i] = np.sum(pixelized)
+        # rotation
+        this = directory + 'shiftByRotation/'
+        print "testing " + this
+        zachopy.utils.mkdir(this)
+        counter = 0
+        for theta in np.linspace(0,2*np.pi,resolution):
+            position = P.cartographer.point(1500, theta,'focalrtheta')
+            P.binHighResolutionPSF(position,dx=0,dy=0,temperature=5000)
+            filename = this + '{0:04.0f}.pdf'.format(counter)
+            plt.savefig(filename)
+            print " saved plot to " + filename
+            counter += 1
 
-    plt.plot(x, flux, marker='o', alpha=0.5)
 
-def psflibrary():
-    directory = settings.prefix + 'plots/psfs/'
-    this = directory + 'spiral/'
-    zachopy.utils.mkdir(this)
-    C = Camera.Camera()
-    P = C.psf
-    resolution = 200
-    x = np.linspace(0, 1, resolution)
-    ints = np.arange(resolution)
-    r, theta = x*2.5, np.pi*5*x
-    track = P.cartographer.point(r,theta,'focalrtheta')
-    library, new = np.zeros_like(x), np.zeros_like(x)
-    trackx, tracky = track.focalxy.tuple
-    trackx -= track.ccd.center[0]
-    tracky -= track.ccd.center[1]
-    for i in np.arange(resolution):
+    def lightcurveFromPSF(self):
+        '''Make sure we get a reasonable light curve when we shift a star around on the detector (without PSF library).'''
+        C = self.camera
+        P = C.psf
+        resolution=300
+        flux = np.zeros(resolution)
+        plt.figure('lightcurve test')
+        x = np.linspace(0.0, 2.0,resolution)
+        for i in np.arange(resolution) :
+            position = P.cartographer.point(1 - (1-x[i])**2,np.pi*2*x[i],'focalrtheta')
+            pixelized = P.newlyPixelizedPSF(position, verbose=True)
+            flux[i] = np.sum(pixelized)
 
-        position = P.cartographer.point(r[i],theta[i], 'focalrtheta')
-        library[i], new[i] = P.comparePSFs(position)
+        plt.plot(x, flux, marker='o', alpha=0.5)
 
-        P.axLightcurve.cla()
-        P.axLightcurve.plot(ints[:i+1], library[:i+1], linewidth=2, alpha=0.5, color='orange', label='library')
-        P.axLightcurve.plot(ints[:i+1], new[:i+1], linewidth=2, alpha=0.5, color='blue', label='recalculated')
-        P.axLightcurve.set_xlim(0, resolution)
-        for ax in [P.axNew, P.axLibrary]:
-            ax.plot(trackx, tracky, alpha=0.25, linewidth=2, color='red')
-            ax.plot(trackx[i], tracky[i], linewidth=0, marker='+', color='red', alpha=0.5, markersize=20, markeredgewidth=4)
-        P.axLightcurve.plot(ints[i], library[i], linewidth=0, marker='+', markeredgecolor='orange', alpha=0.5, markersize=20, markeredgewidth=4)
-        P.axLightcurve.plot(ints[i], new[i], linewidth=0, marker='+', color='blue', alpha=0.5, markersize=20, markeredgewidth=4)
-        plt.legend()
-        plt.draw()
+    def libraryPSF(self, n=100):
+        '''Make sure our PSF library calculations give nearly the same answer as redoing pixelization integrals from scratch.'''
+        directory = settings.prefix + 'plots/psfs/'
 
-        filename = this + '{0:04.0f}.pdf'.format(i)
-        plt.savefig(filename)
+        C = self.camera
+        P = C.psf
+
+        tracks = [Line, Spiral]
+        for t in tracks:
+            track = t(cartographer=P.cartographer, n=n)
+            this = directory + 'library{0}Offsets/'.format(track.__class__.__name__)
+            zachopy.utils.mkdir(this)
+            r, theta = track.positions.focalrtheta.tuple
+
+            library, new = np.zeros(track.n).astype(np.float), np.zeros(track.n).astype(np.float)
+
+            for i in np.arange(track.n):
+                self.speak('testing the library PSFs at position {0:.0f}/{1:.0f} along the track'.format(i, track.n))
+                position = P.cartographer.point(r[i],theta[i], 'focalrtheta')
+                library[i], new[i] = P.comparePSFs(position, center=track.center)
+                trackx, tracky = track.positions.ccdxy.tuple
+                P.axLightcurve.cla()
+                P.axLightcurve.plot(track.steps[:i+1], library[:i+1], linewidth=2, alpha=0.5, color='orange', label='library')
+                P.axLightcurve.plot(track.steps[:i+1], new[:i+1], linewidth=2, alpha=0.5, color='blue', label='recalculated')
+                P.axLightcurve.set_xlim(0,1)
+                P.axLightcurve.set_ylim(0.971, 1.001)
+                for ax in [P.axNew, P.axLibrary]:
+                    ax.plot(trackx, tracky, alpha=0.25, linewidth=2, color='red')
+                    ax.plot(trackx[i], tracky[i], linewidth=0, marker='+', color='red', alpha=0.5, markersize=20, markeredgewidth=4)
+                P.axLightcurve.plot(track.steps[i], library[i], linewidth=0, marker='+', markeredgecolor='orange', alpha=0.5, markersize=20, markeredgewidth=4)
+                P.axLightcurve.plot(track.steps[i], new[i], linewidth=0, marker='+', color='blue', alpha=0.5, markersize=20, markeredgewidth=4)
+                plt.legend(frameon=False)
+                plt.setp(P.axLightcurve.get_xticklabels(), visible=False, fontsize=8)
+
+                plt.draw()
+
+                filename = this + '{0:04.0f}.pdf'.format(i)
+                plt.savefig(filename)
