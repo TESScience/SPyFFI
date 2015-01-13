@@ -303,7 +303,8 @@ class CCD(Talker):
 		self.speak(" ({0}/{1})".format(self.starcounter,self.nstars))
 
 		# (this is probably a slow way of doing things -- speed it up!)
-		ccdxy = self.camera.cartographer.point(ccdx,ccdy,'ccdxy')
+		ccdxy = self.camera.cartographer.point(ccdx + self.camera.nudge['x']/self.camera.pixelscale,ccdy + self.camera.nudge['y']/self.camera.pixelscale,'ccdxy')
+
 		focalx, focaly = ccdxy.focalxy.tuple
 
 		normalized, xindex, yindex = self.camera.psf.pixelizedPSF(ccdxy,temp)
@@ -611,7 +612,7 @@ class CCD(Talker):
 
 		# jitter the camera, or at least update the
 		if jitter:
-			self.camera.jitter(header=self.header)
+			self.camera.jitter.jitter(self.camera.counter, header=self.header)
 
 		# add stars to the image
 		self.addStars(jitter=jitter, remake=remake)
@@ -653,7 +654,8 @@ class CCD(Talker):
 		self.report("created image #{counter:07d} of {pos_string} with {cadence:.0f}s cadence".format(counter=self.camera.counter, pos_string=self.pos_string, cadence=self.camera.cadence))
 
 
-		#self.camera.advanceCounter()
+		##### THIS WON"T WORK ON MULTIPLE CCD CAMERAS
+		self.camera.advanceCounter()
 
 
 		if write==False:

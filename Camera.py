@@ -3,6 +3,7 @@ import settings, catalogs
 from PSF import PSF
 from Cartographer import Cartographer
 from CCD import CCD
+from Jitter import Jitter
 
 # define a camera class
 class Camera(Talker):
@@ -73,9 +74,12 @@ class Camera(Talker):
         # start the camera out unjittered from its nominal position
         self.nudge = {'x':0.0, 'y':0.0, 'z':0.0}						# nudge relative to nominal spacecraft pointing (arcsec)
 
+
         # point the Camera
         self.point(self.ra, self.dec)
 
+        # load the jitterball for this camera
+        self.jitter = Jitter(camera=self)
 
         # load the PSF for this Camera
         self.psf = PSF(camera=self)
@@ -138,9 +142,6 @@ class Camera(Talker):
         self.cadence = cadence
         self.speak("Setting cadence to {0} seconds = {1} reads.".format(self.cadence, self.cadence/self.singleread))
 
-        # update the jitterball to one that has been binned to this cadence
-        self.loadJitterBall()
-
     def point(self, ra=None, dec=None):
         '''Point this Camera at the sky, by using the field-specified (ra,dec) and (if active) the jitter nudge for this exposure.'''
 
@@ -179,191 +180,6 @@ class Camera(Talker):
         # set this to be the WCS
         self.populateHeader()
 
-    def loadJitterBall(self):
-        '''Load the jitterball for this camera, binned to the appropriate cadence.'''
-        self.speak('Populating the jitterball for {0:.0f} second cadence.'.format(self.cadence))
-
-
-        try:
-            # if the jitterball is already loaded and of the correct cadence, we're all set!
-            self.jitterball
-
-            # make sure the we're using the right jitterball for this cadence
-            assert(self.jittercadence == self.cadence)
-        except:
-            # if the jitterball isn't already loaded (or has wrong cadence), then load/create a new one!
-            jitterfile = settings.prefix + 'intermediates/jitter_{0:04.0f}.npy'.format(self.cadence)
-            try:
-                # if a processed jitterfile already exists, then just load it up:
-                self.jitterball, self.jittermap = np.load(jitterfile)
-                self.jittercadence = self.cadence
-            except:
-                # otherwise, create a binned jitterfile
-
-                # load simulated jitterball that Roland got from Orbital
-                self.speak("Using the raw jitter input file AttErrTimeArcsec_80k.dat (which for convenience may be saved in raw_jitter_file.npy)")
-                try:
-                  data = np.load(settings.prefix + 'intermediates/raw_jitter_file.npy')
-                except:
-                  data = astropy.io.ascii.read(settings.prefix + "inputs/AttErrTimeArcsec_80k.dat", names=['t','x', 'y', 'z'])
-                  np.save(settings.prefix + 'intermediates/raw_jitter_file.npy', data)
-
-                # subtract means
-                data['x'] -= np.mean(data['x'])
-                data['y'] -= np.mean(data['y'])
-                data['z'] -= np.mean(data['z'])
-
-                # scale jitterball to requirements (should be inflation by ~1.5)
-                required_jitter_rms = 2.0/3
-                original_fifthsec = np.sqrt(np.mean(data['x']**2 + data['y']**2))
-                data['x'] *= required_jitter_rms/original_fifthsec
-                data['y'] *= required_jitter_rms/original_fifthsec
-                data['z'] *= required_jitter_rms/original_fifthsec
-
-                # smooth them to the required cadence
-                self.speak("Smoothing the jitter to {0}s cadence.".format(self.cadence))
-
-                # define convolution filter to smooth timeseries over as many samples as necessary to match the cadence
-                spacing = data['t'][1] - data['t'][0]
-                n = np.long(self.cadence/spacing)
-                filter = np.ones(n)/n
-
-                # construct smoothed timeseries, sampled at native (high) time resolution
-                smoothed_t = np.convolve(data['t'], filter, mode='valid')
-                smoothed_x = np.convolve(data['x'], filter, mode='valid')
-                smoothed_y = np.convolve(data['y'], filter, mode='valid')
-                smoothed_z = np.convolve(data['z'], filter, mode='valid')
-
-                # sample smoothed timeseries at the camera's cadence
-                t = smoothed_t[::n]
-                x = smoothed_x[::n]
-                y = smoothed_y[::n]
-                z = smoothed_z[::n]
-
-                # plot each dimension separately
-                plotfilename =  settings.prefix + 'plots/jitter_timeseries_{0:04.0f}.pdf'.format(self.cadence)
-                self.speak("Saving plot of the binned jitter timeseries to " + plotfilename)
-
-                # create the plot
-                fi, ax = plt.subplots(3,1, sharey=True, sharex=True)
-                ax[0].plot(data['t'], data['x'], alpha=0.5, color='black')
-                ax[0].plot(t, x, linewidth=2, alpha=0.5, marker='o', color='red')
-                ax[1].plot(data['t'], data['y'], alpha=0.5, color='black')
-                ax[1].plot(t, y, linewidth=2, alpha=0.5, marker='o', color='red')
-                ax[2].plot(data['t'], data['z'], alpha=0.5, color='black')
-                ax[2].plot(t, z, linewidth=2, alpha=0.5, marker='o', color='red')
-                ax[0].set_xlim(0,self.cadence*10)
-                ax[0].set_title('Expected TESS Pointing Jitter for {0}s Cadence'.format(self.cadence))
-                ax[0].set_ylabel('x (")')
-                ax[1].set_ylabel('y (")')
-                ax[2].set_ylabel('z (")')
-                ax[2].set_xlabel('Time (seconds)')
-                plt.show()
-                fi.savefig(plotfilename)
-
-                # create a 2D jittermap
-                narcsec = 3
-                bins = np.ceil(narcsec/self.pixelscale/self.psf.subpixsize).astype(np.int)*2 +1	# bins are in units of subpixels
-                range = [[-(bins-1)/2*self.psf.subpixsize,(bins-1)/2*self.psf.subpixsize],[-(bins-1)/2*self.psf.subpixsize,(bins-1)/2*self.psf.subpixsize]] # range is in units of pixels
-
-                # make interpolators to keep track of the running smooth means at every moment
-                x_interpolator = scipy.interpolate.interp1d(smoothed_t, smoothed_x,'nearest',fill_value=0,bounds_error=False)
-                y_interpolator = scipy.interpolate.interp1d(smoothed_t, smoothed_y,'nearest',fill_value=0,bounds_error=False)
-
-
-                # assign the jittermap here, which will be used for convolution in the PSF code
-                self.jittermap = np.histogram2d((data['x'] - x_interpolator(data['t']))/self.pixelscale, (data['y']  - y_interpolator(data['t']))/self.pixelscale, bins=bins, range=range,normed=True)
-                self.jitterball = (x,y,z)
-                self.jittercadence = self.cadence
-
-                self.speak('Saving plots of the intra-exposure jitter map (which which PSFs should be convolved).')
-                # plot an easier to view histogram of the jitterball
-                jittermap_to_plot = np.histogram2d((data['x'] - x_interpolator(data['t']))/self.pixelscale, (data['y']  - y_interpolator(data['t']))/self.pixelscale, bins=50, range=range,normed=True)
-                self.plothist2d(jittermap_to_plot,title='TESS Pointing Jitter over {0}s'.format(self.cadence),xtitle='Pixels', ytitle='Pixels')
-                plt.savefig(settings.prefix + 'plots/jitter_map_{0:04.0f}.pdf'.format(self.cadence))
-
-                # plot the adopted jitterball, as more useful binning
-                self.plothist2d(self.jittermap ,title='TESS Pointing Jitter over {0}s'.format(self.cadence),xtitle='Pixels', ytitle='Pixels')
-                plt.savefig(settings.prefix + 'plots/jitter_map_adopted_{0:04.0f}.pdf'.format(self.cadence))
-
-                # save the necessary jitter files so we don't have to go through this again
-                self.speak('Saving the jitter files for this cadence to {0}'.format(jitterfile))
-                np.save(jitterfile,( self.jitterball, self.jittermap))
-
-    def plothist2d(self, hist, title=None, log=False, xtitle=None, ytitle=None):
-        '''Plot a 2D histogram. (Used for loadJitterBall plots -- should probably move all this to new Jitterball object.)'''
-        map = hist[0]
-        x = hist[1][1:] + (hist[1][0] - hist[1][1])/2.0
-        y = hist[2][1:]+ (hist[2][0] - hist[2][1])/2.0
-        fig = plt.figure(figsize=(10,10))
-        plt.clf()
-        plt.subplots_adjust(hspace=0, wspace=0)
-        ax_map = fig.add_subplot(2,2,3)
-        ax_vert = fig.add_subplot(2,2,4, sharey=ax_map)
-        ax_hori = fig.add_subplot(2,2,1, sharex=ax_map)
-
-        ax_hori.plot(x, np.sum(map, 0)/np.sum(map), marker='o', color='black', linewidth=3)
-        ax_vert.plot(np.sum(map, 1)/np.sum(map), y, marker='o', color='black', linewidth=3)
-        if log:
-          ax_vert.semilogx()
-          ax_hori.semilogy()
-        if log:
-          bottom = np.min(map[map > 0])/np.maximum(np.sum(map,0).max(),np.sum(map,1).max())
-        else:
-          bottom = 0
-        top = 1
-        ax_hori.set_ylim(bottom,top)
-        ax_vert.set_xlim(bottom,top)
-
-        ax_vert.tick_params(labelleft=False)
-        ax_hori.tick_params(labelbottom=False)
-        if title is not None:
-          ax_hori.set_title(title)
-        if xtitle is not None:
-          ax_map.set_xlabel(xtitle)
-        if ytitle is not None:
-          ax_map.set_ylabel(ytitle)
-        if log:
-          ax_map.imshow(np.log(map), cmap='gray_r', extent=[x.min(), x.max(), y.min(), y.max()],interpolation='nearest')
-        else:
-          ax_map.imshow(map, cmap='gray_r', extent=[x.min(), x.max(), y.min(), y.max()],interpolation='nearest')
-        plt.draw()
-
-    def jitter(self, dx=None, dy=None, dz=None, header=None ):
-        '''Jitter the cameras by a little bit, by introducing nudges draw from a (cadence-appropriate) jitterball timeseries.'''
-
-        # make sure the jitterball has been populated
-        self.loadJitterBall()
-
-        # assign the nudges in two translations and one rotation
-        if dx is None:
-            self.nudge['x'] = self.jitterball[0][self.counter]#*0.002#self.counter*0.0#
-        else:
-            self.nudge['x'] = dx
-
-        if dy is None:
-            self.nudge['y'] = self.jitterball[1][self.counter]#*0.002#-self.counter*3.0#
-        else:
-            self.nudge['y'] = dy
-
-        if dz is None:
-            self.nudge['z'] = self.jitterball[2][self.counter]#*0.002#-self.counter*3.0#
-        else:
-            self.nudge['z'] = dz
-
-        # if possible, write the details to the supplied FITS header
-        try:
-            header['MOTION'] = ''
-            header['MOTNOTE'] = ('', 'properties of the image motion applied')
-            header['JITTERX'] = (self.nudge['x'], '["] jitter-induced nudge')
-            header['JITTERY'] = (self.nudge['y'], '["] jitter-induced nudge')
-        except:
-            pass
-
-        # move the camera, using the updated nudge values
-        self.speak("Jittering the camera to {x},{y},{z} away from nominal pointing.".format(**self.nudge))
-        self.point()
-
     def pos_string(self):
         '''Return the position string for this field.'''
         if self.testpattern:
@@ -374,7 +190,7 @@ class Camera(Talker):
 
     def advanceCounter(self):
         '''Take one step forward in time with this Camera.'''
-        self.camera.counter +=1
+        self.counter +=1
 
     def populateCatalog(self):
         '''Create a catalog of stars that are visible with this Camera.'''
@@ -394,8 +210,7 @@ class Camera(Talker):
             self.catalog = catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=size/np.sqrt(2)*1.01)
 
 
-
-	def c1(self, image):
+	'''def c1(self, image):
 
 		return image[self.xsize - self.subarraysize:, self.ysize - self.subarraysize:]
 
@@ -406,4 +221,4 @@ class Camera(Talker):
 		return image[0:self.subarraysize,0:self.subarraysize]
 
 	def c4(self, image):
-		return image[self.xsize - self.subarraysize:,0:self.subarraysize]
+		return image[self.xsize - self.subarraysize:,0:self.subarraysize]'''

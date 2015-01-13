@@ -45,10 +45,11 @@ class Line(Track):
 class Tester(Talker):
     '''Tester object, to test various SPyFFI components
         (and also leave variables and attributes availbe to play with interactively.)'''
-    def __init__(self, subarray=200, testpattern=True):
+    def __init__(self, subarray=200, testpattern=True, cadence=1800):
         Talker.__init__(self)
-        self.camera = Camera.Camera(subarray=subarray, testpattern=testpattern)
+        self.camera = Camera.Camera(subarray=subarray, testpattern=testpattern, cadence=cadence)
         self.buster = self.camera.cartographer
+        self.jitter = self.camera.jitter
 
     def cartographer(self):
         '''Make sure the Cartographer can convert coordinates back and forth.'''
@@ -57,6 +58,9 @@ class Tester(Talker):
             B.point(0,0,i)
             for o in B.possibleoutputs:
                 B.quote(o)
+
+    def jitter(self):
+        self.jitter = self.camera.jitter
 
     def image(self):
         '''Make sure the CCDs can exposure new images.'''

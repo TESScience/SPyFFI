@@ -97,7 +97,7 @@ class Cube(object):
 			self.ds9
 		except:
 			self.ds9 = zachopy.display.ds9(name)
-		self.ds9.many(cube)
+		self.ds9.many(cube, limit=3200/self.size)
 
 	@property
 	def directory(self):
@@ -214,7 +214,7 @@ class Cube(object):
 			image = flux[:,:,i]
 			self.I.writeToFITS(image, dir + normalization + '_{0:05.0f}.fits'.format(i))
 
-	def plot(self, normalization='median'):
+	def plot(self, normalization='none'):
 
 		# choose how to normalize the lightcurves for plotting
 		if normalization.lower() == 'none':

@@ -1,5 +1,5 @@
 '''A few simple tests of the TESS image simulation tools.'''
-import tess
+import Camera
 from imports import *
 
 
@@ -7,7 +7,7 @@ def foral(diffusion=False, testpattern=False):
 	sub(n=90000, subarray=100, cadence=2, jitter=False, testpattern=testpattern, remake=True, diffusion=diffusion)
 
 def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, subarray=100, jitter=False, testpattern=True, remake=True, diffusion=False):
-	C = tess.Camera(subarray=subarray,testpattern=testpattern)
+	C = Camera.Camera(subarray=subarray,testpattern=testpattern)
 	C.setCadence(cadence)
 	#C.point(ra, dec)
 	I = tess.Image(C)
@@ -18,7 +18,7 @@ def sub(ra=270, dec=66.56070833333332, cadence=2, n=1, subarray=100, jitter=Fals
 
 
 def create(ra=270, dec=66.56070833333332, cadence=2, n=900):
-	C = tess.Camera()
+	C = Camera.Camera()
 	C.setCadence(cadence)
 	C.point(ra, dec)
 	I = tess.Image(C)
@@ -26,7 +26,7 @@ def create(ra=270, dec=66.56070833333332, cadence=2, n=900):
 		I.expose(write=True, split=True, cosmics='original')
 
 def subtractPairs(ra=82, dec=1,cadence=2):
-	C = tess.Camera()
+	C = Camera.Camera()
 	C.setCadence(cadence)
 	C.point(ra, dec)
 	I = tess.Image(C)
@@ -48,7 +48,7 @@ def threefields():
 
 def forPT():
 	pointings = [(270,66.56070833333332), (192.25,27.4), (266.4166666666667,-29.00777777777778)]
-	C = tess.Camera()
+	C = Camera.Camera()
 	for pos in pointings:
 		ra, dec = pos
 		C.setCadence(1800)

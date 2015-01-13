@@ -554,7 +554,7 @@ class PSF(Talker):
 
                                                 for yoffset in self.yoffsets:
                                                     self.speak('adding yoffset of {0:.2f} pixels'.format(yoffset), 5)
-                                                    self.binned[radius][temperature][theta][xoffset][yoffset] = self.binHighResolutionPSF(position, temperature=temperature, dx=xoffset, dy=yoffset, plot=plot)
+                                                    self.binned[radius][temperature][theta][xoffset][yoffset] = self.binHighResolutionPSF(position, temperature=temperature, dx=xoffset, dy=yoffset, plot=plot)[0]
                                                     self.speak('(r={radius:.0f}, T={temperature:.0f}K, theta={theta:.0f} degrees , dx={xoffset:.2f} pixels, dy={yoffset:.2f} pixels)'.format(radius=radius, temperature=temperature, theta=theta, xoffset=xoffset, yoffset=yoffset), 6)
                 np.save(binned_filename, (self.binned, self.focalr, self.temperatures, self.focaltheta, self.xoffsets, self.yoffsets))
                 self.speak('saved binned PSF library to {0}'.format(binned_filename))
@@ -654,6 +654,8 @@ class PSF(Talker):
             xabove_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xabove][yabove] + \
             xbelow_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xbelow][yabove]
 
+        assert( interpolatedPSF is not None)
+        print interpolatedPSF.shape
         return interpolatedPSF, centralx + self.dx_pixels, centraly + self.dy_pixels
 
 def extent(x,y):
