@@ -34,7 +34,7 @@ def drawCosmics(n):
 
 class timeseries():
 	'''Object to store a light curve, both unbinned and binned.'''
-	def __init__(self, cube=None, pixel=(0,0), nexposures=1324, nsubexposures=900, amplitude=2.0, subexposurecadence=2.0, mag=10.0):
+	def __init__(self, cube=None, pixel=(0,0), nexposures=1324, nsubexposures=900, amplitude=None, subexposurecadence=2.0, mag=10.0):
 		'''Initialize timeseries object, either as a toy model or from a pixel drawn from a simulated image cube.
 
 		(for toy model):
@@ -49,17 +49,26 @@ class timeseries():
 		# either make a toy light curve based on input parameters
 		if cube is None:
 		 	self.nexposures = nexposures
-			self.mag = mag
-			self.containedflux = 0.5
-			self.photonsfromstar = 1.7e6*2*73.0*10**(-0.4*mag)*self.containedflux
-			skynoise = 10.0
-			readoutnoise = 10.0
-			signal = self.nsubexposures*self.photonsfromstar
-			noise = np.sqrt(self.nsubexposures*(readoutnoise**2 + skynoise**2 + self.photonsfromstar))
-			snr = signal/noise
-			self.exposurenoise = 1.0/snr
-			self.subexposurenoise = self.exposurenoise*np.sqrt(self.nsubexposures)
-			self.cosmicsamplitude = 1000.0/self.photonsfromstar/self.nsubexposures#amplitude*self.exposurenoise
+			if amplitude is None:
+				self.mag = mag
+				self.containedflux = 0.5
+				self.photonsfromstar = 1.7e6*2*73.0*10**(-0.4*mag)*self.containedflux
+				skynoise = 10.0
+				readoutnoise = 10.0
+				signal = self.nsubexposures*self.photonsfromstar
+				noise = np.sqrt(self.nsubexposures*(readoutnoise**2 + skynoise**2 + self.photonsfromstar))
+				snr = signal/noise
+				self.exposurenoise = 1.0/snr
+				self.subexposurenoise = self.exposurenoise*np.sqrt(self.nsubexposures)
+				self.cosmicsamplitude = 1000.0/self.photonsfromstar/self.nsubexposures#amplitude*self.exposurenoise
+				self.scale =  self.timeseries.nsubexposures
+
+			else:
+				self.exposurenoise = 1.0/self.nsubexposures
+				self.subexposurenoise = self.exposurenoise*np.sqrt(self.nsubexposures)
+				self.cosmicsamplitude = amplitude*self.exposurenoise
+				self.scale=1
+
 			self.cosmicsperexposure = 1.0 - 0.999**self.nsubexposures
 			self.cosmicspersubexposure = self.cosmicsperexposure/self.nsubexposures
 			self.subexposurecadence=subexposurecadence
@@ -81,6 +90,7 @@ class timeseries():
 		y = pixel[1]
 		# KLUDGE (possibly?) -- make sure that reshape is working the way we think it is
 		self.flux = cube.photons[x,y,:self.nexposures*self.nsubexposures].reshape(self.shape)
+		self.noiseless = cube.noiseless[x,y,:self.nexposures*self.nsubexposures].reshape(self.shape)
 		self.cosmics = cube.cosmics[x,y,:self.nexposures*self.nsubexposures].reshape(self.shape)
 		self.subexposurenoise = cube.sigma()[x,y]
 		self.exposurenoise = self.subexposurenoise/np.sqrt(self.nsubexposures)
@@ -193,7 +203,7 @@ class strategy(object):
 	def fileprefix(self):
 
 		f = self.directory() + 'crdemo_filter{0}_n{1}_cr{2}_{3}exposures'.format(self.name.replace(' ',''), self.n, self.timeseries.cosmicsamplitude/self.timeseries.exposurenoise, self.timeseries.nexposures)
-		return f
+		return f.replace('.', 'p')
 
 	def strategyprefix(self):
 		f = self.directory() + 'crdemo_filter{0}_n{1}'.format(self.name.replace(' ',''), self.n, self.timeseries.nexposures)
@@ -303,7 +313,7 @@ class strategy(object):
 		'''Test strategy over a range of input cosmic ray amplitudes (using toy model light curves).'''
 		self.timeseries = t
 		print "testing {0}, with filename of {1}".format(self.name, self.strategyprefix())
-		filename = self.strategyprefix() + '_{0}iterations.npy'.format(niterations)
+		filename = self.strategyprefix() + '_{0}iterations_{1:03.0f}subexposures.npy'.format(niterations, self.timeseries.nsubexposures)
 		try:
 			# can we load a preprocessed file?
 			assert(remake == False)
@@ -373,25 +383,23 @@ class strategy(object):
 
 
 
-		# everything will be multiplied by scale (do you want number of electrons in one subexposure, or one exposure?)
-		scale = self.timeseries.nsubexposures
 
 		# set up the zero-level for the plot, the width of the plotting windows, and the position of the text labels
-		ylevel = np.median(scale*self.binned['nocosmics'])
-		ywidth = scale*self.plotting['nsigma']*0.8*self.timeseries.exposurenoise
+		ylevel = np.median(self.timeseries.scale*self.binned['nocosmics'])
+		ywidth = self.timeseries.scale*self.plotting['nsigma']*0.8*self.timeseries.exposurenoise
 		y =  ylevel - ywidth
 
 
 		# fiddle with the ylimits of the plots, depending on whether looking at binned or unbinned timeseries
 		if unbinned:
-			self.ax['histbinned'].set_ylim(np.min(scale*self.unbinned['flux']), np.max(scale*self.unbinned['flux']))
+			self.ax['histbinned'].set_ylim(np.min(self.timeseries.scale*self.unbinned['flux']), np.max(self.timeseries.scale*self.unbinned['flux']))
 			#self.ax['histbinned'].set_ylim(-self.plotting['nsigma']*self.timeseries.subexposurenoise, self.plotting['nsigma']*self.timeseries.subexposurenoise)
 		else:
-			self.ax['histbinned'].set_ylim(-scale*self.plotting['nsigma']*self.timeseries.exposurenoise + ylevel, scale*self.plotting['nsigma']*self.timeseries.exposurenoise + ylevel)
+			self.ax['histbinned'].set_ylim(-self.timeseries.scale*self.plotting['nsigma']*self.timeseries.exposurenoise + ylevel, self.timeseries.scale*self.plotting['nsigma']*self.timeseries.exposurenoise + ylevel)
 
 		# plot the unbinned timeseries, if desired
 		if unbinned:
-			self.plottimeseries(self.unbinned['x'], scale*self.unbinned['flux'], linewidth=1, alpha=0.1, color='black')# markersize=2, markeredgewidth=0, markerfacecolor='black', marker='o', linewidth=0, alpha=0.1)
+			self.plottimeseries(self.unbinned['x'], self.timeseries.scale*self.unbinned['flux'], linewidth=1, alpha=0.1, color='black')# markersize=2, markeredgewidth=0, markerfacecolor='black', marker='o', linewidth=0, alpha=0.1)
 			#self.plottimeseries(self.unbinned['x'], self.unbinned['nocosmics'], linewidth=1, alpha=0.1, color='orange')# markersize=2, markeredgewidth=0, markerfacecolor='black', marker='o', linewidth=0, alpha=0.1)
 
 		# plot the cosmic ray hits as vertical lines
@@ -401,14 +409,14 @@ class strategy(object):
 
 
 		# plot the binned timeseries
-		self.plottimeseries(self.binned['x'], scale*self.binned['nocosmics'], markersize=4, marker='o', alpha=0.5, markerfacecolor='orange', color=self.plotting['nocosmics'], markeredgewidth=0, linewidth=1)
-		self.plottimeseries(self.binned['x'], scale*self.binned['naive'], markersize=4, marker='o', alpha=0.5, markerfacecolor=self.plotting['naive'], color=self.plotting['naive'], markeredgewidth=0, linewidth=1)
-		self.plottimeseries(self.binned['x'], scale*self.binned['flux'], markersize=4, marker='o', alpha=0.5, markerfacecolor=self.plotting['flux'], color=self.plotting['flux'], markeredgewidth=0, linewidth=1)
+		self.plottimeseries(self.binned['x'], self.timeseries.scale*self.binned['nocosmics'], markersize=4, marker='o', alpha=0.5, markerfacecolor='orange', color=self.plotting['nocosmics'], markeredgewidth=0, linewidth=1)
+		self.plottimeseries(self.binned['x'], self.timeseries.scale*self.binned['naive'], markersize=4, marker='o', alpha=0.5, markerfacecolor=self.plotting['naive'], color=self.plotting['naive'], markeredgewidth=0, linewidth=1)
+		self.plottimeseries(self.binned['x'], self.timeseries.scale*self.binned['flux'], markersize=4, marker='o', alpha=0.5, markerfacecolor=self.plotting['flux'], color=self.plotting['flux'], markeredgewidth=0, linewidth=1)
 
 		# plot the binned histogram
-		self.plothistogram(scale*self.binned['nocosmics'], binwidth=scale*0.2*self.timeseries.exposurenoise, alpha=0.5, color=self.plotting['nocosmics'])
-		self.plothistogram(scale*self.binned['naive'], binwidth=scale*0.2*self.timeseries.exposurenoise, alpha=0.5, color=self.plotting['naive'])
-		self.plothistogram(scale*self.binned['flux'], binwidth=scale*0.2*self.timeseries.exposurenoise, alpha=0.5, color=self.plotting['flux'])
+		self.plothistogram(self.timeseries.scale*self.binned['nocosmics'], binwidth=self.timeseries.scale*0.2*self.timeseries.exposurenoise, alpha=0.5, color=self.plotting['nocosmics'])
+		self.plothistogram(self.timeseries.scale*self.binned['naive'], binwidth=self.timeseries.scale*0.2*self.timeseries.exposurenoise, alpha=0.5, color=self.plotting['naive'])
+		self.plothistogram(self.timeseries.scale*self.binned['flux'], binwidth=self.timeseries.scale*0.2*self.timeseries.exposurenoise, alpha=0.5, color=self.plotting['flux'])
 
 		# plot the image and position, if this isn't just a toy model
 		if includeimage:
@@ -421,9 +429,9 @@ class strategy(object):
 		# labels showing the unmitigated, achieved, and ideal noise values
 		left, right = np.log(self.ax['histbinned'].get_xlim())
 		span = right - left
-		self.ax['histbinned'].text(np.exp(span*0.2 + left), y, "{0:.0f}e-\n({1:.2f})".format(scale*self.unmititigated, self.unmititigated/self.timeseries.exposurenoise), fontsize=6, color=self.plotting['naive'], horizontalalignment='center', alpha=0.7)
-		self.ax['histbinned'].text(np.exp(span*0.5 + left), y, "{0:.0f}e-\n({1:.2f})".format(scale*self.achieved, self.achieved/self.timeseries.exposurenoise), fontsize=6, color=self.plotting['flux'], horizontalalignment='center', alpha=0.7)
-		self.ax['histbinned'].text(np.exp(span*0.78 + left), y, "{0:.0f}e-\n({1:.2f})".format(scale*self.timeseries.exposurenoise, 1.0), fontsize=6, color=self.plotting['nocosmics'], horizontalalignment='center', alpha=0.7)
+		self.ax['histbinned'].text(np.exp(span*0.2 + left), y, "{1:.2f}".format(self.timeseries.scale*self.unmititigated, self.unmititigated/self.timeseries.exposurenoise), fontsize=6, color=self.plotting['naive'], horizontalalignment='center', alpha=0.7)
+		self.ax['histbinned'].text(np.exp(span*0.5 + left), y, "{1:.2f}".format(self.timeseries.scale*self.achieved, self.achieved/self.timeseries.exposurenoise), fontsize=6, color=self.plotting['flux'], horizontalalignment='center', alpha=0.7)
+		self.ax['histbinned'].text(np.exp(span*0.78 + left), y, "{1:.2f}".format(self.timeseries.scale*self.timeseries.exposurenoise, 1.0), fontsize=6, color=self.plotting['nocosmics'], horizontalalignment='center', alpha=0.7)
 		self.ax['histbinned'].text(np.exp(span*0.2 + left), ylevel - ywidth*1.1, 'unmitigated', fontsize=4, color=self.plotting['naive'], horizontalalignment='center', alpha=0.7)
 		self.ax['histbinned'].text(np.exp(span*0.5 + left), ylevel - ywidth*1.1, 'achieved', fontsize=4, color=self.plotting['flux'], horizontalalignment='center', alpha=0.7)
 		self.ax['histbinned'].text(np.exp(span*0.8 + left), ylevel - ywidth*1.1, 'perfect', fontsize=4, color=self.plotting['nocosmics'], horizontalalignment='center', alpha=0.7)
@@ -431,6 +439,7 @@ class strategy(object):
 		# draw and save the plot
 		plt.draw()
 		plt.savefig(self.fileprefix() + '.pdf')
+		print "saved plot to " +  self.fileprefix() + '.pdf'
 
 
 class mean(strategy):
@@ -563,7 +572,7 @@ class outlierwithdecay(strategy):
 		self.safetybuffer = 2.0
 
 		# define a name for this filter
-		self.name = r'Rejecting {threshold}$\sigma$ Outliers; with $\sigma$ estimated from {memory}% memory per {n} subexposure chunk.'.format(threshold=self.threshold, memory=self.memory*100, n=self.n)
+		self.name = r'Rejecting {threshold}$\sigma$ Outliers; $\sigma$ from chunks of {n};  memory of {memory}%'.format(threshold=self.threshold, memory=self.memory*100, n=self.n)
 
 		# for testing, keep a diagnostics flag to say whether to display the mean + std. estimates
 		self.diagnostics = diagnostics
@@ -760,18 +769,19 @@ def plottransit(s):
 
 	plt.draw()
 
-def compare(nexposures=1324, nsubexposures=900, niterations=1):
+def compare(nsubexposures=900, niterations=1, remake=True):
 
-	t = timeseries(nexposures=nexposures, nsubexposures=nsubexposures)
+	nexposures = 1324*900/nsubexposures
+	t = timeseries(nexposures=nexposures, nsubexposures=nsubexposures, amplitude=1.0)
 
 	subsets = [[mean()],
+				[mean(),outlierwithdecay(n=10,threshold=10, memory=0.1),outlierwithdecay(n=10,threshold=10, memory=0.5),outlierwithdecay(n=10,threshold=10, memory=0.9)],
 				[mean(), median(n=3), median(n=4),  median( n=5), median( n=6)],
 				[mean(),shiftedmedian(n=3), shiftedmedian(n=4), shiftedmedian(n=5), shiftedmedian(n=6)],
-				[mean(),lowest(2), lowest(3), lowest(4), lowest(5),  lowest(10), lowest(20), lowest( 60),  lowest(900)],
-				[mean(),central(3), central(5), central(10),central(20), central( 60), central( 900)],
-				[mean(),outlierwithdecay(n=10,threshold=10, memory=0.1),outlierwithdecay(n=10,threshold=10, memory=0.5),outlierwithdecay(n=10,threshold=10, memory=0.9)],
-				[mean(),  median(n=3), median(n=4), shiftedmedian(n=3), shiftedmedian(n=4),  lowest(10), lowest(20),  central(10),central(20) ]]
-	labels = ['mean', 'median', 'shiftedmedian', 'lowest', 'central', 'outlierrejection', 'everything']
+				[mean(),lowest(2), lowest(3), lowest(4), lowest(5),  lowest(10), lowest(20), lowest( 60)],
+				[mean(),central(3), central(5), central(10),central(20), central( 60)],
+				[mean(),  median(n=3), shiftedmedian(n=3), lowest(10),  central(10), outlierwithdecay(n=10,threshold=10, memory=0.5)]]
+	labels = ['mean', 'outlierrejection', 'median', 'shiftedmedian', 'lowest', 'central',  'everything']
 	for i in range(len(subsets)):
 		strategies = subsets[i]
 		names = []
@@ -780,7 +790,7 @@ def compare(nexposures=1324, nsubexposures=900, niterations=1):
 		while(len(strategies)>0):
 			print "  {0:2} strategies to go!".format(len(strategies))
 			s = strategies.pop()
-			s.test(t, niterations=niterations)
+			s.test(t, niterations=niterations, remake=remake)
 			plt.draw()
 			names.append(s.name)
 			results[s.name] = {'amplitudes':s.amplitudes, 'noise':s.noise, 'strategy':s}
@@ -789,9 +799,9 @@ def compare(nexposures=1324, nsubexposures=900, niterations=1):
 		figure = plt.figure(figsize=(7,4), dpi=150)
 		gs = plt.matplotlib.gridspec.GridSpec(1,4, wspace=0,hspace=0)
 
-		ax = plt.subplot(gs[0:3])
+		ax = plt.subplot(gs[0:])
 		plt.cla()
-		medianlinestyle, lowestlinestyle, centrallinestyle, shiftedlinestyle = 0,0,0, 0
+		medianlinestyle, lowestlinestyle, centrallinestyle, shiftedlinestyle, outlierstyle = 0,0,0, 0,0
 		linestyles = ['-', '--']
 		count =0
 		for k in names:
@@ -812,7 +822,11 @@ def compare(nexposures=1324, nsubexposures=900, niterations=1):
 				color = 'green'
 				linestyle = centrallinestyle
 				centrallinestyle += 1
-
+			if "Reject" in k:
+				color = 'red'
+				linestyle = outlierstyle
+				outlierstyle += 1
+			print k
 			n = np.float(results[k]['strategy'].n)
 			scale = 2
 			if "Mean" in k:
@@ -825,15 +839,16 @@ def compare(nexposures=1324, nsubexposures=900, niterations=1):
 				#linewidth = np.log(n/t.nsubexposures) - np.log(1.0/t.nsubexposures)
 				alpha=1-(linewidth)/(len(names)+1.0)#(1 - np.log(1.0/t.nsubexposures))
 
-			ax.plot(results[k]['amplitudes'], results[k]['noise'], label=k.replace(' out of ', '/'), color=color, linewidth=linewidth, alpha=alpha, linestyle=linestyles[linestyle % len(linestyles)])
-			ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., fontsize=7)
+			ax.plot(results[k]['amplitudes'], results[k]['noise'], label=k.replace(' out of ', '/').replace('; ', '\n '), color=color, linewidth=linewidth, alpha=alpha, linestyle=linestyles[linestyle % len(linestyles)])
+			ax.legend(bbox_to_anchor=(0.95, 0.95), loc=1, borderaxespad=0., fontsize=7)
 			ax.set_xlabel(r'Cosmic Ray Amplitude (in $\sigma$)')
 			ax.set_ylabel(r'Achieved Noise (in $\sigma$)')
-			ax.set_ylim(1.0, 1.25)
+			ax.set_ylim(0.95, 1.25)
+			ax.set_title('Cosmic Ray Rejection when Stacking {0} Exposures'.format(t.nsubexposures))
 			count +=1
 		plt.tight_layout()
 		plt.draw()
-		plt.savefig( '/Users/zkbt/Cosmos/Data/TESS/CR/comparisons/cosmicrayrejectioncomparisons_{0}.pdf'.format(labels[i]))
+		plt.savefig( '/Users/zkbt/Cosmos/Data/TESS/CR/comparisons/cosmicrayrejectioncomparisons_{2:03.0f}iterations_{1:.0f}subexposures_{0}.pdf'.format(labels[i], t.nsubexposures, niterations))
 
 
 def testTransit(s=mean(), mag=10.0, short=True):

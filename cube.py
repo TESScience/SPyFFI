@@ -2,7 +2,7 @@
 from imports import *
 import SPyFFI, cr
 
-class Cube(object):
+class Cube(Talker):
 	'''Cube to handle simulated postage stamp pixel light curves;
 			has dimensions of (xpixels, ypixels, time).'''
 
@@ -16,25 +16,25 @@ class Cube(object):
 		[cadence=2] the cadence of the simulated images, in seconds
 		[jitter=False] should jitter be included between images?'''
 
-		# define a prefix for output
-		self.prefix = '   [cube] '
+		# decide whether or not this Cube is chatty
+		Talker.__init__(self, mute=False, pithy=False)
 
 		# decide what to point the camera at...
 		self.subject = subject
 		if 'test' in self.subject.lower():
 			# ...either a test pattern of stars...
-			print self.prefix + 'pointing at a test pattern'
+			self.speak( 'pointing at a test pattern')
 			self.testpattern = True
 		else:
 			self.testpattern = False
 			# ...or a field centered on a particular star.
 			try:
-				print self.prefix + "trying to point at ", subject
+				self.speak( "trying to point at {0}".format(subject))
 				s = zachopy.star.SingleStar(name)
 				self.ra = s.icrs.ra.degree
 				self.dec = s.icrs.dec.degree
 			except:
-				print self.prefix + " but that failed, so we'll go with a test pattern"
+				self.speak( " but that failed, so we'll go with a test pattern")
 				self.testpattern = True
 
 		# define basic geometry
@@ -49,11 +49,12 @@ class Cube(object):
 		self.shape = (self.xpixels, self.ypixels, self.n)
 
 		# create a TESS camera and point it at the subject
-		self.C = SPyFFI.Camera(subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera = SPyFFI.Camera(subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera.cartographer.pithy = True
 
 		# create a blank image with the camera
-		self.I = self.C.ccds[0]
-		self.I.image = self.I.zeros()
+		self.ccd = self.camera.ccds[0]
+		self.ccd.image = self.ccd.zeros()
 
 		# create empty (xpixels, ypixels, n)
 		if self.cadence == 2:
@@ -69,20 +70,27 @@ class Cube(object):
 		# self.simulate()
 		# self.plot()
 
-	def bin(self, nsubexposures=60, strategy=cr.central(n=10)):
+	def bin(self, nsubexposures=60, strategy=cr.central(n=10), plot=False):
 		'''Bin together 2-second exposures, using some cosmic strategy.'''
 
-		# make sure that we're starting with a
+		# make sure that we're starting with a 2-second exposure
 		assert(self.cadence == 2)
 
+		# create an empty binned cube object that has the right size and shape
 		binned = Cube(subject=self.subject, size=self.size, cadence=self.cadence*nsubexposures, n=(np.int(self.n/nsubexposures)) )
+
+		# add an additional array to keep track of what the unmitigated lightcurves would look like
 		binned.unmitigated = np.zeros_like(binned.photons)
+
+		# loop over the x and y pixels
+		self.speak('binning {0} cube by {1} subexposures into a {2} cube'.format(self.shape, nsubexposures, binned.shape))
 		for x in np.arange(self.shape[0]):
 			for y in np.arange(self.shape[1]):
-				print '{x}, {y} out of ({size}, {size})'.format(x=x, y=y, size=self.size)
+				self.speak('   {x}, {y} out of ({size}, {size})'.format(x=x, y=y, size=self.size))
 				timeseries = cr.timeseries(self, (x,y), nsubexposures=nsubexposures)
 				strategy.calculate(timeseries)
-				strategy.plot()
+				if plot:
+					strategy.plot()
 				binned.photons[x,y] = strategy.binned['flux']
 				binned.cosmics[x,y] = strategy.binned['naive'] - strategy.binned['nocosmics']
 				binned.unmitigated[x,y] = strategy.binned['naive']
@@ -90,19 +98,21 @@ class Cube(object):
 
 
 
-	def display(self, cube=None, name='cube'):
+	def display(self, cube=None, name='cube', limit=50):
+		'''Use ds9 to display the image cube.'''
+		self.speak('displaying (up to {0:.0f} exposures) of the pixel cube with ds9'.format(limit))
 		if cube is None:
 			cube = self.photons
 		try:
 			self.ds9
 		except:
 			self.ds9 = zachopy.display.ds9(name)
-		self.ds9.many(cube, limit=3200/self.size)
+		self.ds9.many(cube, limit=limit)
 
 	@property
 	def directory(self):
 		'''Return path to a directory where this cube's data can be stored.'''
-		dir = self.I.directory + 'cubes/'
+		dir = self.ccd.directory + 'cubes/'
 		zachopy.utils.mkdir(dir)
 		return dir
 
@@ -113,27 +123,31 @@ class Cube(object):
 			phrase = 'with'
 		else:
 			phrase = 'without'
-		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase)
+		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter_{intrapixel}.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase, intrapixel=self.camera.psf.intrapixel.name)
 
 	def simulate(self):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
-		self.I.display =0
+		self.ccd.display =0
+		self.camera.cartographer.pithy = False
+		self.speak('populating the {0} cube with {1:.0f}-second exposures'.format(self.shape, self.cadence))
 		for i in range(self.n):
-			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.I.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
+			self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
+			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
+		self.background = self.ccd.backgroundimage
 
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''
-		print " saving cube to " + self.filename
+		self.speak( "Saving cube to " + self.filename)
 		np.save(self.filename, (self.photons, self.cosmics, self.noiseless))
 
 	def load(self):
 		'''Load this cube from a 3D numpy array, assuming one exists with the appropriate size, for this field, at this cadence, with the right number of exposures.'''
-		print " loading simulated cube from " + self.filename
+		self.speak("Trying to load simulated cube from " + self.filename)
 		try:
 			self.photons, self.cosmics, self.noiseless = np.load(self.filename)
-			print self.prefix + 'Loaded cube from ' + self.filename
+			self.speak( 'Loaded cube from ' + self.filename)
 		except:
-			print self.prefix + 'No saved cube was found; generating a new one.\n          (looked in {0})'.format( self.filename)
+			self.speak('No saved cube was found; generating a new one.\n          (looked in {0})'.format( self.filename))
 			self.simulate()
 			self.save()
 
@@ -212,7 +226,7 @@ class Cube(object):
 		for i in range(self.n):
 			# pick some kind of normalization for the image
 			image = flux[:,:,i]
-			self.I.writeToFITS(image, dir + normalization + '_{0:05.0f}.fits'.format(i))
+			self.ccd.writeToFITS(image, dir + normalization + '_{0:05.0f}.fits'.format(i))
 
 	def plot(self, normalization='none'):
 

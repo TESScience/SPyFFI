@@ -690,12 +690,11 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY,
   */
 
   seed = get_tw_seed();
-  fprintf(stderr," using CosmicAl to generate simulated cosmic rays for a %ldx%ld pixel image, assuming:\n",
-	  NX,NY);
-  fprintf(stderr,"     exposure times spanning %f to %f s\n", exptm1, exptm2);
-  fprintf(stderr,"     a mean of %f events \n", ncrmn);
-  fprintf(stderr,"     Fano factor of %f\n", SQRT_FANO_SI*SQRT_FANO_SI);
-  fprintf(stderr,"     and a seed of %lu \n",seed);
+  //fprintf(stderr," using CosmicAl to generate simulated cosmic rays for a %ldx%ld pixel image, assuming:\n", NX,NY);
+  //fprintf(stderr,"     exposure times spanning %f to %f s\n", exptm1, exptm2);
+  //fprintf(stderr,"     a mean of %f events \n", ncrmn);
+  //fprintf(stderr,"     Fano factor of %f\n", SQRT_FANO_SI*SQRT_FANO_SI);
+  //fprintf(stderr,"     and a seed of %lu \n",seed);
   seedMT(seed);
 }
 
@@ -735,6 +734,8 @@ double * cosmical(double crfl, double exptm1, double exptm2, long NX, long NY, i
 
     if (idodif == 1)
       do_diffusion(NX,NY);
+    free(imaged);
+    free(temp);
     return image;
   }
 
@@ -747,7 +748,7 @@ int main(int argc, char *argv[])
   double exptm1, exptm2, crfl;
   int i, iimg, nimg, idodif;
   long NX, NY;
-  FILE *fp;
+  //FILE *fp;
   clock_t t;
 
   t = clock();
@@ -774,9 +775,9 @@ int main(int argc, char *argv[])
     */
     sprintf(fileout,"image_%05d.dat",iimg);
     // 'fp" could be stdout instead of a pointer to a specific file
-    fp = fopen(fileout,"w");
-    print_image(NX,NY,fp);
-    fclose(fp);
+    //fp = fopen(fileout,"w");
+    //print_image(NX,NY,fp);
+    //fclose(fp);
     t = clock() - t;
     fprintf(stderr," added %ld cosmic rays in %f seconds \n",ncr,((float)t)/CLOCKS_PER_SEC);
   }

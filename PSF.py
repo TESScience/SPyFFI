@@ -28,7 +28,7 @@ class PSF(Talker):
         self.setupPixelArrays()
 
         # fill in an intrapixel sensitivity
-        self.intrapixel = Intrapixel.Boxcar(nsubpixels=self.numberof_subpixelsforintegrating)
+        self.intrapixel = Intrapixel.Perfect(nsubpixels=self.numberof_subpixelsforintegrating)
 
         # if possible, associate a Camera object with this PSF
         self.setCamera(camera)
@@ -96,6 +96,7 @@ class PSF(Talker):
         # create a subarray CCD with these parameters, to aid pixelization calculations
         self.ccd = CCD(camera=self.camera, subarray=self.dx_pixels.shape[0], number=1, label='PSF')
         self.cartographer = Cartographer(camera=self.ccd.camera, ccd=self.ccd)
+        self.cartographer.pithy = True
 
     def subpixel2pixel(self,anysubpixel):
         '''Convert from fractional pixel to an integer pixel (pixel centers are at 0.0's; edges are at 0.5's).'''
@@ -655,7 +656,6 @@ class PSF(Talker):
             xbelow_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xbelow][yabove]
 
         assert( interpolatedPSF is not None)
-        print interpolatedPSF.shape
         return interpolatedPSF, centralx + self.dx_pixels, centraly + self.dy_pixels
 
 def extent(x,y):

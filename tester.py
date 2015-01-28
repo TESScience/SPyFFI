@@ -62,11 +62,10 @@ class Tester(Talker):
     def jitter(self):
         self.jitter = self.camera.jitter
 
-    def image(self):
+    def image(self, remake=True, jitter=False):
         '''Make sure the CCDs can exposure new images.'''
-        C = self.camera
-        I = C.ccds[0]
-        I.expose(write=True, remake=True)
+        self.ccd = self.camera.ccds[0]
+        self.ccd.expose(write=True, remake=remake, jitter=jitter)
 
     def shiftPSF(self):
         '''Make sure we can shift PSFs around.'''

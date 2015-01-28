@@ -59,8 +59,7 @@ class CCD(Talker):
 		# a few misc diagnostics
 		self.display = display
 		self.plot = False
-		self.starcounter = 0
-		self.nstars =0
+
 
 		# start populating the image header (seems like we can't do this until we're sure camera has pointed somewhere)
 		self.populateHeader()
@@ -68,6 +67,7 @@ class CCD(Talker):
 	def show(self):
 		'''Display the current (possibly in-progress image.)'''
 		if self.display:
+
 			try:
 				self.ds9
 			except:
@@ -240,8 +240,8 @@ class CCD(Talker):
 	def writeFinal(self, lean=True):
 		'''Write the final image from this CCD.'''
 
-		self.header.extend(self.camera.header)
-		self.header.extend(self.camera.psf.header)
+		#self.header.extend(self.camera.header)
+		#self.header.extend(self.camera.psf.header)
 
 		# make filename for this image
 		self.note = 'final_{0:06.0f}'.format(self.camera.counter)
@@ -295,12 +295,12 @@ class CCD(Talker):
 			np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f'])
 			self.speak("save projected star catalog {0}".format(outfile))
 
-	def addStar(self, ccdx, ccdy, mag, temp, verbose=True, plot=False):
+	def addStar(self, ccdx, ccdy, mag, temp, verbose=False, plot=False):
 		'''Add one star to an image, given position, magnitude, and effective temperature.'''
 
 
-		self.speak("adding stars at ({0}, {1}) with magnitude of {2}".format(ccdx, ccdy, mag))
-		self.speak(" ({0}/{1})".format(self.starcounter,self.nstars))
+		#self.speak("adding stars at ({0}, {1}) with magnitude of {2}".format(ccdx, ccdy, mag))
+		#self.speak(" ({0}/{1})".format(self.starcounter,self.nstars))
 
 		# (this is probably a slow way of doing things -- speed it up!)
 		ccdxy = self.camera.cartographer.point(ccdx + self.camera.nudge['x']/self.camera.pixelscale,ccdy + self.camera.nudge['y']/self.camera.pixelscale,'ccdxy')
@@ -334,12 +334,14 @@ class CCD(Talker):
 		ok = (xindex >= self.xmin) * (xindex < self.xsize) * (yindex >= self.ymin) * (yindex < self.ysize)
 		self.starimage[yindex[ok], xindex[ok]] += binned[ok]
 
+
 	def addStars(self, remake=False, jitter=False):
 		self.speak("Adding stars.")
-
+		self.starcounter = 0
+		self.nstars =0
 		if jitter:
 			remake=True
-
+		self.camera.cartographer.pithy = True
 		# define a grid of magnitude thresholds, will save an image containing all stars brighter than each
 		dthreshold = 1
 		magnitude_thresholds = np.arange(6,18,dthreshold)
@@ -363,8 +365,9 @@ class CCD(Talker):
 			except:
 				self.projectCatalog()
 
-			for threshold in magnitude_thresholds:
-
+			#for threshold in magnitude_thresholds:
+			if True:
+				threshold = np.max(magnitude_thresholds)
 				# define a filename for this magnitude range
 				self.note = 'starsbrighterthan{0:02d}'.format(threshold)
 				starsfilename = self.directory + self.note + '.fits'
@@ -375,16 +378,16 @@ class CCD(Talker):
 					self.starimage = self.loadFromFITS(starsfilename)
 				except:
 					# if this is the smallest threshold, include all the stars brighter than it
-					if threshold == np.min(magnitude_thresholds):
-						min = -100
-					else:
-						min = threshold - dthreshold
+					#if threshold == np.min(magnitude_thresholds):
+					minimum = -100
+					#else:
+					#	minimum = threshold - dthreshold
 					# pick the stars to add to the image on this pass through
 					ok =    (self.starx + self.camera.psf.dx_pixels_axis[-1] >= self.xmin) * \
 							(self.starx + self.camera.psf.dx_pixels_axis[0] <= self.xmax) * \
 							(self.stary + self.camera.psf.dy_pixels_axis[-1] >= self.ymin) * \
 							(self.stary + self.camera.psf.dy_pixels_axis[0] <= self.ymax) * \
-							(self.starmag < threshold)*(self.starmag >= min)
+							(self.starmag < threshold)*(self.starmag >= minimum)
 					x = self.starx[ok]
 					y = self.stary[ok]
 					mag = self.starmag[ok]
@@ -458,20 +461,20 @@ class CCD(Talker):
 			oversaturated = self.image > saturation_limit
 			saturated = self.image >= saturation_limit
 			for x in range(self.image.shape[1]):
-				regions, nregions = scipy.ndimage.measurements.label(oversaturated[x,:])
+				regions, nregions = scipy.ndimage.measurements.label(oversaturated[:,x])
 				if nregions > 0:
 					for i in np.arange(nregions)+1:
 						y = (regions == i).nonzero()[0]
-						if oversaturated[x,y].any():
-							fluxtodistribute = np.sum(self.image[x,y])
+						if oversaturated[y,x].any():
+							fluxtodistribute = np.sum(self.image[y,x])
 							npixels = (fluxtodistribute/saturation_limit)
 							center = np.int(np.mean(y))
 							grow = np.int(np.floor(npixels/2 - 0.5))
 							indices = np.arange(np.maximum(center - grow, 0),np.minimum(center + grow, self.image.shape[0]-1)+1)
 							assert(y[0] in indices)
 
-							existingflux = np.sum(self.image[x,indices])
-							self.image[x,indices] = saturation_limit
+							existingflux = np.sum(self.image[indices,x])
+							self.image[indices,x] = saturation_limit
 							leftoverflux = existingflux - indices.shape[0]*saturation_limit
 							#print "       distributing flux of {0:10.5f}X saturated pixels over {1:4} + {2:.5f} pixels".format(fluxtodistribute/saturation_limit, indices.shape[0], leftoverflux/saturation_limit)
 							#print x, y
@@ -480,13 +483,13 @@ class CCD(Talker):
 							rightedge = center + grow +1
 							try:
 								try:
-									self.image[x,leftedge] += leftoverflux/2.0
+									self.image[leftedge,x] += leftoverflux/2.0
 								except:
-									self.image[x,rightedge] += leftoverflux/2.0
+									self.image[rightedge,x] += leftoverflux/2.0
 								try:
-									self.image[x,rightege] += leftoverflux/2.0
+									self.image[rightege,x] += leftoverflux/2.0
 								except:
-									self.image[x,leftedge] += leftoverflux/2.0
+									self.image[leftedge,x] += leftoverflux/2.0
 							except:
 								print "    this star seems to saturate the entire detector!"
 			self.speak("on pass #{0} through saturation filter,  \n        the max saturation fraction is {1} \n        and the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
@@ -589,7 +592,7 @@ class CCD(Talker):
 
 
 		untouched = self.image + 0.0
-		mean =np.mean(self.image, 1).reshape(self.image.shape[0],1)*self.ones()
+		mean =np.mean(self.image, 0).reshape(1,self.image.shape[0])*self.ones()
 		self.image += mean*self.camera.readouttime/self.camera.singleread
 
 		self.note = 'readoutsmear'
@@ -600,6 +603,7 @@ class CCD(Talker):
 		# update header
 		self.header['ISMEAR'] = ('True', 'smearing during transer to frame store')
 		self.show()
+
 
 	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False):
 		'''Expose an image on this CCD.'''

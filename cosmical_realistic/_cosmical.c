@@ -37,10 +37,13 @@ static PyObject *cosmical_cosmical(PyObject *self, PyObject *args)
     /* Call the external C function to compute the chi-squared. */
     double *unraveled = cosmical(crfl, exptm1, exptm2, NX, NY, idodif);
 
-	npy_intp size[2];
-	size[0] = NX;
-	size[1] = NY;
+		npy_intp size[2];
+		size[0] = NX;
+		size[1] = NY;
     PyObject *ret = PyArray_SimpleNewFromData(2, size, NPY_DOUBLE, unraveled);
+		PyArray_ENABLEFLAGS(ret, NPY_ARRAY_OWNDATA);
+		//Py_XDECREF(unraveled);
+
 
 
     /* Build the output tuple */

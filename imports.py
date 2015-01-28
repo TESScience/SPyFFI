@@ -18,3 +18,5 @@ import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.di
 
 # a parent class that allows text reporting to be muted/unmuted
 from Talker import Talker
+
+#from memory_profiler import profile

@@ -18,7 +18,6 @@ class Jitter(Talker):
 
     def load(self, remake=False):
         '''Load the jitterball for this camera, binned to the appropriate cadence.'''
-        self.speak('Populating the jitterball for {0:.0f} second cadence.'.format(self.camera.cadence))
 
         try:
             # if the jitterball is already loaded and of the correct cadence, we're all set!
@@ -27,6 +26,7 @@ class Jitter(Talker):
             # make sure the we're using the right jitterball for this cadence
             assert(self.jittercadence == self.camera.cadence)
         except:
+            self.speak('Populating the jitterball for {0:.0f} second cadence.'.format(self.camera.cadence))
             # if the jitterball isn't already loaded (or has wrong cadence), then load/create a new one!
             jitterfile = settings.prefix + 'intermediates/jitter_{0:04.0f}.npy'.format(self.camera.cadence)
             try:
@@ -183,20 +183,20 @@ class Jitter(Talker):
 
         # make sure the jitterball has been populated
         self.load()
-
+        n = len(self.jitterball[0])
         # assign the nudges in two translations and one rotation
         if dx is None:
-            self.camera.nudge['x'] = scale*self.jitterball[0][counter]#*0.002#self.camera.counter*0.0#
+            self.camera.nudge['x'] = scale*self.jitterball[0][counter % n]#*0.002#self.camera.counter*0.0#
         else:
             self.camera.nudge['x'] = dx
 
         if dy is None:
-            self.camera.nudge['y'] = scale*self.jitterball[1][counter]#*0.002#-self.camera.counter*3.0#
+            self.camera.nudge['y'] = scale*self.jitterball[1][counter % n]#*0.002#-self.camera.counter*3.0#
         else:
             self.camera.nudge['y'] = dy
 
         if dz is None:
-            self.camera.nudge['z'] = scale*self.jitterball[2][counter]#*0.002#-self.camera.counter*3.0#
+            self.camera.nudge['z'] = scale*self.jitterball[2][counter % n]#*0.002#-self.camera.counter*3.0#
         else:
             self.camera.nudge['z'] = dz
 
