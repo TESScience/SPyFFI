@@ -1,6 +1,6 @@
 '''Generate TESS pixel lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
 from imports import *
-import SPyFFI, cr
+import SPyFFI, CR.Strategies
 
 class Cube(Talker):
 	'''Cube to handle simulated postage stamp pixel light curves;
@@ -70,7 +70,7 @@ class Cube(Talker):
 		# self.simulate()
 		# self.plot()
 
-	def bin(self, nsubexposures=60, strategy=cr.central(n=10), plot=False):
+	def bin(self, nsubexposures=60, strategy=CR.Strategies.central(n=10), plot=False):
 		'''Bin together 2-second exposures, using some cosmic strategy.'''
 
 		# make sure that we're starting with a 2-second exposure
@@ -87,7 +87,7 @@ class Cube(Talker):
 		for x in np.arange(self.shape[0]):
 			for y in np.arange(self.shape[1]):
 				self.speak('   {x}, {y} out of ({size}, {size})'.format(x=x, y=y, size=self.size))
-				timeseries = cr.timeseries(self, (x,y), nsubexposures=nsubexposures)
+				timeseries = CR.Strategies.timeseries(self, (x,y), nsubexposures=nsubexposures)
 				strategy.calculate(timeseries)
 				if plot:
 					strategy.plot()
@@ -134,6 +134,8 @@ class Cube(Talker):
 			self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
 			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
 		self.background = self.ccd.backgroundimage
+		self.noise = self.ccd.noiseimage
+		self.catalog = self.camera.catalog
 
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''

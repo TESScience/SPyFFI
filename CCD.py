@@ -552,6 +552,7 @@ class CCD(Talker):
 	def addPhotonNoise(self):
 		'''Add photon noise into an image.'''
 
+		self.noiseimage = self.zeros()
 		self.speak("Adding photon noise [sqrt(photons from stars and various backgrounds)].")
 		noise_variance = self.image
 		ok = noise_variance > 0
@@ -561,6 +562,7 @@ class CCD(Talker):
 
 		assert(np.isfinite(noise).all())
 		self.image += noise*np.random.randn(self.xsize, self.ysize)
+		self.noiseimage = noise
 
 		self.note = 'photonnoise'
 		noisefilename = self.directory + self.note + '.fits'
@@ -579,6 +581,10 @@ class CCD(Talker):
 
 		# add noise into image
 		self.image += np.sqrt(noise_variance)*np.random.randn(self.xsize, self.ysize)
+		try:
+			self.noiseimage = np.sqrt(self.noiseimage**2 + noise_variance)
+		except:
+			self.noiseimage = np.sqrt(noise_variance)
 
 		# update image header
 		self.header['IREADNOI'] = ('True', 'read noise')

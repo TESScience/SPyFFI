@@ -1,4 +1,5 @@
-import Cosmics
+import SPyFFI.Cosmics as Cosmics
+import SPyFFI.settings as settings
 import zachopy.display
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,9 +14,8 @@ def demoimages():
         d.one(image, clobber=cadence==2.0)
     print "fiddle with the images until you like them, and then save as example_cosmics.png"
 
-# estimate the PDF of cosmic ray flux per pixel
-def histogram(remake=False, diffusion=False, n=10, size=4096, xpeak = 700, version='fancy'):
-
+def histogram(remake=False, diffusion=False, n=10, size=4096, xpeak = 750, version='fancy'):
+    '''Estimate the PDF of cosmic ray fluxes for pixels.'''
     plt.ion()
     gs = plt.matplotlib.gridspec.GridSpec(2,1,wspace=0, hspace=0.05)
     ax = []
@@ -41,7 +41,7 @@ def histogram(remake=False, diffusion=False, n=10, size=4096, xpeak = 700, versi
     def ccdf(y):
         return 1.0 - np.cumsum(y.astype(np.float))/np.sum(y)
 
-    filename='cosmics_histogram.npy'
+    filename=settings.dirs['intermediates']+'cosmics_histogram.npy'
     try:
         assert(remake == False)
         x, y = np.load(filename)
