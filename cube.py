@@ -140,13 +140,14 @@ class Cube(Talker):
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''
 		self.speak( "Saving cube to " + self.filename)
-		np.save(self.filename, (self.photons, self.cosmics, self.noiseless))
+		np.save(self.filename, (self.photons, self.cosmics, self.noiseless, self.background, self.noise, self.catalog))
 
-	def load(self):
+	def load(self, remake=False):
 		'''Load this cube from a 3D numpy array, assuming one exists with the appropriate size, for this field, at this cadence, with the right number of exposures.'''
 		self.speak("Trying to load simulated cube from " + self.filename)
 		try:
-			self.photons, self.cosmics, self.noiseless = np.load(self.filename)
+			assert(remake==False)
+			self.photons, self.cosmics, self.noiseless, self.background, self.noise, self.catalog = np.load(self.filename)
 			self.speak( 'Loaded cube from ' + self.filename)
 		except:
 			self.speak('No saved cube was found; generating a new one.\n          (looked in {0})'.format( self.filename))

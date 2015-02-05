@@ -10,13 +10,13 @@ import scipy.ndimage, scipy.signal, scipy.interpolate
 # lots from astropy
 import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
 
-# online access to catalogs
+# online access to Catalogs
 import astroquery.vizier
 
 # general tools from my library
 import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.display, zachopy.star, zachopy.oned
 
 # a parent class that allows text reporting to be muted/unmuted
-from Talker import Talker
+from zachopy.Talker import Talker
 
 #from memory_profiler import profile

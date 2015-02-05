@@ -1,4 +1,4 @@
-'''Keep track of catalogs of objects, usually stars.'''
+'''Keep track of Catalogs of objects, usually stars.'''
 from imports import *
 import settings, relations
 
@@ -39,7 +39,7 @@ class Catalog(Talker):
 
 class TestPattern(Catalog):
 	'''a test pattern catalog, creating a grid of stars to fill an image'''
-	def __init__(self, size=3000.0, spacing=200.0, magnitudes=[9,16], ra=0.0, dec=0.0):
+	def __init__(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False):
 		'''create a size x size square (in arcsecs) test pattern of stars,
 		with spacing (in arcsecs) between each element and
 		magnitudes spanning the range of magnitudes'''
@@ -51,6 +51,8 @@ class TestPattern(Catalog):
 
 		# construct a linear grid of magnitudes
 		self.tmag = np.linspace(np.min(magnitudes), np.max(magnitudes),n)[::-1]
+		if random:
+			self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
 		ras, decs = np.meshgrid(np.arange(pixels)*spacing, np.arange(pixels)*spacing)
 		ras += np.random.rand() - 0.5
 		decs += np.random.rand() - 0.5

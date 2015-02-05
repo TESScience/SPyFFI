@@ -1,5 +1,5 @@
 from imports import *
-import settings, catalogs
+import settings, Catalogs
 from PSF import PSF
 from Cartographer import Cartographer
 from CCD import CCD
@@ -192,7 +192,7 @@ class Camera(Talker):
         '''Take one step forward in time with this Camera.'''
         self.counter +=1
 
-    def populateCatalog(self):
+    def populateCatalog(self, **kwargs):
         '''Create a catalog of stars that are visible with this Camera.'''
 
         # figure out how wide we need to search for stars
@@ -205,9 +205,9 @@ class Camera(Talker):
         if self.testpattern:
             # figure out how big a test pattern to create (in arcsec)
 
-            self.catalog = catalogs.TestPattern(size=size*3600.0)
+            self.catalog = Catalogs.TestPattern(size=size*3600.0, **kwargs)
         else:
-            self.catalog = catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=size/np.sqrt(2)*1.01)
+            self.catalog = Catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=size/np.sqrt(2)*1.01, **kwargs)
 
 
 	'''def c1(self, image):

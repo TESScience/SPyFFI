@@ -1,5 +1,5 @@
 from imports import *
-import Camera, Cosmics, settings
+import Camera, Cosmics, Cube, Photometer, settings
 
 class Track(object):
     '''Quick way to make a path for a pixel to follow. Must be created with a Cartographer.'''
@@ -50,6 +50,12 @@ class Tester(Talker):
         self.camera = Camera.Camera(subarray=subarray, testpattern=testpattern, cadence=cadence)
         self.buster = self.camera.cartographer
         self.jitter = self.camera.jitter
+
+    def photometer(self, remake=False, size=100, cadence=2, n=100, jitter=False):
+        self.cube = Cube.Cube(n=n,size=size, cadence=cadence, jitter=jitter)
+        self.cube.camera.populateCatalog(random=True, magnitudes=[6,16])
+        self.cube.load(remake=remake)
+        self.phot = Photometer.Photometer(self.cube)
 
     def cartographer(self):
         '''Make sure the Cartographer can convert coordinates back and forth.'''
