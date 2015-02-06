@@ -205,6 +205,15 @@ class Cube(Talker):
 		else:
 			return self.std(which)
 
+	def oneWeirdTrickToTrimCosmics(self, threshold=4):
+		'''To be used for simulating ground-based cosmics removal.'''
+		shape = np.array(self.photons.shape)
+		shape[-1] = 1
+		bad = self.photons > (self.median() + threshold*self.sigma(robust=True)).reshape(shape)
+		x, y, z = bad.nonzero()
+		self.photons[x,y,z] = self.median()[x,y]
+		self.speak('trimmed {0} cosmics from cube!'.format(np.sum(bad)))
+
 	def master(self, which='photons'):
 		'''The (calculated) master frame.'''
 		return self.median(which)

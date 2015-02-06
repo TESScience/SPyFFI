@@ -77,6 +77,9 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0, \
     # photoelectrons from the star
     e_star = 10.0**(-0.4*tmag) * tmag0 * effective_area * exptime * frac_aper
 
+    if ra is not None and dec is not None:
+        elon, elat = carto.point(ra, dec, 'celestial').ecliptic.tuple
+
     if verbose:
         print 'imag = ', imag
         print 'tmag = ', tmag
@@ -107,7 +110,7 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0, \
 
     # photoelectrons/pixel from background stars
     coord = carto.point(elon, elat, 'ecliptic')
-    glon, glat = coord.ecliptic.tuple
+    glon, glat = coord.galactic.tuple
     glon = np.array([glon])
     glat = np.array([glat])
     if verbose:
@@ -131,11 +134,11 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0, \
     noise_sys  = 0.0*noise_star + sys_limit/1e6/np.sqrt(exptime/3600.)
     noise = np.sqrt( noise_star**2. + noise_sky**2. + noise_ro**2. + noise_sys**2. )
 
-    if verbose:
+    '''if verbose:
         print 'noise_star [ppm] = ', noise_star*1e6
         print 'noise_sky  [ppm] = ', noise_sky*1e6
         print 'noise_ro   [ppm] = ', noise_ro*1e6
         print 'noise_sys  [ppm] = ', noise_sys*1e6
         print 'noise      [ppm] = ', noise*1e6
-
+        '''
     return noise

@@ -491,8 +491,8 @@ class CCD(Talker):
 								except:
 									self.image[leftedge,x] += leftoverflux/2.0
 							except:
-								print "    this star seems to saturate the entire detector!"
-			self.speak("on pass #{0} through saturation filter,  \n        the max saturation fraction is {1} \n        and the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
+								self.speak("this star seems to saturate the entire detector!")
+			self.speak("on pass #{0} through saturation filter,  \nthe max saturation fraction is {1} \nand the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
 
 			# KLUDGE to prevent endless loops
 			stilloversaturated = (self.image > saturation_limit).any() and count < 10

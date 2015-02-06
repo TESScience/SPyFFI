@@ -1,0 +1,19 @@
+# the optimal number of pixels in a TESS photometric aperture
+#   (rough average values traced by hand from Peter Sullivan’s
+#    simulation paper draft, traced by ZKBT on 1/20/2015)
+tmag	npix
+0.00	35.0
+5.905	34.482
+6.281	32.564
+6.903	29.034
+7.090	27.833
+7.137	26.000
+7.459	23.965
+7.853	22.009
+8.683	18.772
+9.764	14.383
+10.395	11.321
+11.305	7.727
+12.616	4.723
+13.860	3.059
+30.0	3.0

@@ -73,8 +73,17 @@ class Aperture(Talker):
     def measure(self, cube, plot=True):
         self.speak('calculating lightcurve for {0}'.format(self))
         self.expectednoise = np.sqrt(np.sum(cube.noise[self.row, self.col]**2))
-        self.lc = np.sum(cube.photons[self.row, self.col, :], 0)
+        shape = (len(self.row), 1)
+        self.lc = np.sum(cube.photons[self.row, self.col, :] - cube.background[self.row, self.col].reshape(shape), 0)
         self.achievednoise = np.std(self.lc)
+        ok = np.array(self.lc < 4*1.48*zachopy.oned.mad(self.lc) + np.median(self.lc))
+        '''plt.cla()
+        plt.plot(self.lc)
+        a = plt.gca()
+
+        a.axhline(3*1.48*zachopy.oned.mad(self.lc) + np.median(self.lc))
+        plt.draw()
+        self.input('hmmm?')'''
+        self.mitigatednoise = np.std(self.lc[ok])
         self.median = np.median(self.lc)
-        if plot:
-            plt.plot(self.lc)
+        self.speak('{0}'.format(np.sum(ok == False)))

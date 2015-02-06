@@ -1,0 +1,1 @@
+# taken from Table 1 of Peter Sullivan's simulation paper draftspt teff zeropoint icminustM9V 2450 2.38 306M5V 3000 1.43 -191M4V 3200 1.40 -202M3V 3400 1.38 -201M1V 3700 1.39 -174K5V 4100 1.41 -132K3V 4500 1.43 -101K1V 5000 1.45 -80.0G2V 5777 1.45 -69.5F5V 6500 1.48 -40.0F0V 7200 1.48 -34.1A0V 9700 1.56 35.0

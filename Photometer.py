@@ -50,3 +50,7 @@ class Photometer(Talker):
     def measure(self):
         for a in self.apertures:
             a.measure(self.cube)
+        mag = np.array([a.mag for a in self.apertures])
+        exp = np.array([a.expectednoise/a.median for a in self.apertures])
+        ach = np.array([a.achievednoise/a.median for a in self.apertures])
+        return mag, exp, ach
