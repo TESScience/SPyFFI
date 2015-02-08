@@ -457,42 +457,72 @@ class CCD(Talker):
 		# keep looping until all saturation problems are gone
 		count =0
 		while stilloversaturated:
+
+			# keep track of iterations, to prevent infinite loops!
 			count +=1
+
+			# identify saturated pixels
 			oversaturated = self.image > saturation_limit
 			saturated = self.image >= saturation_limit
+
+			# loop over columns, treating each separately
 			for x in range(self.image.shape[1]):
-				regions, nregions = scipy.ndimage.measurements.label(oversaturated[:,x])
+
+				# identify continuous saturated regions
+				regions, nregions = scipy.ndimage.measurements.label(saturated[:,x])
 				if nregions > 0:
 					for i in np.arange(nregions)+1:
 						y = (regions == i).nonzero()[0]
 						if oversaturated[y,x].any():
+							#self.speak('')
+							#self.speak('in column {0}'.format(x))
+							# in this saturated region, how much flux needs to be redistributed?
 							fluxtodistribute = np.sum(self.image[y,x])
+							#self.speak('must distribute {0} electrons'.format(fluxtodistribute))
+							# how many pixels would this correspond to? (including the original pixels)
 							npixels = (fluxtodistribute/saturation_limit)
-							center = np.int(np.mean(y))
-							grow = np.int(np.floor(npixels/2 - 0.5))
-							indices = np.arange(np.maximum(center - grow, 0),np.minimum(center + grow, self.image.shape[0]-1)+1)
+							#self.speak('which we could do over {0} pixels'.format(npixels))
+
+							# find the center of the saturated region
+							center = np.mean(y)
+
+							# find how far we away from center we can totally saturate pixel
+							grow = (npixels-1.0)/2.0
+							indices = np.arange(np.maximum(np.ceil(center - grow).astype(np.int), 0),np.minimum(np.floor(center + grow).astype(np.int), self.image.shape[0]-1)+1)
+							#self.speak('with indices of {0}'.format(indices))
+
 							assert(y[0] in indices)
 
+							# record the flux we're starting with in this region
 							existingflux = np.sum(self.image[indices,x])
+
+							# saturate the pixels needed
 							self.image[indices,x] = saturation_limit
 							leftoverflux = existingflux - indices.shape[0]*saturation_limit
-							#print "       distributing flux of {0:10.5f}X saturated pixels over {1:4} + {2:.5f} pixels".format(fluxtodistribute/saturation_limit, indices.shape[0], leftoverflux/saturation_limit)
-							#print x, y
-							#print indices
-							leftedge = center - grow -1
-							rightedge = center + grow +1
+							#self.speak('leaving {0} behind'.format(leftoverflux))
+
+							'''if leftoverflux > 0:
+								leftedge = indices.min() -1
+								rightedge = indices.max() +1
+							else:'''
+							leftedge = indices.min()-1
+							rightedge = indices.max()+1
 							try:
 								try:
 									self.image[leftedge,x] += leftoverflux/2.0
 								except:
 									self.image[rightedge,x] += leftoverflux/2.0
 								try:
-									self.image[rightege,x] += leftoverflux/2.0
+									self.image[rightedge,x] += leftoverflux/2.0
 								except:
 									self.image[leftedge,x] += leftoverflux/2.0
 							except:
 								self.speak("this star seems to saturate the entire detector!")
-			self.speak("on pass #{0} through saturation filter,  \nthe max saturation fraction is {1} \nand the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
+			self.speak("on pass #{0} through saturation filter: the max saturation fraction is {1}; and the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
+			#self.display=True
+			#self.show()
+			#self.display=False
+			#self.input('saturation?')
 
 			# KLUDGE to prevent endless loops
 			stilloversaturated = (self.image > saturation_limit).any() and count < 10

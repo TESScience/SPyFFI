@@ -240,7 +240,7 @@ class Cube(Talker):
 			image = flux[:,:,i]
 			self.ccd.writeToFITS(image, dir + normalization + '_{0:05.0f}.fits'.format(i))
 
-	def plot(self, normalization='none'):
+	def plot(self, normalization='none', ylim=None):
 
 		# choose how to normalize the lightcurves for plotting
 		if normalization.lower() == 'none':
@@ -267,7 +267,7 @@ class Cube(Talker):
 
 		# create a plot
 		scale = 1.5
-		plt.figure(figsize = (np.minimum(self.xpixels*scale,10),np.minimum(self.ypixels*scale, 10)))
+		plt.figure('pixel timeseries', figsize = (np.minimum(self.xpixels*scale,10),np.minimum(self.ypixels*scale, 10)))
 		gs = plt.matplotlib.gridspec.GridSpec(self.xpixels,self.ypixels, wspace=0, hspace=0)
 
 		# loop over pixels (in x and y directions)
@@ -279,7 +279,7 @@ class Cube(Talker):
 					sharex, sharey = ax, ax
 				except:
 					sharex, sharey = None, None
-				ax = plt.subplot(gs[i,j], sharex=sharex, sharey=sharey)
+				ax = plt.subplot(gs[-(i+1),j], sharex=sharex, sharey=sharey)
 
 				# color the plot panel based on the pixel's intensity
 				ax.patch.set_facecolor(color(self.median()[i,j]))
@@ -289,7 +289,7 @@ class Cube(Talker):
 				ax.plot(noiselessnormalized[i,j,:], color='blue', alpha=0.3)
 				ax.plot(cosmicsnormalized[i,j,:], color='green', alpha=0.3)
 
-				if i == (self.ypixels-1) and j == 0:
+				if i == 0 and j == 0:
 					plt.setp(ax.get_xticklabels(), rotation=90)
 					ax.set_xlabel('Time')
 					ax.set_ylabel(ylabel)
@@ -298,7 +298,8 @@ class Cube(Talker):
 					plt.setp(ax.get_yticklabels(), visible=False)
 
 
-
-		ax.set_ylim(np.min(photonsnormalized), np.max(photonsnormalized))
-
+		if ylim is None:
+			ax.set_ylim(np.min(photonsnormalized), np.max(photonsnormalized))
+		else:
+			ax.set_ylim(*ylim)
 		plt.draw()

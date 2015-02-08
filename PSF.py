@@ -376,7 +376,7 @@ class PSF(Talker):
             for focalplaneradius in self.focalplaneradii:
                 self.speak('calculating jittered PSFs at temperatures of {0}'.format(self.temperatures))
                 for temperature in self.temperatures:
-                    self.jitteredlibrary[focalplaneradius][temperature] = scipy.signal.convolve2d(self.temperaturelibrary[focalplaneradius][temperature], self.camera.jittermap[0]/np.sum(self.camera.jittermap[0]), 'same', 'fill', 0)
+                    self.jitteredlibrary[focalplaneradius][temperature] = scipy.signal.convolve2d(self.temperaturelibrary[focalplaneradius][temperature], self.camera.jitter.jittermap[0]/np.sum(self.camera.jitter.jittermap[0]), 'same', 'fill', 0)
                     self.jitteredlibrarytime = self.camera.cadence
                     np.save(jittered_filename, (self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime))
                     self.speak('saved jittered, high-resolution PSF library to {0}'.format(jittered_filename))

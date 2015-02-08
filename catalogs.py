@@ -39,7 +39,7 @@ class Catalog(Talker):
 
 class TestPattern(Catalog):
 	'''a test pattern catalog, creating a grid of stars to fill an image'''
-	def __init__(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False):
+	def __init__(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False, nudge=21.1):
 		'''create a size x size square (in arcsecs) test pattern of stars,
 		with spacing (in arcsecs) between each element and
 		magnitudes spanning the range of magnitudes'''
@@ -54,10 +54,9 @@ class TestPattern(Catalog):
 		if random:
 			self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
 		ras, decs = np.meshgrid(np.arange(pixels)*spacing, np.arange(pixels)*spacing)
-		ras += np.random.rand() - 0.5
-		decs += np.random.rand() - 0.5
-		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten()
-		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra
+		offset = nudge*(np.random.rand(2) - 0.5)/3600.0
+		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten() + offset[0]
+		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra + offset[1]
 		self.temperature = 5800.0 + np.zeros_like(self.ra)
 
 class UCAC4(Catalog):

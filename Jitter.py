@@ -100,8 +100,8 @@ class Jitter(Talker):
 
                 # create a 2D jittermap
                 narcsec = 3
-                bins = np.ceil(narcsec/self.camera.pixelscale/self.camera.psf.subpixsize).astype(np.int)*2 +1	# bins are in units of subpixels
-                range = [[-(bins-1)/2*self.psf.subpixsize,(bins-1)/2*self.camera.psf.subpixsize],[-(bins-1)/2*self.camera.psf.subpixsize,(bins-1)/2*self.camera.psf.subpixsize]] # range is in units of pixels
+                bins = np.ceil(narcsec/self.camera.pixelscale/self.camera.psf.subpixelsforintegrating_size).astype(np.int)*2 +1	# bins are in units of subpixels
+                range = [[-(bins-1)/2*self.camera.psf.subpixelsforintegrating_size,(bins-1)/2*self.camera.psf.subpixelsforintegrating_size],[-(bins-1)/2*self.camera.psf.subpixelsforintegrating_size,(bins-1)/2*self.camera.psf.subpixelsforintegrating_size]] # range is in units of pixels
 
                 # make interpolators to keep track of the running smooth means at every moment
                 x_interpolator = scipy.interpolate.interp1d(smoothed_t, smoothed_x,'nearest',fill_value=0,bounds_error=False)

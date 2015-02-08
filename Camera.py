@@ -78,11 +78,13 @@ class Camera(Talker):
         # point the Camera
         self.point(self.ra, self.dec)
 
+        # load the PSF for this Camera
+        self.psf = PSF(camera=self)
+        
         # load the jitterball for this camera
         self.jitter = Jitter(camera=self)
 
-        # load the PSF for this Camera
-        self.psf = PSF(camera=self)
+
 
     @property
     def fielddirectory(self):
