@@ -3,6 +3,17 @@
 
 from imports import *
 
+
+def pick(name='Sum'):
+    '''Based on an input name, return a stacker object.'''
+    if 'Central' in name:
+        bits = name.split()
+        m, n = np.int(bits[1]), np.int(bits[-1])
+        return SumOfTruncatedMean(n=n, m=m)
+
+
+
+
 class Stacker(Talker):
     '''Stack a cube of images, using some filter.'''
 
@@ -10,7 +21,10 @@ class Stacker(Talker):
         # decide whether or not this Stacker is chatty
         Talker.__init__(self, **kwargs)
 
-class TruncatedMean(Stacker):
+    def stackCosmics(self, cube):
+        pass
+
+class SumOfTruncatedMean(Stacker):
     '''Binning with TruncatedMean = break into subsets, reject the highest and lowest points from each and take the mean of the rest, sum these truncated means.'''
     def __init__(self, n=10, m=None):
         Stacker.__init__(self)
@@ -18,21 +32,34 @@ class TruncatedMean(Stacker):
         if m is None:
             self.m = self.n-2
         else:
-            self.m = None
+            self.m = m
             assert(((self.n - self.m) % 2) == 0)
         self.name = "Central {m} out of {n}".format(m = self.m, n=self.n)
 
-    def filter(self):
-        assert(self.m == self.n-2)
-        shape = self.timeseries.flux.shape
-        reshapen = self.timeseries.flux.reshape(shape[0], shape[1]/self.n, self.n)
-        sum = np.sum(reshapen, 2)
-        max = np.max(reshapen, 2)
-        min = np.min(reshapen, 2)
-        corrected = np.mean((sum - max - min)/self.m,1)
-        return corrected #- np.mean(corrected)
+    def stack(self, cube, nsubexposures):
+        assert(self.n - self.m == 2)
 
-class outlierwithdecay(Strategy):
+        # figure out the original shape
+        xpixels, ypixels, subexposures = cube.photons.shape
+        exposures = subexposures/nsubexposures
+        assert(subexposures % nsubexposures == 0)
+
+        # reshape into something more convenient for summing
+        splitintosubexposures = cube.photons.reshape(xpixels, ypixels, exposures, nsubexposures)
+        splitintochunks = splitintosubexposures.reshape(xpixels, ypixels, exposures, nsubexposures/self.n, self.n)
+
+        # calculate the sum of the truncated means (and recalibrate to the original scale!!!)
+        sum = np.sum(splitintochunks, -1)
+        min = np.min(splitintochunks, -1)
+        max = np.max(splitintochunks, -1)
+        photons = np.sum(sum - max - min, -1)*self.n/self.m
+
+        # sum the cosmics
+        cosmics = np.sum(cube.cosmics.reshape(xpixels, ypixels, exposures, nsubexposures), -1)
+        noiseless = np.sum(cube.noiseless.reshape(xpixels, ypixels, exposures, nsubexposures), -1)
+        return photons.squeeze(), cosmics.squeeze(), noiseless.squeeze()
+
+class outlierwithdecay(Stacker):
     '''Binning Strategy -- break into subsets, estimate standard deviation with weighted mean of current subset and previous estimate, reject from each and take the mean of the rest, sum these truncated means.'''
     def __init__(self, n=10, threshold=10.0, memory=0.90, safetybuffer=2.0, diagnostics=False):
         '''Initialize an outlierwith decay Strategy.

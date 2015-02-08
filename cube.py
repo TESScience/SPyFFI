@@ -1,12 +1,13 @@
 '''Generate TESS pixel lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
 from imports import *
-import SPyFFI, CR.Strategies
+import SPyFFI, CR.Strategies, Stacker
 
+subexposurecadence = 2
 class Cube(Talker):
 	'''Cube to handle simulated postage stamp pixel light curves;
 			has dimensions of (xpixels, ypixels, time).'''
 
-	def __init__(self, subject='test', size=32, n=900, cadence=2, jitter=False):
+	def __init__(self, subject='test', size=32, n=900, cadence=2, jitter=False, stacker='Sum'):
 		'''Initialize a cube object.
 
 		keyword arguments:
@@ -36,6 +37,10 @@ class Cube(Talker):
 			except:
 				self.speak( " but that failed, so we'll go with a test pattern")
 				self.testpattern = True
+
+		# keep track of which stacker is being used to create this image
+		self.stacker = stacker
+
 
 		# define basic geometry
 		self.size = size
@@ -74,7 +79,7 @@ class Cube(Talker):
 		'''Bin together 2-second exposures, using some cosmic strategy.'''
 
 		# make sure that we're starting with a 2-second exposure
-		assert(self.cadence == 2)
+		assert(self.cadence == subexposurecadence)
 
 		# create an empty binned cube object that has the right size and shape
 		binned = Cube(subject=self.subject, size=self.size, cadence=self.cadence*nsubexposures, n=(np.int(self.n/nsubexposures)) )
@@ -123,19 +128,45 @@ class Cube(Talker):
 			phrase = 'with'
 		else:
 			phrase = 'without'
-		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter_{intrapixel}.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase, intrapixel=self.camera.psf.intrapixel.name)
+		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter_{intrapixel}_{stacker}.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase, intrapixel=self.camera.psf.intrapixel.name, stacker=self.stacker.replace(' ',''))
 
 	def simulate(self):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
+
+
+		# turn off display and some of the text output, to speed things up
 		self.ccd.display =0
 		self.camera.cartographer.pithy = False
+
+		# provide an update
 		self.speak('populating the {0} cube with {1:.0f}-second exposures'.format(self.shape, self.cadence))
-		for i in range(self.n):
-			self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
-			self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
-		self.background = self.ccd.backgroundimage
-		self.noise = self.ccd.noiseimage
-		self.catalog = self.camera.catalog
+
+
+		# if we're using a "Sum" stacking strategy, then don't generate the individual 2-second frames
+		if (self.stacker.lower() == 'sum') | (self.cadence == subexposurecadence):
+			# loop over (already stacked) exposures, creating them
+			for i in range(self.n):
+				self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
+				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
+			# store some useful accessory information about
+			self.background = self.ccd.backgroundimage
+			self.noise = self.ccd.noiseimage
+			self.catalog = self.camera.catalog
+		else:
+			theWayToStack = Stacker.pick(self.stacker).stack
+			self.speak('using {0} strategy to stack from 2-second images')
+			ninstack = self.cadence/subexposurecadence
+			self.subcube = Cube(subject=self.subject, size=self.size, n=ninstack, cadence=subexposurecadence, jitter=self.jitter)
+			for i in range(self.n):
+				self.speak()
+				self.speak('creating a temporary stack of {0} images {1}s images'.format(ninstack, subexposurecadence))
+				self.subcube.simulate()
+				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = theWayToStack(self.subcube, ninstack)
+
+			self.background = self.subcube.ccd.backgroundimage*ninstack
+			self.noise = self.subcube.ccd.noiseimage*np.sqrt(ninstack)
+			self.catalog = self.subcube.camera.catalog
+
 
 	def save(self):
 		'''Save this cube a 3D numpy array (as opposed to a series of FITS images).'''
