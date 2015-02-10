@@ -66,7 +66,7 @@ class Cube(Talker):
 			bits = np.float32
 		else:
 			bits = np.float64
-		self.photons, self.cosmics, self.noiseless = np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits)
+		self.photons, self.cosmics, self.noiseless, self.unmitigated = np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits), np.zeros(self.shape).astype(bits)
 
 		# create a dictionary to store a bunch of summaries
 		self.summaries = {}
@@ -147,21 +147,25 @@ class Cube(Talker):
 			# loop over (already stacked) exposures, creating them
 			for i in range(self.n):
 				self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
+
 				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
+			self.unmitigated = self.photons
 			# store some useful accessory information about
 			self.background = self.ccd.backgroundimage
 			self.noise = self.ccd.noiseimage
 			self.catalog = self.camera.catalog
 		else:
-			theWayToStack = Stacker.pick(self.stacker).stack
+			theWayToStack = Stacker.pick(self.stacker)
 			self.speak('using {0} strategy to stack from 2-second images')
 			ninstack = self.cadence/subexposurecadence
 			self.subcube = Cube(subject=self.subject, size=self.size, n=ninstack, cadence=subexposurecadence, jitter=self.jitter)
+			self.subcube.camera.catalog = self.camera.catalog
 			for i in range(self.n):
 				self.speak()
 				self.speak('creating a temporary stack of {0} images {1}s images'.format(ninstack, subexposurecadence))
 				self.subcube.simulate()
-				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = theWayToStack(self.subcube, ninstack)
+
+				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i], self.unmitigated[:,:,i] = theWayToStack.stack(self.subcube, ninstack)
 
 			self.background = self.subcube.ccd.backgroundimage*ninstack
 			self.noise = self.subcube.ccd.noiseimage*np.sqrt(ninstack)

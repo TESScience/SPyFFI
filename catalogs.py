@@ -51,12 +51,12 @@ class TestPattern(Catalog):
 
 		# construct a linear grid of magnitudes
 		self.tmag = np.linspace(np.min(magnitudes), np.max(magnitudes),n)[::-1]
-		if random:
-			self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
 		ras, decs = np.meshgrid(np.arange(pixels)*spacing, np.arange(pixels)*spacing)
-		offset = nudge*(np.random.rand(2) - 0.5)/3600.0
-		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten() + offset[0]
-		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra + offset[1]
+		if random:
+			#self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
+			offset = nudge*(np.random.rand(2, n) - 0.5)/3600.0
+		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten() + offset[0,:]
+		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra + offset[1,:]
 		self.temperature = 5800.0 + np.zeros_like(self.ra)
 
 class UCAC4(Catalog):
