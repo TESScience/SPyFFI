@@ -12,8 +12,8 @@ def pick(name='Sum'):
         return SumOfTruncatedMean(n=n, m=m)
     if 'Rejecting' in name:
         bits = name.split()
-        threshold, n, memory = np.float(bits[1]), np.float(bits[7]), np.float(bits[10])
-        return SumWithOutlierRejection(threshold=threshold, n=n, memory=memory)
+        #threshold, n, memory = np.float(bits[1]), np.float(bits[7]), np.float(bits[10])
+        return SumWithOutlierRejection(threshold=10, n=10, memory=0.5)
 
 
 
@@ -72,7 +72,7 @@ class SumWithOutlierRejection(Stacker):
         try:
             self.running_mean
             self.running_std
-
+            self.juststarted = False
             #self.speak('USING A RUNNING MEAN THAT WAS ALREADY CALCULATED!')
         except:
             # create arrays to store the per-chunk estimates of the mean and the standard deviation
@@ -87,18 +87,15 @@ class SumWithOutlierRejection(Stacker):
             self.running_std[:,:] *= self.safetybuffer
 
             self.running_std[:,:] = np.maximum(self.running_std, np.sqrt(self.running_mean))
+            self.juststarted = True
 
-        # set the first binned point to this mean estimate (there's no other choice)
-        finaltimeseries[:,:,0] = self.running_mean[:,:]
 
         # loop over the binned exposures, and chunks within exposures
         count = 1
         for iexposure in np.arange(exposures):
           for ichunk in np.arange(nchunks):
 
-            # skip the very first point, because it's already been defined
-            if (ichunk == 0)&(iexposure == 0):
-              continue
+
 
             # pull out the light curve for this little chunk
             flux = splitintochunks[:,:,iexposure, ichunk,:].squeeze()
@@ -113,6 +110,10 @@ class SumWithOutlierRejection(Stacker):
             # if all the images are outliers, decide that none of them are
             fail = np.sum(notoutlier,-1) == 0
             notoutlier[fail.reshape(xpixels, ypixels),:] = True
+
+            if self.juststarted:
+                notoutlier[:,:,:] = True
+                self.juststarted = False
 
             # determine the mean and standard deviation of the good points in this chunk
             this_mean = np.sum(flux*notoutlier,-1)/np.sum(notoutlier,-1)
@@ -133,8 +134,8 @@ class SumWithOutlierRejection(Stacker):
             count += 1
         photons = finaltimeseries
 
-        cube.display(self.running_mean)
-        cube.ds9.one(self.running_std, clobber=False)
+        #cube.display(self.running_mean)
+        #cube.ds9.one(self.running_std, clobber=False)
         # sum the cosmics
         cosmics = np.sum(cube.cosmics.reshape(xpixels, ypixels, exposures, nsubexposures), -1)
 

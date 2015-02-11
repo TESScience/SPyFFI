@@ -67,6 +67,7 @@ class Aperture(Talker):
                 ax_line.set_title('{0:.1f} magnitude star'.format(mag))
                 plt.draw()
                 self.input('hmmm?')
+        self.n = len(self.row)
         self.speak('created {0}'.format(self))
 
     def __str__(self):
@@ -79,6 +80,9 @@ class Aperture(Talker):
         self.unmitigated = np.sum(cube.unmitigated[self.row, self.col, :] - cube.background[self.row, self.col].reshape(shape), 0)
         self.cosmics = np.sum(cube.cosmics[self.row, self.col, :], 0)
         self.withoutcosmics = self.unmitigated - self.cosmics
+
+        # kludge for outlier rejection statistics
+        self.npixelsaffected = np.sum((cube.unmitigated[self.row, self.col, :] - cube.photons[self.row, self.col, :]) > 0.1*cube.noise[self.row, self.col].reshape(shape), 0)
 
         # calculate various noises
         self.noises = {}
