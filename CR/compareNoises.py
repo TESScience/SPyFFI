@@ -5,6 +5,7 @@ from SPyFFI.Photometer import Photometer
 from SPyFFI.Noise import noise
 from Strategies import *
 import textwrap
+import os
 class Noises(Talker):
 
     def __init__(self, cadence=120, **kwargs):
@@ -23,7 +24,7 @@ class Noises(Talker):
         line = 40
         self.descriptions['No Mitigation'] = textwrap.fill('doing nothing to correct cosmic rays', line)
 
-        self.descriptions['Ground Mitigation'] = textwrap.fill('rejecting {0}sigma pixel outliers on the ground, assuming stellar variability and image motion are perfectly known'.format(threshold), line)
+        self.descriptions['Ground Mitigation'] = textwrap.fill('rejecting {0}sigma pixel outliers on the ground, assuming stellar variability and jitter are perfectly known'.format(threshold), line)
         try:
             assert(remake==False)
             self.unmitigated, self.groundmitigated = np.load(groundfilename)
@@ -39,7 +40,7 @@ class Noises(Talker):
             np.save(groundfilename, (self.unmitigated, self.groundmitigated))
             self.speak('saved to {0}'.format(groundfilename))
 
-        self.descriptions['Space Mitigation'] = textwrap.fill('mitigating cosmic rays onboard, using a [{0}] strategy, simulating jitter but not stellar variability'.format(strategy), line)
+        self.descriptions['Space Mitigation'] = textwrap.fill('mitigating cosmic rays onboard, using a [{0}] strategy, including jitter (and uniform intrapixel sensitivity) but not stellar variability'.format(strategy), line)
         self.space = Cube(cadence=self.cadence, n=n, size=size, jitter=True, stacker=strategy)
         spacefilename = self.space.filename.replace('cube_', 'spacemitigated_photometry_')
         try:
@@ -58,10 +59,11 @@ class Noises(Talker):
     def plot(self):
 
         # create figure to compare achieved noises
-        fi = plt.figure('{0} seconds'.format(self.cadence), figsize=(15,6), dpi=100)
+        fi = plt.figure('{0} seconds'.format(self.cadence), figsize=(15,10), dpi=100)
+        fi.clf()
         keys = ['No Mitigation', 'Ground Mitigation', 'Space Mitigation']
         gs = plt.matplotlib.gridspec.GridSpec(2,len(keys),height_ratios=[1,0.3],hspace=0.05,wspace=0.05)
-        fi.suptitle('Cosmic Ray Impact for {0}s Exposures'.format(self.cadence), weight='extra bold')
+        fi.suptitle('Cosmic Ray Impact for {0}s Exposures'.format(self.cadence), weight='extra bold', size=2)
         ax_noise, ax_comp = [], []
         for j in range(len(keys)):
             if keys[j] == 'No Mitigation':
@@ -92,7 +94,7 @@ class Noises(Talker):
             pkw = dict(alpha=0.25,marker='o',linewidth=0, markeredgewidth=0, markersize=5)
             ax_noise[j].plot(mag[i], scale*exp[i], color='black',**pkw)
             ax_noise[j].plot(mag[i], scale*ach[i], color='Sienna', **pkw)
-            bin=0.2
+            bin=0.5
             bach = zachopy.oned.binto(mag[i], scale*ach[i], bin)
             bexp = zachopy.oned.binto(mag[i], scale*exp[i], bin)
             ax_noise[j].plot(bach[0], bach[1], color='SaddleBrown', alpha=1, linewidth=3)
@@ -115,10 +117,12 @@ class Noises(Talker):
 
             ax_comp[j].set_xlabel('TESS magnitude')
             ax_noise[j].set_title(keys[j])
-            ax_comp[j].set_ylim(np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
+            ax_comp[j].set_ylim(0.8, 1.5)#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
             ax_comp[j].set_xlim(6, 16)#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
-            ax_noise[j].text(11, 5e5, self.descriptions[keys[j]], va='top', ha='center', alpha=0.6)
+            ax_noise[j].text(11, np.max(ax_noise[j].get_ylim())*0.5, self.descriptions[keys[j]], va='top', ha='center', alpha=0.6)
 
-        filename = settings.dirs['plots'] + 'cosmicsin{0}.pdf'.format(self.cadence)
+        #filename = settings.dirs['plots'] + 'cosmicsin{0}.pdf'.format(self.cadence)
+        filename = self.space.filename.replace('cube_','rejectioncomparison_').replace('.npy', '.pdf')
         fi.savefig(filename)
         self.speak('saved plot to {0}'.format(filename))
+        os.system('cp {0} ~/Dropbox/TESS/memos/crsim/.'.format(filename))

@@ -5,16 +5,16 @@ from Strategies import *
 
 
 def compare():
-    totest = [mean(),  median(n=3), shiftedmedian(n=3), lowest(10),  central(10), outlierwithdecay(n=10,threshold=10, memory=0.5)]
+    totest = [ lowest(10),  central(10), outlierwithdecay(n=10,threshold=10, memory=0.5)]
     for s in totest:
         for n in [60,900]:
             for l in ['Hot Jupiter around Sun', 'Habitable Planet around WD']:
-                for m in [8,10,12,14,16]:
+                for m in [15]:
                     testTransit(s, mag=m, nsubexposures=n, label=l)
 
 
 def plottransit(s, label=''):
-    plt.figure('transit',figsize=(9,6), dpi=150)
+    plt.figure('transit',figsize=(12, 8), dpi=150)
 
 
     plt.clf()
@@ -57,7 +57,7 @@ def plottransit(s, label=''):
         span = right - left
         ylevel = 0
 
-        ywidth = s.timeseries.exposurenoise*10
+        ywidth = s.timeseries.exposurenoise*7
         axhistogram.text(np.exp(span*positions[tag] + left), ylevel + ywidth*1.2, "{0:.0f}e-\n({1:.2f})\n{2:.0f}".format(noises[tag]*s.timeseries.photonsfromstar*s.timeseries.nsubexposures, noises[tag]/s.timeseries.exposurenoise, noises[tag]*1e6), fontsize=6, color=s.plotting[tag], horizontalalignment='center', alpha=0.7)
         axhistogram.text(np.exp(span*positions[tag] + left), ylevel + ywidth, tag, fontsize=4, color=s.plotting[tag], horizontalalignment='center', alpha=0.7)
         if tag == 'nocosmics':
@@ -74,7 +74,7 @@ def plottransit(s, label=''):
     axresiduals.set_xlim(-0.05*period, 0.05*period)
     plt.setp(axhistogram.get_yticklabels(), visible=False)
     plt.draw()
-    filename = s.strategyprefix() + '{0:.1f}mag_{1}'.format(s.timeseries.mag, label).replace('.','p').replace(' ','').replace('crdemo','transit') + ".pdf"
+    filename = (s.strategyprefix() + '{0:.1f}mag_{1}_{2}exp'.format(s.timeseries.mag, label, s.timeseries.nsubexposures).replace('.','p').replace(' ','')).replace('crdemo','transit') + ".pdf"
     plt.savefig(filename)
 
 
