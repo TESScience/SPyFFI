@@ -6,6 +6,67 @@ from SPyFFI.Noise import noise
 from Strategies import *
 import textwrap
 import os
+
+def final():
+    directory = '/Users/zkbt/Cosmos/Data/TESS/FFIs/outputs/testpattern/120s/sub400x400/cubes/'
+    #spacefilename = '/Users/zkbt/Cosmos/Data/TESS/FFIs/outputs/testpattern/120s/sub256x256/cubes/spacemitigated_photometry_400exp_at120s_withjitter_perfectpixels_Rejecting10sigmaoutlierswithchunksof10andmemory0.5.npy'
+    spacefilename = directory + 'spacemitigated_photometry_1000exp_at120s_withjitter_perfectpixels_Central8outof10.npy'
+    groundfilename = directory +  'groundmitigated_photometry_1000exp_at120s_withoutjitter_perfectpixels_Sum.npy'
+    space = np.load(spacefilename)
+    ground = np.load(groundfilename)[1]
+
+
+
+
+    pkw = dict(alpha=0.25,marker='o',linewidth=0, markeredgewidth=0, markersize=5)
+
+    scale= 1e6
+    bin=0.5
+    ax_noise, ax_comp = [], []
+
+    keys = ['Ground Mitigation', 'Space Mitigation']
+    colors = ['DarkOrange', 'SlateBlue']
+    fi = plt.figure('120 seconds', figsize=(10,16), dpi=100)
+    gs = plt.matplotlib.gridspec.GridSpec(2,1,height_ratios=[0.75,1],hspace=0.05,wspace=0.05)
+    ax_noise = plt.subplot(gs[0])
+    ax_comp = plt.subplot(gs[1])
+    ax_noise.set_ylabel('Noise in a 120s Binned Exposure (ppm)')
+    ax_comp.set_ylabel('Ratio of Noises')
+    ax_comp.set_xlabel('TESS Magnitude')
+    ax_noise.set_yscale('log')
+    plt.setp(ax_noise.get_xticklabels(), visible=False)
+    syslimit = 60.0*np.sqrt(30)
+    for j in range(len(keys)):
+        if keys[j] == 'Ground Mitigation':
+            mag, noises = ground
+        elif keys[j] == 'Space Mitigation':
+            mag, noises = space
+        exp, ach = noises['expected'], noises['achieved']
+        # sort stars by magnitude
+        i = np.argsort(mag)
+
+
+        bach = zachopy.oned.binto(mag[i], scale*ach[i], bin)
+        bexp = zachopy.oned.binto(mag[i], scale*exp[i], bin)
+        x= bexp[0]
+        # plot the raw noises
+        ax_noise.plot(bach[0], bach[1], color=colors[j], alpha=1, linewidth=3, label=keys[j])
+        ax_comp.plot(mag[i], ach[i]/exp[i], color=colors[j], **pkw)
+        ax_comp.plot(bexp[0], bach[1]/bexp[1], color=colors[j], alpha=1, linewidth=3)
+    ax_noise.plot(bach[0], bexp[1], color='gray', alpha=1, linewidth=3, label='(if no cosmics existed)')
+
+
+    # plot the comparison
+    ax_comp.axhline(1.0, linewidth=3, color='gray')
+
+    ax_comp.set_ylim(0.95, 1.35)#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
+    ax_comp.set_xlim(6, 16)#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
+    inputs = dict(imag=x, exptime=120, ra=0.0, dec=0.0, verbose=False)
+    ax_noise.plot(x, np.sqrt(1 + (syslimit/bexp[1])**2)*bexp[1], linewidth=3, linestyle='--', color='gray', alpha=0.5, label='("incorrigible" noise)')
+    ax_comp.plot(x, np.sqrt(1 + (syslimit/bexp[1])**2), linewidth=3, linestyle='--', color='gray', alpha=0.5)
+    ax_noise.legend(loc='upper left')
+    plt.savefig('/Users/zkbt/Dropbox/TESS/memos/crsim/bestgroundvsspace.pdf')
+    print noise(**inputs)/bexp[1]
 class Noises(Talker):
 
     def __init__(self, cadence=120, **kwargs):

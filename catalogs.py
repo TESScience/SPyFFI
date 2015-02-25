@@ -52,7 +52,7 @@ class TestPattern(Catalog):
 		# construct a linear grid of magnitudes
 		self.tmag = np.linspace(np.min(magnitudes), np.max(magnitudes),n)[::-1]
 		ras, decs = np.meshgrid(np.arange(pixels)*spacing, np.arange(pixels)*spacing)
-		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten() 
+		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten()
 		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra
 		if random:
 			#self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
@@ -62,7 +62,7 @@ class TestPattern(Catalog):
 		self.temperature = 5800.0 + np.zeros_like(self.ra)
 
 class UCAC4(Catalog):
-	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True):
+	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True, epoch=2018.0):
 		Catalog.__init__(self)
 		self.load(ra=ra, dec=dec, radius=radius, write=write)
 
@@ -75,7 +75,7 @@ class UCAC4(Catalog):
 			rmagtag ='f.mag'
 			jmagtag = 'Jmag'
 			vmagtag = 'Vmag'
-			columns = ['_RAJ2000','_DECJ2000','f.mag','Jmag', 'Vmag']
+			columns = ['_RAJ2000','_DECJ2000','pmRA', 'pmDec','f.mag','Jmag', 'Vmag']
 		#if catalog=='Tycho-2':
 		#	vcat = 'I/259/tyc2'
 		#	rmagtag = 'VTmag'

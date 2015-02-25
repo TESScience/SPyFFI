@@ -2,11 +2,18 @@
 
 (translated from Josh Winn's IDL TESS signal-to-noise calculator on the TESS wiki and updated to include calculations published with Peter Sullivan's simulation paper)'''
 
-from imports import *
-import Cartographer
+import numpy as np
+import matplotlib.pyplot as plt
+import astropy.io
+import scipy.interpolate
 
-# create a cartographer for managing conversions between ecliptic and galactic coordinates
-carto = Cartographer.Cartographer()
+try:
+    assert(False)
+    import Cartographer
+    # create a cartographer for managing conversions between ecliptic and galactic coordinates
+    carto = Cartographer.Cartographer()
+except:
+    pass
 
 # create an interpolator to estimate the best number of pixels in a photometric aperture
 optimalpixelsdata = astropy.io.ascii.read('relations/optimalnumberofpixels.txt')
@@ -34,8 +41,8 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0, \
             elon=0.0, elat=30.0, glon=None, glat=None, ra=None, dec=None, \
             subexptime=2.0, npix_aper=4, frac_aper=0.76, e_pix_ro=10.0, \
             effective_area = 73.0, pix_scale=21.1, sys_limit=60.0, \
-            verbose=True):
-    '''Calculate noise, given input magnitude, returing the fractional rms (= 1/snr)
+            verbose=False):
+    '''Calculate noise, given input Ic magnitude, returing the fractional rms (= 1/snr)
 
         ; mandatory inputs
         ;
@@ -109,12 +116,18 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0, \
         print 'e_pix_zodi = ', e_pix_zodi
 
     # photoelectrons/pixel from background stars
-    coord = carto.point(elon, elat, 'ecliptic')
-    glon, glat = coord.galactic.tuple
+    try:
+        coord = carto.point(elon, elat, 'ecliptic')
+        glon, glat = coord.galactic.tuple
+    except:
+        glon, glat = 96.36079818, -30.18846954
     glon = np.array([glon])
     glat = np.array([glat])
+
+
     if verbose:
         print 'glon, glat = ', glon, glat
+
     dlat = np.abs(glat)/40.0
     dlon = glon
     q = (dlon > 180.)
@@ -142,3 +155,35 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0, \
         print 'noise      [ppm] = ', noise*1e6
         '''
     return noise
+
+def demo(span=27.4, period=12.345678, mean=17, amplitude=1.0):
+    '''Demonstration of the TESS noise calculator, on a faint and highly-variable star.'''
+
+
+    # create times at a half hour spacing
+    t = np.arange(0, span, 0.5/24.0)
+    n = len(t)
+
+    # create a (perfectly smooth) noiseless model
+    noiselessmodel = mean + amplitude*np.sin(2*np.pi*t/period)
+
+    # calculate the per-point photometric uncertainty for each point of that model
+    perpointuncertainty = noise(imag=noiselessmodel)
+
+    # create one random realization of the noise
+    noiserealization = np.random.normal(0,1,n)*perpointuncertainty
+
+    # simulate measurements
+    simulated = noiselessmodel + noiserealization
+
+    plt.ion()
+    plt.figure('demonstration', figsize=(10,3), dpi=200)
+    plt.cla()
+    plt.errorbar(t, simulated, perpointuncertainty, marker='o', elinewidth=2, capthick=2, linewidth=0, color='black', alpha=0.5)
+    plt.ylim(mean + amplitude + np.max(perpointuncertainty)*5, mean - amplitude - np.min(perpointuncertainty)*5)
+    plt.xlim(np.min(t), np.max(t))
+    plt.xlabel('Time (in days)')
+    plt.ylabel('Flux (magnitudes)')
+    plt.tight_layout()
+
+    return t, simulated, perpointuncertainty
