@@ -176,11 +176,15 @@ def demo(span=27.4, period=12.345678, mean=17, amplitude=1.0):
     # simulate measurements
     simulated = noiselessmodel + noiserealization
 
+    # create plot showing the demonstration
     plt.ion()
     plt.figure('demonstration', figsize=(10,3), dpi=200)
     plt.cla()
-    plt.errorbar(t, simulated, perpointuncertainty, marker='o', elinewidth=2, capthick=2, linewidth=0, color='black', alpha=0.5)
+    # plot the simulated measurements
+    plt.errorbar(t, simulated, perpointuncertainty, marker='o', elinewidth=2, linewidth=0, color='black', alpha=0.5)
+    # plot the noiseless model
     plt.plot(t,noiselessmodel, color='green', linewidth=2, alpha=0.5)
+    # clean up the look of the plot
     plt.ylim(mean + amplitude + np.max(perpointuncertainty)*5, mean - amplitude - np.min(perpointuncertainty)*5)
     plt.xlim(np.min(t), np.max(t))
     plt.xlabel('Time (in days)')
