@@ -15,7 +15,7 @@ class Photometer(Talker):
         self.camera = self.cube.camera
         self.cartographer = self.camera.cartographer
 
-    def drawApertures(self, plot=False):
+    def drawApertures(self, plot=False, level=5):
         '''Take all stars in the catalog, and draw apertures around them.'''
 
 
@@ -34,7 +34,7 @@ class Photometer(Talker):
         self.cube.ds9.one(self.images['stars']/self.images['noise'], clobber=False)
 
         # define regions from the star image (these are starting points for the aperture finder)
-        threshold = 3*self.images['noise']
+        threshold = level*self.images['noise']
         self.images['labeled'], nlabels = scipy.ndimage.measurements.label(self.images['stars'] > threshold)
         self.cube.ds9.one(self.images['labeled'], clobber=False)
         self.cube.ds9.scale(scale='log', mode='minmax')
@@ -44,8 +44,11 @@ class Photometer(Talker):
         self.apertures = []
         for i in range(len(self.x)):
             ap = Aperture(i)
-            ap.create(self.images, self.x[i], self.y[i], self.mag[i], plot=plot)
-            self.apertures.append(ap)
+            try:
+                ap.create(self.images, self.x[i], self.y[i], self.mag[i], plot=plot)
+                self.apertures.append(ap)
+            except:
+                pass
 
     def measure(self):
         for a in self.apertures:

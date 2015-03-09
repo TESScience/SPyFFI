@@ -26,17 +26,19 @@ class Cube(Talker):
 			# ...either a test pattern of stars...
 			self.speak( 'pointing at a test pattern')
 			self.testpattern = True
+			self.ra, self.dec = 0, 0
 		else:
 			self.testpattern = False
 			# ...or a field centered on a particular star.
-			try:
-				self.speak( "trying to point at {0}".format(subject))
-				s = zachopy.star.SingleStar(name)
-				self.ra = s.icrs.ra.degree
-				self.dec = s.icrs.dec.degree
-			except:
-				self.speak( " but that failed, so we'll go with a test pattern")
-				self.testpattern = True
+			#try:
+			self.speak( "trying to point at {0}".format(subject))
+			s = zachopy.star.SingleStar(subject)
+			self.ra = s.icrs.ra.degree
+			self.dec = s.icrs.dec.degree
+
+			#except:
+			#	self.speak( " but that failed, so we'll go with a test pattern")
+			#	self.testpattern = True
 
 		# keep track of which stacker is being used to create this image
 		self.stacker = stacker
@@ -54,7 +56,7 @@ class Cube(Talker):
 		self.shape = (self.xpixels, self.ypixels, self.n)
 
 		# create a TESS camera and point it at the subject
-		self.camera = SPyFFI.Camera(subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera = SPyFFI.Camera(ra=self.ra, dec=self.dec, subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
 		self.camera.cartographer.pithy = True
 
 		# create a blank image with the camera
