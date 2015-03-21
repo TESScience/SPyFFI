@@ -1,6 +1,20 @@
 '''Keep track of Catalogs of objects, usually stars.'''
 from imports import *
 import settings, relations
+import matplotlib.animation
+
+def makeCatalog(**kwargs):
+	'''Use keywords to select a kind of Catalog, enter its parameters, and construct the necessary catalog.'''
+	name = kwargs['name']
+	if name.lower() == 'testpattern':
+		cat = TestPattern(**kwargs)
+	elif name.lower() == 'ucac4':
+		cat = UCAC4(**kwargs)
+	else:
+		star = zachopy.star.SingleStar(name)
+		kwargs['ra'], kwargs['dec'] = star.icrs.ra.deg, star.icrs.dec.deg
+		cat = UCAC4(**kwargs)
+	return cat
 
 class Star(object):
 	'''a Star object, containing at least RA + Dec + magnitude'''
@@ -20,30 +34,89 @@ class Catalog(Talker):
 		Talker.__init__(self, mute=False, pithy=False)
 
 	def arrays(self):
+		'''return (static) arrays of positions, magnitudes, and effective temperatures'''
 		return self.ra, self.dec, self.tmag, self.temperature
 
-	def plot(self):
+	def snapshot(self, epoch):
+		'''return a snapshot of positions, magnitudes, and effective temperatures (all of which may be time-varying)'''
+
+		# propagate proper motions
+		ra, dec = self.atEpoch(epoch)
+
+		# determine brightness of star
+		tmag = self.tmag
+
+		# determine color of star
+		temperature = self.temperature
+
+		return ra, dec, tmag, temperature
+
+
+	def atEpoch(self, epoch):
+
+		# how many years since the catalog's epoch?
+		timeelapsed = epoch - self.epoch	# in years
+
+		# calculate the dec
+		decrate = self.pmdec/60.0/60.0/1000.0	# in degrees/year (assuming original was in mas/year)
+		decindegrees = self.dec + timeelapsed*decrate
+
+		# calculate the unprojected rate of RA motion, using the mean declination between the catalog and present epoch
+		rarate = self.pmra/60.0/60.0/np.cos((self.dec + timeelapsed*decrate/2.0)*np.pi/180.0)/1000.0	# in degress of RA/year (assuming original was *projected* mas/year)
+		raindegrees = self.ra + timeelapsed*rarate
+
+		# return the current positions
+		return raindegrees, decindegrees
+
+
+	def plot(self, epoch=2018.0):
 		plt.ion()
 		plt.figure('star chart')
-		self.ax = plt.subplot()
-		self.ax.cla()
-		deltamag = 20.0 - self.tmag
+		try:
+			self.ax.cla()
+		except:
+			self.ax = plt.subplot()
+		ra, dec, tmag, temperature = self.snapshot(epoch)
+		deltamag = 20.0 - tmag
 		size = deltamag**2*5
-		self.ax.scatter(self.ra, self.dec, s=size, marker='o', color='grey', alpha=0.3, edgecolors='black')
-		for i in range(len(self.ra)):
-			self.ax.text(self.ra[i], self.dec[i], '{0:.2f}'.format(self.tmag[i]),horizontalalignment='center', verticalalignment='center', alpha=0.5, size=8, color='green',weight='bold')
+		try:
+			self.plotdata.set_data(ra, dec)
+		except:
+			self.plotdata = self.ax.scatter(ra, dec, s=size, marker='o', color='grey', alpha=0.3, edgecolors='black')
+		#for i in range(len(ra)):
+		#	self.ax.text(ra[i], dec[i], '{0:.2f}'.format(tmag[i]),horizontalalignment='center', verticalalignment='center', alpha=0.5, size=8, color='green',weight='bold')
 		self.ax.set_aspect(1)
 		self.ax.set_xlabel('Right Ascension')
 		self.ax.set_ylabel('Declination')
-		plt.show()
+		self.ax.set_title('{0} at epoch {1}'.format(self.__class__.__name__, epoch))
+		self.ax.set_xlim(np.min(self.ra), np.max(self.ra))
+		self.ax.set_ylim(np.min(self.dec), np.max(self.dec))
+		plt.draw()
+
+	def movie(self, epochs=[1950,2050], bitrate=10000):
+		metadata = dict(artist='Zach Berta-Thompson (zkbt@mit.edu)')
+		self.writer = matplotlib.animation.FFMpegWriter(fps=30, metadata=metadata, bitrate=bitrate)
+
+		self.plot(np.min(epochs))
+		f = plt.gcf()
+		filename='testcatalogpropermotions.mp4'
+		with self.writer.saving(f, filename, 100):
+			for e in np.arange(*epochs):
+				self.speak('{0}'.format(e))
+				self.plot(e)
+				self.writer.grab_frame()
+
 
 class TestPattern(Catalog):
 	'''a test pattern catalog, creating a grid of stars to fill an image'''
-	def __init__(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False, nudge=21.1):
+	def __init__(self, **kwargs):
 		'''create a size x size square (in arcsecs) test pattern of stars,
 		with spacing (in arcsecs) between each element and
 		magnitudes spanning the range of magnitudes'''
 		Catalog.__init__(self)
+		self.load(**kwargs)
+
+	def load(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False, nudge=21.1, pm=0.0, **kwargs):
 
 		# how many stars do we need?
 		pixels = np.maximum(np.int(size/spacing), 1)
@@ -59,10 +132,17 @@ class TestPattern(Catalog):
 			offset = nudge*(np.random.rand(2, n) - 0.5)/3600.0
 			self.dec += offset[0,:]
 			self.ra += offset[1,:]
+
+		if pm > 0:
+			self.pmra, self.pmdec = np.random.normal(0,pm,n), np.random.normal(0,pm, n)
+		else:
+			self.pmra, self.pmdec = 0, 0
+		self.epoch = 2018.0
 		self.temperature = 5800.0 + np.zeros_like(self.ra)
 
+
 class UCAC4(Catalog):
-	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True, epoch=2018.0):
+	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True, epoch=2018.0, **kwargs):
 		Catalog.__init__(self)
 		self.load(ra=ra, dec=dec, radius=radius, write=write)
 
@@ -104,6 +184,7 @@ class UCAC4(Catalog):
 			bt = bv.query_region(astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)), radius='{:f}d'.format(radius))[0]
 			np.save(brightstarsfilename, bt)'''
 
+		self.table = astropy.table.Table(t)
 
 		ras = np.array(t[:][ratag])
 		decs = np.array(t[:][dectag])

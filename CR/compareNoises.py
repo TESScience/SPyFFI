@@ -26,7 +26,7 @@ def final():
 
     keys = ['Ground Mitigation', 'Space Mitigation']
     colors = ['DarkOrange', 'SlateBlue']
-    fi = plt.figure('120 seconds', figsize=(10,16), dpi=100)
+    fi = plt.figure('120 seconds', figsize=(10,16), dpi=75)
     gs = plt.matplotlib.gridspec.GridSpec(2,1,height_ratios=[0.75,1],hspace=0.05,wspace=0.05)
     ax_noise = plt.subplot(gs[0])
     ax_comp = plt.subplot(gs[1])
@@ -65,8 +65,9 @@ def final():
     ax_noise.plot(x, np.sqrt(1 + (syslimit/bexp[1])**2)*bexp[1], linewidth=3, linestyle='--', color='gray', alpha=0.5, label='("incorrigible" noise)')
     ax_comp.plot(x, np.sqrt(1 + (syslimit/bexp[1])**2), linewidth=3, linestyle='--', color='gray', alpha=0.5)
     ax_noise.legend(loc='upper left')
-    plt.savefig('/Users/zkbt/Dropbox/TESS/memos/crsim/bestgroundvsspace.pdf')
+    plt.savefig('/Users/zkbt/Dropbox/TESS/memos/cosmics/bestgroundvsspace.pdf')
     print noise(**inputs)/bexp[1]
+
 class Noises(Talker):
 
     def __init__(self, cadence=120, **kwargs):
@@ -120,11 +121,11 @@ class Noises(Talker):
     def plot(self):
 
         # create figure to compare achieved noises
-        fi = plt.figure('{0} seconds'.format(self.cadence), figsize=(15,10), dpi=100)
+        fi = plt.figure('{0} seconds'.format(self.cadence), figsize=(15,10), dpi=75)
         fi.clf()
         keys = ['No Mitigation', 'Ground Mitigation', 'Space Mitigation']
         gs = plt.matplotlib.gridspec.GridSpec(2,len(keys),height_ratios=[1,0.3],hspace=0.05,wspace=0.05)
-        fi.suptitle('Cosmic Ray Impact for {0}s Exposures'.format(self.cadence), weight='extra bold', size=2)
+        fi.suptitle('Cosmic Ray Impact for {0}s Exposures'.format(self.cadence), weight='extra bold', size=20)
         ax_noise, ax_comp = [], []
         for j in range(len(keys)):
             if keys[j] == 'No Mitigation':
@@ -186,4 +187,4 @@ class Noises(Talker):
         filename = self.space.filename.replace('cube_','rejectioncomparison_').replace('.npy', '.pdf')
         fi.savefig(filename)
         self.speak('saved plot to {0}'.format(filename))
-        os.system('cp {0} ~/Dropbox/TESS/memos/crsim/.'.format(filename))
+        os.system('cp {0} ~/Dropbox/TESS/memos/cosmics/.'.format(filename))
