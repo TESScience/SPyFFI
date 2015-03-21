@@ -2,6 +2,7 @@
 from imports import *
 import settings, relations
 import matplotlib.animation
+import astroquery.vizier
 
 def makeCatalog(**kwargs):
 	'''Use keywords to select a kind of Catalog, enter its parameters, and construct the necessary catalog.'''
