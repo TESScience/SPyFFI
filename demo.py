@@ -62,5 +62,3 @@ def forPT():
 		C.setCadence(1800)
 		C.point(ra, dec)
 		C.project(write=True)
-
-def forEd():
