@@ -2,7 +2,7 @@
 from imports import *
 
 # define a folder that all data is held
-prefix = "/Users/zkbt/Cosmos/Data/TESS/FFIs/"
+prefix = os.getenv('SPYFFIDATA')
 # if that path doesn't exist, complain!
 if not os.path.exists(prefix):
 	print "Please enter a parent directory where you want to store all data related to TESS FFI's:"

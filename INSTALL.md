@@ -39,8 +39,21 @@ Install the zachopy toolkit in exactly the same way, with
 
 You should also run this from ~/code/ (or whatever you choose), so the zachopy tools will be in your PATH.
 
-### update PYTHONPATH
-Make sure that you have a PYTHONPATH environment variable set, and that it points to (in this example) ~/code/. This is necessary so Python can find all the scripts and dependencies.
+### set environment variables
+Make sure you have the following environment variables set, which I do by modifying my `/.profile` to read:
+
+    ############################
+    # TESS -- the SPyFFI tools #
+    ############################
+
+    # where the Python scripts can be found (i.e. the directory containing SPyFFI/ and zachopy/)
+    export PYTHONPATH=$HOME/Dropbox/python/:$PYTHONPATH
+
+    # the root directory of SPyFFI (needed for some file-finding by the code)
+    export SPYFFIPATH=$HOME/Dropbox/code/SPyFFI/
+
+    # the directory where you want to store TESS data (inputs/intermediates/outputs)
+    export SPYFFIDATA=$HOME/Cosmos/Data/TESS/FFIs/
 
 ### recompile the cosmic ray code
 Go into the cosmical_realistic directory, and run `python setup.py build_ext --inplace` to compile the C extension required to generate cosmic rays. (It's an intenstive process, and Al's cosmic ray code is a super-fast).

@@ -39,6 +39,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
@@ -622,8 +623,12 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY,
   int ip, jp;
   unsigned long seed;
   FILE *fpin;
-
-  fpin = fopen("st.dat","r");
+  char *path = getenv("SPYFFIPATH");
+  char *file = "cosmical_realistic/st.dat";
+  char *completepath;
+  asprintf(&completepath, "%s%s", path, file);
+  printf("%s\n", completepath);
+  fpin = fopen(completepath,"r");
   read_phi_lambda(fpin);
   fclose(fpin);
 
