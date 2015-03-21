@@ -32,8 +32,8 @@ class TestPattern(Observation):
 		size = self.camera.pixelscale*self.camera.subarray # in arcsec
 		self.camera.catalog = Catalogs.makeCatalog(name='testpattern', size=size, spacing=spacing, magnitudes=magnitudes, random=random, nudge=nudge, pm=pm)
 
-	def expose(self, remake=False, write=True, display=False):
+	def expose(self, remake=False, write=True, display=False, jitter=True):
 		self.ccd = self.camera.ccds[0]
 		self.ccd.display = display
 		for i in range(self.nexposures):
-			self.ccd.expose(write=write, remake=remake)
+			self.ccd.expose(write=write, remake=remake, jitter=jitter)
