@@ -1,5 +1,4 @@
 from imports import *
-import cosmical_original._cosmical
 import cosmical_realistic._cosmical
 
 def test(n):
@@ -21,18 +20,7 @@ def cosmicImage(exptime=1800.0, size=2048, rate=5.0, gradient=False, version='fa
     bufferedsize = size + 2*buffer
 
     # call different codes, depending
-    if version == 'original':
-
-        # draw an Poisson number, for how many cosmic rays should be included in this image
-        physicalpixelsize = 15.0/1e4    # cm
-        nexpected = (physicalpixelsize*size)**2*(0.5*smallexptime + 0.5*bigexptime)*rate
-        ndrawn = np.random.poisson(nexpected)
-
-        # call the original cosmic ray code
-        image = cosmical_original._cosmical.cosmical(smallexptime, bigexptime, ndrawn, bufferedsize, bufferedsize)
-
-
-    elif version == 'fancy':
+    if version == 'fancy':
 
         # set the diffusion flag to be 0 if False, 1 if True (as integer type)
         intdiffusion=0#np.int(diffusion)
