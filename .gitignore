@@ -3,7 +3,7 @@
 #################################
 illustrations/
 
-
+.nfs*
 
 ##############################
 # ignore weird Mac OSX files
