@@ -2,7 +2,7 @@
 from imports import *
 import settings, relations
 import matplotlib.animation
-import astroquery.vizier
+from astroquery.vizier import Vizier
 
 def makeCatalog(**kwargs):
 	'''Use keywords to select a kind of Catalog, enter its parameters, and construct the necessary catalog.'''
@@ -161,7 +161,7 @@ class UCAC4(Catalog):
 		#	vcat = 'I/259/tyc2'
 		#	rmagtag = 'VTmag'
 		#	columns = ['_RAJ2000','_DECJ2000','VTmag']
-		v = astroquery.vizier.Vizier(catalog=vcat,columns=columns)
+		v = Vizier(catalog=vcat,columns=columns)
 		v.ROW_LIMIT = -1
 		bcatalog = 'SIMBAD'
 		starsfilename = settings.prefix + 'intermediates/' +  "{catalog}_{ra}_{dec}_{radius}".format(catalog=catalog, ra=ra, dec=dec, radius=radius).replace(' ', '') + '.npy'
