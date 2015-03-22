@@ -26,7 +26,7 @@ class Observation(Talker):
 		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
 
 	def create(self, **kwargs):
-		todo = {2:10, 120:15, 1800:int(27.4*48)}
+		todo = {2:3, 120:3, 1800:int(27.4*48)}
 		for k in todo.keys():
 			self.camera.setCadence(k)
 			self.nexposures = todo[k]
