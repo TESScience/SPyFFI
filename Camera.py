@@ -101,10 +101,10 @@ class Camera(Talker):
         zachopy.utils.mkdir(d)
         return d
 
-    def expose(self):
+    def expose(self, **kwargs):
         '''Take an exposure on all the available CCD's.'''
         for c in self.ccds:
-            c.expose()
+            c.expose(**kwargs)
 
     def populateHeader(self):
         '''Populate the header structure with information about the Camera, and its WCS.'''

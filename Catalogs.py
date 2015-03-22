@@ -57,7 +57,7 @@ class Catalog(Talker):
 
 		# how many years since the catalog's epoch?
 		timeelapsed = epoch - self.epoch	# in years
-
+		self.speak('projecting catalog {0:.3f} years relative to {1:.0f}'.format(timeelapsed, self.epoch))
 		# calculate the dec
 		decrate = self.pmdec/60.0/60.0/1000.0	# in degrees/year (assuming original was in mas/year)
 		decindegrees = self.dec + timeelapsed*decrate
@@ -100,12 +100,13 @@ class Catalog(Talker):
 
 		self.plot(np.min(epochs))
 		f = plt.gcf()
-		filename='testcatalogpropermotions.mp4'
+		filename=settings.dirs['plots'] + 'testcatalogpropermotions.mp4'
 		with self.writer.saving(f, filename, 100):
-			for e in np.arange(*epochs):
+			for e in np.linspace(epochs[0], epochs[1], 20):
 				self.speak('{0}'.format(e))
 				self.plot(e)
 				self.writer.grab_frame()
+		self.speak('saved movie to {0}'.format(filename))
 
 
 class TestPattern(Catalog):
@@ -144,7 +145,7 @@ class TestPattern(Catalog):
 
 
 class UCAC4(Catalog):
-	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True, epoch=2018.0, **kwargs):
+	def __init__(self, ra=0.0, dec=90.0, radius=0.2, write=True, faint=10, **kwargs):
 		Catalog.__init__(self)
 		self.load(ra=ra, dec=dec, radius=radius, write=write)
 
@@ -157,16 +158,15 @@ class UCAC4(Catalog):
 			rmagtag ='f.mag'
 			jmagtag = 'Jmag'
 			vmagtag = 'Vmag'
-			columns = ['_RAJ2000','_DECJ2000','pmRA', 'pmDec','f.mag','Jmag', 'Vmag']
+			pmratag, pmdectag = 'pmRA', 'pmDE'
+			columns = ['_RAJ2000','_DECJ2000','pmRA', 'pmDE','f.mag','Jmag', 'Vmag']
 		#if catalog=='Tycho-2':
 		#	vcat = 'I/259/tyc2'
 		#	rmagtag = 'VTmag'
 		#	columns = ['_RAJ2000','_DECJ2000','VTmag']
 		v = Vizier(catalog=vcat,columns=columns)
 		v.ROW_LIMIT = -1
-		bcatalog = 'SIMBAD'
 		starsfilename = settings.prefix + 'intermediates/' +  "{catalog}_{ra}_{dec}_{radius}".format(catalog=catalog, ra=ra, dec=dec, radius=radius).replace(' ', '') + '.npy'
-		brightstarsfilename = settings.prefix + 'intermediates/' +  "{catalog}_{ra}_{dec}_{radius}".format(catalog=bcatalog, ra=ra, dec=dec, radius=radius).replace(' ', '') + '.npy'
 		try:
 			t = np.load(starsfilename)
 			self.speak("loading a catalog of stars from {0}".format(starsfilename))
@@ -175,21 +175,12 @@ class UCAC4(Catalog):
 			t = v.query_region(astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)), radius='{:f}d'.format(radius), verbose=True)[0]
 			np.save(starsfilename, t)
 
-		'''try:
-			bt = np.load(brightstarsfilename)
-			print "      and loading extra bright stars from ", brightstarsfilename
-
-		except:
-			bv =Vizier(catalog='I/131A/sao', columns= ['_RAJ2000','_DECJ2000','Vmag'],column_filters={"Vmag":"<3"})
-			bv.ROW_LIMIT = -1
-			print "   querying bright stars from {catalog} for ra = {ra}, dec = {dec}, radius = {radius}".format(catalog=bcatalog, ra=ra, dec=dec, radius=radius)
-			bt = bv.query_region(astropy.coordinates.ICRS(ra=ra, dec=dec, unit=(astropy.units.deg,astropy.units.deg)), radius='{:f}d'.format(radius))[0]
-			np.save(brightstarsfilename, bt)'''
-
 		self.table = astropy.table.Table(t)
 
 		ras = np.array(t[:][ratag])
 		decs = np.array(t[:][dectag])
+		pmra = np.array(t[:][pmratag])
+		pmdec = np.array(t[:][pmdectag])
 		rmag = np.array(t[:][rmagtag])
 		jmag = np.array(t[:][jmagtag])
 		vmag = np.array(t[:][vmagtag])
@@ -221,12 +212,22 @@ class UCAC4(Catalog):
 		plt.scatter(bt[:][ratag], bt[:][dectag], s=100/bt[:][vmagtag]**2,color='red',alpha=0.5)
 
 
+
+
 		assert(False)'''
 		#assert(np.sum(np.isfinite(imag)==False) == 0)
+
+
+		pmra[np.isfinite(pmra) == False] = 0.0
+		pmdec[np.isfinite(pmdec) == False] = 0.0
+
 		ok = np.isfinite(imag)
 		self.speak("found {0} stars with {1} < V < {2}".format(np.sum(ok), np.min(rmag[ok]), np.max(rmag[ok])))
 		self.ra = ras[ok]
 		self.dec = decs[ok]
+		self.pmra = pmra[ok]
+		self.pmdec = pmdec[ok]
 		self.tmag = imag[ok]
 		self.temperature = temperatures[ok]
+		self.epoch = 2000.0
 		#return ras[ok], decs[ok], rmag[ok], jmag[ok], imag[ok], temperatures[ok]
