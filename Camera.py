@@ -101,10 +101,10 @@ class Camera(Talker):
         zachopy.utils.mkdir(d)
         return d
 
-    def expose(self):
+    def expose(self, **kwargs):
         '''Take an exposure on all the available CCD's.'''
         for c in self.ccds:
-            c.expose()
+            c.expose(**kwargs)
 
     def populateHeader(self):
         '''Populate the header structure with information about the Camera, and its WCS.'''
@@ -180,7 +180,7 @@ class Camera(Talker):
         self.wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
 
         # set this to be the WCS
-        self.populateHeader()
+        #self.populateHeader()
 
     def pos_string(self):
         '''Return the position string for this field.'''

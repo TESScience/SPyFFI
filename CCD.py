@@ -62,7 +62,7 @@ class CCD(Talker):
 
 
 		# start populating the image header (seems like we can't do this until we're sure camera has pointed somewhere)
-		self.populateHeader()
+		#self.populateHeader()
 
 	def show(self):
 		'''Display the current (possibly in-progress image.)'''
@@ -98,14 +98,6 @@ class CCD(Talker):
 		zachopy.utils.mkdir(d)
 		return d
 
-		#@property
-		#def wcs(self):
-		#	'''The WCS for this CCD, automatically derived from the Camera's WCS.'''
-		#
-		#	# what is the imagexy pixel coordinate of the center of the field?
-		#	self.wcs.wcs.crpix =[self.npix/2.0,self.npix/2.0]
-
-
 	def photons(self, mag):
 		'''Use magnitude to calculate photons per second that will be recorded on a CCD.'''
 
@@ -117,10 +109,10 @@ class CCD(Talker):
 
 		# create an empty header
 		try:
-			self.header
+			self.camera.header
 		except:
-			self.header = astropy.io.fits.Header()
-
+			self.camera.populateHeader()#astropy.io.fits.Header()
+		self.header = self.camera.header
 
 
 		# fill it with some CCD details
@@ -132,7 +124,7 @@ class CCD(Talker):
 		self.header['SATURATE'] = (self.camera.saturation*self.camera.cadence/self.camera.singleread, '[e-] saturation level in this image')
 		self.header['READNOIS'] = (self.camera.read_noise, '[e-] read noise (per individual read)')
 		self.header['READTIME'] = (self.camera.readouttime, '[s] time to transer to frame store')
-		self.header['CCDNUM'] = (self.number, 'CCD number (1,2,3,4 or 0=fake subarrayor)')
+		self.header['CCDNUM'] = (self.number, 'CCD number (1,2,3,4 or 0=fake subarray)')
 		self.header['CCDSIZE'] = (self.npix, '[pix] size of one CCD')
 
 		# fill in the timestamp for this CCD image
@@ -147,7 +139,12 @@ class CCD(Talker):
 
 		# add time to the image (in a very simplistic way -- no accounting for the spacecraft orbit)
 		self.header['COUNTER'] = self.camera.counter, '# of exposures since start, for this field'
-		self.header['BJD'] = self.camera.counter*self.camera.cadence/24.0/60.0/60.0, '[day] mid-exposure time - 2457827.0 (e.g.)'
+		self.bjd0 = 2457827.0
+		self.bjd = self.bjd0 + self.camera.counter*self.camera.cadence/24.0/60.0/60.0
+		self.header['BJD0'] = self.bjd0, '[day] base time subtracted from all BJD'
+		self.header['BJD'] = self.bjd - self.bjd0, '[day] mid-exposure time - BJD0'
+		self.epoch = (self.bjd - 2451544.5)/365.25 + 2000.0
+		self.header['EPOCH'] = self.epoch, '[years] epoch of mid-exposure time'
 
 	def pixels(self):
 		'''Give grids of x and y values (2D arrays) of the image pixels.'''
@@ -210,6 +207,12 @@ class CCD(Talker):
 		self.speak('saving {0}x{0} image to {1} with type {2}'.format(image.shape[0],path,savetype.__name__))
 		cr = self.camera.cartographer.point(0.0, 0.0, 'focalxy')
 		x, y = cr.ccdxy.tuple
+
+		#quad = quadrants[self.number]
+		#if quad is not None:
+		#	offset = self.npix
+		#	x += quad[0]*
+
 		# modify the camera's WCS, based on the CCD number
 		self.header['CRPIX1'] = x
 		self.header['CRPIX2'] = y
@@ -236,6 +239,9 @@ class CCD(Talker):
 			self.speak("       ...failed.")
 			assert(False)
 
+	@property
+	def fileidentifier(self):
+		return '{pos_string}_{name}_{counter:06.0f}'.format(pos_string=self.camera.pos_string(), name=self.name, counter=self.camera.counter)
 
 	def writeFinal(self, lean=True):
 		'''Write the final image from this CCD.'''
@@ -244,7 +250,7 @@ class CCD(Talker):
 		#self.header.extend(self.camera.psf.header)
 
 		# make filename for this image
-		self.note = 'final_{0:06.0f}'.format(self.camera.counter)
+		self.note = 'simulated_'+self.fileidentifier
 		finalfilename = self.directory + self.note + '.fits'
 
 		# write the image to FITS
@@ -269,7 +275,7 @@ class CCD(Talker):
 			self.camera.populateCatalog()
 
 		# pull out positions, magnitudes, and temperatures
-		ras, decs, tmag, temperatures = self.camera.catalog.arrays()
+		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.epoch)
 		self.camera.cartographer.ccd = self
 
 		# create coordinate object for the stars
@@ -291,9 +297,10 @@ class CCD(Talker):
 
 		# write the catalog to a text file
 		if write:
-			outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
-			np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f'])
-			self.speak("save projected star catalog {0}".format(outfile))
+			if self.camera.counter == 0:
+				outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
+				np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f'])
+				self.speak("save projected star catalog {0}".format(outfile))
 
 	def addStar(self, ccdx, ccdy, mag, temp, verbose=False, plot=False):
 		'''Add one star to an image, given position, magnitude, and effective temperature.'''
@@ -359,11 +366,9 @@ class CCD(Talker):
 		# otherwise loop through thresholds, adding stars at each
 		except:
 			self.starimage = self.zeros()
-			try:
-				self.starx
-				assert(self.starsareon == self.name)
-			except:
-				self.projectCatalog()
+
+			# propagate proper motions and project onto the detector
+			self.projectCatalog()
 
 			#for threshold in magnitude_thresholds:
 			if True:
@@ -405,7 +410,11 @@ class CCD(Talker):
 
 		self.image += self.starimage
 		self.show()
-		self.header['ISTARS'] = ('True', 'stars from UCAC4')
+		if self.camera.testpattern:
+			self.header['ISTARS'] = ('True', 'stars from a test pattern')
+		else:
+			self.header['ISTARS'] = ('True', 'stars from UCAC4')
+
 		if jitter:
 			self.header['IJITTER'] = ('True', 'spacecraft jitter, motion between images')
 		return self.starimage
@@ -415,7 +424,7 @@ class CCD(Talker):
 		# looks like I should use http://vizier.cfa.harvard.edu/viz-bin/Cat?VII/155 for a source catalog?
 
 
-	def addCosmics(self, gradient=False, version='fancy', diffusion=False, write=False, rate=5.0):
+	def addCosmics(self, gradient=False, version='fancy', diffusion=False, write=False, rate=5.0, correctcosmics=True):
 		'''Add cosmic rays to image.'''
 
 		# print update
@@ -430,14 +439,17 @@ class CCD(Talker):
 
 		# (optionally), write cosmic ray image
 		if write:
-			self.note = 'cosmics_{0:.1f}persecond_{1}seconds_{2:06.0f}'.format(rate,self.camera.cadence, self.camera.counter).replace('.', 'p')
+			self.note = 'cosmics_'+self.fileidentifier
 			cosmicsfilename = self.directory + self.note + '.fits'
 			self.writeToFITS(image, cosmicsfilename)
 
 		# add the cosmics into the running image
-		self.image += image
-		# note that cosmics were included in the image header
-		self.header['ICOSMICS'] = ('True', 'cosmic rays injected')
+		if (correctcosmics == False) or self.camera.cadence <= 2:
+			self.image += image
+			self.header['ICOSMICS'] = ('True', 'cosmic rays injected')
+		else:
+			self.header['ICOSMICS'] = ('False', 'cosmic rays injected')
+
 		self.show()
 		return image
 
@@ -641,7 +653,7 @@ class CCD(Talker):
 		self.show()
 
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True):
 		'''Expose an image on this CCD.'''
 
 		self.plot = plot
@@ -650,6 +662,7 @@ class CCD(Talker):
 		# create a blank image
 		self.image = self.zeros()
 
+		self.populateHeader()
 		# jitter the camera, or at least update the
 		if jitter:
 			self.camera.jitter.jitter(self.camera.counter, header=self.header)
@@ -667,11 +680,21 @@ class CCD(Talker):
 		if write==False:
 			stars = self.image + 0.0
 
+		if writenoiseless:
+			# make filename for this image
+			self.note = 'noiseless_'+self.fileidentifier
+			noiselessfilename = self.directory + self.note + '.fits'
+
+			# write the image to FITS
+			self.speak('saving noiseless TESS image')
+			self.writeToFITS(self.image, noiselessfilename, savetype=np.int32)
+
+
 		# add the photon noise from stars, galaxies, and backgrounds
 		self.addPhotonNoise()
 
 		# add cosmic rays to the image (after noise, because the *sub-Poisson* noise is already modeled with the Fano factor)
-		cosmics = self.addCosmics(write=write, version=cosmics, diffusion=diffusion)
+		cosmics = self.addCosmics(write=write, version=cosmics, diffusion=diffusion, correctcosmics=correctcosmics)
 
 		# add smear from the finite frame transfer time
 		if smear:
@@ -693,10 +716,9 @@ class CCD(Talker):
 
 		self.report("created image #{counter:07d} of {pos_string} with {cadence:.0f}s cadence".format(counter=self.camera.counter, pos_string=self.pos_string, cadence=self.camera.cadence))
 
-
-		##### THIS WON"T WORK ON MULTIPLE CCD CAMERAS
-		self.camera.advanceCounter()
-
+		# advance the camera's counter (and therefore timestep) if this is the last of the CCDs
+		if self == self.camera.ccds[-1]:
+			self.camera.advanceCounter()
 
 		if write==False:
 			return self.image, cosmics, stars
