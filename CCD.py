@@ -62,7 +62,7 @@ class CCD(Talker):
 
 
 		# start populating the image header (seems like we can't do this until we're sure camera has pointed somewhere)
-		self.populateHeader()
+		#self.populateHeader()
 
 	def show(self):
 		'''Display the current (possibly in-progress image.)'''
@@ -117,10 +117,10 @@ class CCD(Talker):
 
 		# create an empty header
 		try:
-			self.header
+			self.camera.header
 		except:
-			self.header = astropy.io.fits.Header()
-
+			self.camera.populateHeader()#astropy.io.fits.Header()
+		self.header = self.camera.header
 
 
 		# fill it with some CCD details
@@ -132,7 +132,7 @@ class CCD(Talker):
 		self.header['SATURATE'] = (self.camera.saturation*self.camera.cadence/self.camera.singleread, '[e-] saturation level in this image')
 		self.header['READNOIS'] = (self.camera.read_noise, '[e-] read noise (per individual read)')
 		self.header['READTIME'] = (self.camera.readouttime, '[s] time to transer to frame store')
-		self.header['CCDNUM'] = (self.number, 'CCD number (1,2,3,4 or 0=fake subarrayor)')
+		self.header['CCDNUM'] = (self.number, 'CCD number (1,2,3,4 or 0=fake subarray)')
 		self.header['CCDSIZE'] = (self.npix, '[pix] size of one CCD')
 
 		# fill in the timestamp for this CCD image
@@ -405,7 +405,11 @@ class CCD(Talker):
 
 		self.image += self.starimage
 		self.show()
-		self.header['ISTARS'] = ('True', 'stars from UCAC4')
+		if self.camera.testpattern:
+			self.header['ISTARS'] = ('True', 'stars from a test pattern')
+		else:
+			self.header['ISTARS'] = ('True', 'stars from UCAC4')
+
 		if jitter:
 			self.header['IJITTER'] = ('True', 'spacecraft jitter, motion between images')
 		return self.starimage
@@ -650,6 +654,7 @@ class CCD(Talker):
 		# create a blank image
 		self.image = self.zeros()
 
+		self.populateHeader()
 		# jitter the camera, or at least update the
 		if jitter:
 			self.camera.jitter.jitter(self.camera.counter, header=self.header)

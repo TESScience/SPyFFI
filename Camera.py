@@ -80,7 +80,7 @@ class Camera(Talker):
 
         # load the PSF for this Camera
         self.psf = PSF(camera=self)
-        
+
         # load the jitterball for this camera
         self.jitter = Jitter(camera=self)
 
@@ -180,12 +180,13 @@ class Camera(Talker):
         self.wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
 
         # set this to be the WCS
-        self.populateHeader()
+        #self.populateHeader()
 
     def pos_string(self):
         '''Return the position string for this field.'''
         if self.testpattern:
-            return "testpattern"
+            return self.catalog.name
+
         else:
             coords = astropy.coordinates.ICRS(ra=self.ra*astropy.units.degree, dec=self.dec*astropy.units.degree)
             return "{0:02}h{1:02}m{2:02}s{3:+03}d{4:02}m{5:02}s".format(np.int(coords.ra.hms[0]),np.int(coords.ra.hms[1]),np.int(coords.ra.hms[2].round()), np.int(coords.dec.dms[0]),np.int(np.abs(coords.dec.dms[1])),np.int(np.abs(coords.dec.dms[2].round())))
