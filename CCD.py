@@ -723,6 +723,8 @@ class CCD(Talker):
 		if write==False:
 			return self.image, cosmics, stars
 
+		self.zip()
+		
 	def zip(self):
 		'''Compress all the files in this directory.'''
 		os.system('gzip -v {0}*.fits'.format(self.directory))
