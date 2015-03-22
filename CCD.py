@@ -200,7 +200,7 @@ class CCD(Talker):
 		return 10**(-0.4*I_surface_brightness)*1.7e6*self.camera.effective_area*self.camera.pixel_solid_area
 
 
-	def writeToFITS(self, image, path, split=False, savetype=np.float32):
+	def writeToFITS(self, image, path, split=False, savetype=np.float32, zip=False):
 		'''General FITS writer for this CCD.'''
 
 		# print status
@@ -220,6 +220,9 @@ class CCD(Talker):
 		# write the file to FITS
 		#astropy.io.fits.PrimaryHDU(np.transpose(savetype(image)), header=self.header).writeto(filename, clobber=True)
 		astropy.io.fits.PrimaryHDU(savetype(image), header=self.header).writeto(path, clobber=True)
+
+		if zip:
+			compress(path)
 
 
 	def loadFromFITS(self, path):
@@ -255,7 +258,7 @@ class CCD(Talker):
 
 		# write the image to FITS
 		self.speak('saving final TESS image')
-		self.writeToFITS(self.image, finalfilename, savetype=np.int32)
+		self.writeToFITS(self.image, finalfilename, savetype=np.int32, zip=self.zip)
 
 		# optionally, write some other outputs too!
 		if lean == False:
@@ -441,7 +444,7 @@ class CCD(Talker):
 		if write:
 			self.note = 'cosmics_'+self.fileidentifier
 			cosmicsfilename = self.directory + self.note + '.fits'
-			self.writeToFITS(image, cosmicsfilename)
+			self.writeToFITS(image, cosmicsfilename, zip=self.zip)
 
 		# add the cosmics into the running image
 		if (correctcosmics == False) or self.camera.cadence <= 2:
@@ -653,9 +656,9 @@ class CCD(Talker):
 		self.show()
 
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True, zip=True):
 		'''Expose an image on this CCD.'''
-
+		self.zip = zip
 		self.plot = plot
 		self.terse = terse
 
@@ -687,7 +690,7 @@ class CCD(Talker):
 
 			# write the image to FITS
 			self.speak('saving noiseless TESS image')
-			self.writeToFITS(self.image, noiselessfilename, savetype=np.int32)
+			self.writeToFITS(self.image, noiselessfilename, savetype=np.int32, zip=self.zip)
 
 
 		# add the photon noise from stars, galaxies, and backgrounds
@@ -723,11 +726,10 @@ class CCD(Talker):
 		if write==False:
 			return self.image, cosmics, stars
 
-		self.zip()
-		
-	def zip(self):
-		'''Compress all the files in this directory.'''
-		os.system('gzip -v {0}*.fits'.format(self.directory))
+
+def compress( filename):
+	'''Compress all the files in this directory.'''
+	os.system('gzip -v {0}'.format(filename))
 
 
 
