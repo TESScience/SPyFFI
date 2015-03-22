@@ -60,8 +60,14 @@ Go into the cosmical_realistic directory, and run `python setup.py build_ext --i
 
 
 
+### download the SPyFFI inputs
+SPyFFI requires a few big files in order to run (primarily the PSF library and a jitterball). Download and unpack them with the following commands:
+
+    cd $SPYFFIDATA
+    wget
+    tar -xvf SPyFFI_inputs.tar.gz
 
 
 
-
-Created by Zach Berta-Thompson (2014).
+### asking for help
+These instructions worked for Zach, starting with a clean install on the MIT antares cluster, as of 3/21/2015. It was was fairly smooth, but it *probably* will not work on the first try for you. Please e-mail me (zkbt@mit.edu) with problems and I'll try to help as quickly as I can!
