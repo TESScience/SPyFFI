@@ -119,6 +119,7 @@ class TestPattern(Catalog):
 
 	def load(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False, nudge=21.1, pm=0.0, **kwargs):
 
+		self.name = 'testpattern_{0}to{1}'.format(np.min(magnitudes), np.max(magnitudes))
 		# how many stars do we need?
 		pixels = np.maximum(np.int(size/spacing), 1)
 		n = pixels**2
