@@ -1,4 +1,5 @@
-from Camera import Camera
-from PSF import PSF
-from CCD import CCD
-from Cartographer import Cartographer
+import socket
+hostname = socket.gethostname()
+if 'antares' in hostname:
+	import matplotlib 
+	matplotlib.use('Agg')
