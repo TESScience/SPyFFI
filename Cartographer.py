@@ -171,7 +171,7 @@ class focalxy(position):
     @property
     def focalrtheta(self):
         radius = np.sqrt(self.x**2 + self.y**2)
-        theta = np.arctan2(self.y, self.x)
+        theta = (np.arctan2(self.y, self.x) + 2*np.pi) % (2*np.pi)
         return focalrtheta(radius, theta, self.cartographer)
 
     @property
