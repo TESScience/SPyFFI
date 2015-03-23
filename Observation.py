@@ -40,10 +40,11 @@ class Sky(Observation):
 	def createCatalog(self, radius=0.2, **kwargs):
 		# determine the size of the catalog from the camera's subarray size (in pixels)
 		ra, dec = self.camera.ra, self.camera.dec
-		self.camera.catalog = Catalogs.makeCatalog(name='UCAC4', ra=ra, dec=dec, radius=radius, **kwargs)
+		radius = self.camera.subarray*self.camera.pixelscale/60.0/60.0
+		self.camera.catalog = Catalogs.makeCatalog(name='UCAC4', ra=ra, dec=dec, radius=radius)
 
 class SkySubarray(Sky):
-	def __init__(self, subarray=100, **kwargs):
+	def __init__(self, subarray=200, **kwargs):
 		kwargs['subarray'] = subarray
 		Sky.__init__(self, **kwargs)
 
