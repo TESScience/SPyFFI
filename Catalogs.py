@@ -131,7 +131,7 @@ class TestPattern(Catalog):
 		self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten()
 		self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra
 		if random:
-			#self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
+			self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
 			offset = nudge*(np.random.rand(2, n) - 0.5)/3600.0
 			self.dec += offset[0,:]
 			self.ra += offset[1,:]

@@ -253,7 +253,7 @@ class CCD(Talker):
 
 		# make filename for this image
 		self.note = 'simulated_'+self.fileidentifier
-		finalfilename = self.directory + self.note + '.fits' + zipsufffix
+		finalfilename = self.directory + self.note + '.fits' + zipsuffix
 
 		# write the image to FITS
 		self.speak('saving final TESS image')
@@ -442,7 +442,7 @@ class CCD(Talker):
 		# (optionally), write cosmic ray image
 		if write:
 			self.note = 'cosmics_'+self.fileidentifier
-			cosmicsfilename = self.directory + self.note + '.fits' + zipsufffix
+			cosmicsfilename = self.directory + self.note + '.fits' + zipsuffix
 			self.writeToFITS(image, cosmicsfilename)
 
 		# add the cosmics into the running image
@@ -684,7 +684,7 @@ class CCD(Talker):
 		if writenoiseless:
 			# make filename for this image
 			self.note = 'noiseless_'+self.fileidentifier
-			noiselessfilename = self.directory + self.note + '.fits' + zipsufffix
+			noiselessfilename = self.directory + self.note + '.fits' + zipsuffix
 
 			# write the image to FITS
 			self.speak('saving noiseless TESS image')
