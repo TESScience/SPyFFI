@@ -16,7 +16,7 @@ class Observation(Talker):
 		self.createCamera(**kwargs)
 		self.createCatalog(**kwargs)
 
-	def expose(self, remake=False, write=True, display=False, jitter=True):
+	def expose(self, remake=False, write=True, display=False, jitter=True, **kwargs):
 		self.ccd = self.camera.ccds[0]
 		self.ccd.display = display
 		for i in range(self.nexposures):
@@ -24,9 +24,17 @@ class Observation(Talker):
 
 	def createCamera(self, cadence=2, ra=0.0, dec=0.0, subarray=100, **kwargs):
 		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
+		try:
+			self.camera.label = kwargs['label']
+		except KeyError:
+			pass
 
 	def create(self, **kwargs):
-		todo = {2:3, 120:3, 1800:int(27.4*48)}
+		try:
+			todo = kwargs['todo']
+		except:
+			todo = {2:3, 120:3, 1800:int(27.4*48)}
+
 		for k in todo.keys():
 			self.camera.setCadence(k)
 			self.nexposures = todo[k]
@@ -65,7 +73,7 @@ class SkyFFI(Sky):
 			radius *= 0.1
 		self.camera.catalog = Catalogs.makeCatalog(name='UCAC4', ra=ra, dec=dec, radius=radius)
 
-	def expose(self, remake=False, write=True, display=False, jitter=True):
+	def expose(self, remake=False, write=True, display=False, jitter=True, **kwargs):
 		self.ccd = self.camera.ccds[0]
 		self.ccd.display = display
 		for i in range(self.nexposures):
