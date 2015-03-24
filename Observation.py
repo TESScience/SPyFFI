@@ -35,6 +35,11 @@ class Observation(Talker):
 		except:
 			todo = {2:3, 120:3, 1800:int(27.4*48)}
 
+		try:
+			self.camera.label = kwargs['label']
+		except KeyError:
+			pass
+
 		for k in todo.keys():
 			self.camera.setCadence(k)
 			self.nexposures = todo[k]
