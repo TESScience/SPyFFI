@@ -8,6 +8,8 @@ import Cosmics
 np.set_printoptions(threshold = 1e6, linewidth = 300)
 plt.ion()
 
+zipsuffix = ''
+
 # define mapping between CCD number and quadrant
 quadrants = {1:(1,1), 2:(-1,1), 3:(-1,-1), 4:(1,-1), 0:None}
 
@@ -251,7 +253,7 @@ class CCD(Talker):
 
 		# make filename for this image
 		self.note = 'simulated_'+self.fileidentifier
-		finalfilename = self.directory + self.note + '.fits.gz'
+		finalfilename = self.directory + self.note + '.fits' + zipsufffix
 
 		# write the image to FITS
 		self.speak('saving final TESS image')
@@ -440,7 +442,7 @@ class CCD(Talker):
 		# (optionally), write cosmic ray image
 		if write:
 			self.note = 'cosmics_'+self.fileidentifier
-			cosmicsfilename = self.directory + self.note + '.fits.gz'
+			cosmicsfilename = self.directory + self.note + '.fits' + zipsufffix
 			self.writeToFITS(image, cosmicsfilename)
 
 		# add the cosmics into the running image
@@ -682,7 +684,7 @@ class CCD(Talker):
 		if writenoiseless:
 			# make filename for this image
 			self.note = 'noiseless_'+self.fileidentifier
-			noiselessfilename = self.directory + self.note + '.fits.gz'
+			noiselessfilename = self.directory + self.note + '.fits' + zipsufffix
 
 			# write the image to FITS
 			self.speak('saving noiseless TESS image')

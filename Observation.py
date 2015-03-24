@@ -42,6 +42,7 @@ class Observation(Talker):
 
 		for k in todo.keys():
 			self.camera.setCadence(k)
+			self.camera.counter = 0
 			self.nexposures = todo[k]
 			self.expose(**kwargs)
 
