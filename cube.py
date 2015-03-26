@@ -1,13 +1,13 @@
 '''Generate TESS pixel lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
 from imports import *
-import SPyFFI, CR.Strategies, Stacker
+import Camera, CR.Strategies, Stacker
 
 subexposurecadence = 2
 class Cube(Talker):
 	'''Cube to handle simulated postage stamp pixel light curves;
 			has dimensions of (xpixels, ypixels, time).'''
 
-	def __init__(self, subject='test', size=32, n=900, cadence=2, jitter=False, stacker='Sum'):
+	def __init__(self, subject='test', size=32, n=900, cadence=2, jitter=False, stacker='Sum', **kwargs):
 		'''Initialize a cube object.
 
 		keyword arguments:
@@ -56,7 +56,8 @@ class Cube(Talker):
 		self.shape = (self.xpixels, self.ypixels, self.n)
 
 		# create a TESS camera and point it at the subject
-		self.camera = SPyFFI.Camera(ra=self.ra, dec=self.dec, subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera = Camera.Camera(ra=self.ra, dec=self.dec, subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera.populateCatalog(name='testpattern', **kwargs)
 		self.camera.cartographer.pithy = True
 
 		# create a blank image with the camera
@@ -150,7 +151,7 @@ class Cube(Talker):
 			for i in range(self.n):
 				self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
 
-				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
+				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy', correctcosmics=False)
 			self.unmitigated = self.photons
 			# store some useful accessory information about
 			self.background = self.ccd.backgroundimage

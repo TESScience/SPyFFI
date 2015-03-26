@@ -20,7 +20,7 @@ class Observation(Talker):
 		self.ccd = self.camera.ccds[0]
 		self.ccd.display = display
 		for i in range(self.nexposures):
-			self.ccd.expose(write=write, remake=remake, jitter=jitter)
+			self.ccd.expose(write=write, remake=remake, jitter=jitter, **kwargs)
 
 	def createCamera(self, cadence=2, ra=0.0, dec=0.0, subarray=100, **kwargs):
 		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
@@ -83,7 +83,7 @@ class SkyFFI(Sky):
 		self.ccd = self.camera.ccds[0]
 		self.ccd.display = display
 		for i in range(self.nexposures):
-			self.camera.expose(write=write, remake=remake, jitter=jitter)
+			self.camera.expose(write=write, remake=remake, jitter=jitter, **kwargs)
 
 
 class TestPattern(Observation):

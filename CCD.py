@@ -451,7 +451,6 @@ class CCD(Talker):
 			self.header['ICOSMICS'] = ('True', 'cosmic rays injected')
 		else:
 			self.header['ICOSMICS'] = ('False', 'cosmic rays injected')
-
 		self.show()
 		return image
 
