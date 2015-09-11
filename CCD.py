@@ -654,7 +654,7 @@ class CCD(Talker):
 		self.show()
 
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True, **kwargs):
 		'''Expose an image on this CCD.'''
 		self.plot = plot
 		self.terse = terse
