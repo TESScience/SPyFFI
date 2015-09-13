@@ -277,7 +277,7 @@ class CCD(Talker):
 			self.camera.populateCatalog()
 
 		# pull out positions, magnitudes, and temperatures
-		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.epoch)
+		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd)
 		self.camera.cartographer.ccd = self
 
 		# create coordinate object for the stars

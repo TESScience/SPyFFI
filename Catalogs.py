@@ -17,6 +17,12 @@ def makeCatalog(**kwargs):
 		cat = UCAC4(**kwargs)
 	return cat
 
+
+
+
+
+
+
 class Star(object):
 	'''a Star object, containing at least RA + Dec + magnitude'''
 	def __init__(self, ra=0.0, dec=0.0, tmag=10.0, **kwargs):
@@ -38,10 +44,11 @@ class Catalog(Talker):
 		'''return (static) arrays of positions, magnitudes, and effective temperatures'''
 		return self.ra, self.dec, self.tmag, self.temperature
 
-	def snapshot(self, epoch):
+	def snapshot(self, bjd):
 		'''return a snapshot of positions, magnitudes, and effective temperatures (all of which may be time-varying)'''
 
 		# propagate proper motions
+		epoch = (bjd - 2451544.5)/365.25 + 2000.0
 		ra, dec = self.atEpoch(epoch)
 
 		# determine brightness of star
@@ -150,6 +157,8 @@ class UCAC4(Catalog):
 		self.load(ra=ra, dec=dec, radius=radius, write=write)
 
 	def load(self, ra=0.0, dec=90.0, radius=0.2, write=True):
+
+		# select the columns that should be downloaded from UCAC
 		catalog = 'UCAC4'
 		ratag = '_RAJ2000'
 		dectag = '_DEJ2000'
@@ -160,12 +169,12 @@ class UCAC4(Catalog):
 			vmagtag = 'Vmag'
 			pmratag, pmdectag = 'pmRA', 'pmDE'
 			columns = ['_RAJ2000','_DECJ2000','pmRA', 'pmDE','f.mag','Jmag', 'Vmag']
-		#if catalog=='Tycho-2':
-		#	vcat = 'I/259/tyc2'
-		#	rmagtag = 'VTmag'
-		#	columns = ['_RAJ2000','_DECJ2000','VTmag']
+
+		# create a query through Vizier
 		v = Vizier(catalog=vcat,columns=columns)
 		v.ROW_LIMIT = -1
+
+		# either reload an existing catalog file or download to create a new one
 		starsfilename = settings.prefix + 'intermediates/' +  "{catalog}_{ra}_{dec}_{radius}".format(catalog=catalog, ra=ra, dec=dec, radius=radius).replace(' ', '') + '.npy'
 		try:
 			t = np.load(starsfilename)
@@ -205,17 +214,6 @@ class UCAC4(Catalog):
 		temperatures = relations.pickles(rmag-jmag)
 		imag = rmag - relations.davenport(rmag-jmag)
 
-		'''bad = np.isfinite(imag) == False
-		bad = imag < 5
-		plt.cla()
-		plt.scatter(ras[bad], decs[bad], alpha=0.5, color='blue')
-		plt.scatter(bt[:][ratag], bt[:][dectag], s=100/bt[:][vmagtag]**2,color='red',alpha=0.5)
-
-
-
-
-		assert(False)'''
-		#assert(np.sum(np.isfinite(imag)==False) == 0)
 
 
 		pmra[np.isfinite(pmra) == False] = 0.0
