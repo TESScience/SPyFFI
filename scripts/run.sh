@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-screen -d -m ./midlatitude.py
-screen -d -m ./sparse.py
-screen -d -m ./crowded.py
-screen -d -m ./testpattern.py
+screen -S midlatitude -d -m ./midlatitude.py
+screen -S sparse -d -m ./sparse.py
+screen -S crowded -d -m ./crowded.py
+screen -S testpattern -d -m ./testpattern.py
