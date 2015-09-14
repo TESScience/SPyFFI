@@ -68,8 +68,8 @@ class SkyFFI(Sky):
 		kwargs['subarray'] = None
 		Sky.__init__(self, **kwargs)
 
-	def createCamera(self, subarray=None, cadence=2, ra=0.0, dec=0.0, **kwargs):
-		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
+	#def createCamera(self, subarray=None, cadence=2, ra=0.0, dec=0.0, **kwargs):
+	#	self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
 
 	def createCatalog(self, fast=False, **kwargs):
 		# determine the size of the catalog from the camera's subarray size (in pixels)
