@@ -8,7 +8,6 @@ import astropy.io.ascii
 import scipy.interpolate
 
 try:
-    assert(False)
     import Cartographer
     # create a cartographer for managing conversions between ecliptic and galactic coordinates
     carto = Cartographer.Cartographer()

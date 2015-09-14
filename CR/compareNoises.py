@@ -2,10 +2,69 @@ from SPyFFI.imports import *
 import SPyFFI.settings as settings
 from SPyFFI.Cube import Cube
 from SPyFFI.Photometer import Photometer
+from SPyFFI.Stacker import pick
 from SPyFFI.Noise import noise
 from Strategies import *
 import textwrap
 import os
+
+def hogg(bin=1, number=25):
+    pkw = dict(alpha=0.15,marker='o',linewidth=0, markeredgewidth=0, markersize=5)
+
+    Qs, alphas = [1, 3, 10, 30, 100, 300], [0.006, 0.02, 0.06, 0.2, 0.6]
+    figure = plt.figure('Hogg optimization', figsize=(10,8))
+    gs = plt.matplotlib.gridspec.GridSpec(len(alphas),len(Qs),  hspace=0.1, wspace=0.1)
+
+    directory = '/Users/zkbt/Cosmos/Data/TESS/FFIs/outputs/testpattern_6to16/120s/sub400x400/cubes/'
+    spacefilename = directory + 'spacemitigated_photometry_1000exp_at120s_withjitter_perfectpixels_Central8outof10.npy'
+    space = np.load(spacefilename)
+    mag, noises = space
+    exp, ach = noises['expected'], noises['achieved']
+    isort = np.argsort(mag)
+    scale=1e6
+
+    cach = zachopy.oned.binto(mag[isort], scale*ach[isort], bin, robust=True)
+    cexp = zachopy.oned.binto(mag[isort], scale*exp[isort], bin, robust=True)
+
+    share = None
+    ax = []
+    for i in range(len(alphas)):
+        for j in range(len(Qs)):
+            alpha, Q = alphas[i], Qs[j]
+            ax.append(  plt.subplot(gs[i,j], sharex=share, sharey=share))
+            share = ax[-1]
+            n = Noises()
+            n.create(n=number, size=128, strategy=dict(name='Hogg', alpha=alpha, Q=Q))
+
+            mag, noises = n.spacemitigated
+            exp, ach = noises['expected'], noises['achieved']
+            isort = np.argsort(mag)
+
+            scale = 1e6
+            bach = zachopy.oned.binto(mag[isort], scale*ach[isort], bin, robust=True)
+            bexp = zachopy.oned.binto(mag[isort], scale*exp[isort], bin, robust=True)
+
+            if j == 0:
+                ax[-1].set_ylabel('alpha =\n{alpha}'.format(**locals()))#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
+            else:
+                plt.setp(ax[-1].get_yticklabels(), visible=False)
+
+            ax[-1].plot(mag[isort], ach[isort]/exp[isort], color='Sienna', **pkw)
+            ax[-1].plot(bexp[0], bach[1]/bexp[1], color='SaddleBrown', alpha=0.5, linewidth=3)
+
+            ax[-1].plot(cexp[0], cach[1]/cexp[1], color='DarkBlue', alpha=0.5, linewidth=3)
+
+            ax[-1].axhline(1.0, linewidth=3, color='gray')
+
+            if i == len(alphas)-1:
+                ax[-1].set_xlabel('Q = {Q}'.format(**locals()))
+            else:
+                plt.setp(ax[-1].get_xticklabels(), visible=False)
+            ax[-1].set_ylim(0.5, 2.0)#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
+            ax[-1].set_xlim(6, 16)#np.min(ach[i]/exp[i]), np.max(ach[i]/exp[i]))
+            #ax[-1].text(11, np.max(ax[-1].get_ylim())*0.5, n.label, va='top', ha='center', alpha=0.6)
+
+            plt.draw()
 
 def final():
     directory = '/Users/zkbt/Cosmos/Data/TESS/FFIs/outputs/testpattern/120s/sub400x400/cubes/'
@@ -77,7 +136,7 @@ class Noises(Talker):
 
         self.cadence = cadence
 
-    def create(self, n=100, size=100, remake=False, strategy='Central 8 out of 10'):
+    def create(self, n=100, size=100, remake=False, strategy=dict(name='Central', n=10), jitter=True):
         self.ground = Cube(cadence=self.cadence, n=n, size=size, jitter=False)
         # calculate ground-mitigation
         groundfilename = self.ground.filename.replace('cube_', 'groundmitigated_photometry_')
@@ -102,8 +161,9 @@ class Noises(Talker):
             np.save(groundfilename, (self.unmitigated, self.groundmitigated))
             self.speak('saved to {0}'.format(groundfilename))
 
-        self.descriptions['Space Mitigation'] = textwrap.fill('mitigating cosmic rays onboard, using a [{0}] strategy, including jitter (and uniform intrapixel sensitivity) but not stellar variability'.format(strategy), line)
-        self.space = Cube(cadence=self.cadence, n=n, size=size, jitter=True, stacker=strategy)
+        self.space = Cube(cadence=self.cadence, n=n, size=size, jitter=jitter, stacker=strategy)
+        self.label = pick(strategy).name
+        self.descriptions['Space Mitigation'] = textwrap.fill('mitigating cosmic rays onboard, using a [{0}] strategy, including jitter (and uniform intrapixel sensitivity) but not stellar variability'.format(self.label), line)
         spacefilename = self.space.filename.replace('cube_', 'spacemitigated_photometry_')
         try:
             assert(remake==False)

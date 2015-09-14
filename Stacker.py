@@ -4,17 +4,18 @@
 from imports import *
 
 
-def pick(name='Sum'):
-    '''Based on an input name, return a stacker object.'''
+def pick(dictionary):
+    '''Based on an input dictionary (with 'name' and parameters defined), return a stacker object.'''
+    name = dictionary['name']
     if 'Central' in name:
-        bits = name.split()
-        m, n = np.int(bits[1]), np.int(bits[-1])
-        return SumOfTruncatedMean(n=n, m=m)
+        s = SumOfTruncatedMean
     if 'Rejecting' in name:
-        bits = name.split()
-        #threshold, n, memory = np.float(bits[1]), np.float(bits[7]), np.float(bits[10])
-        return SumWithOutlierRejection(threshold=10, n=10, memory=0.5)
-
+        s = SumWithOutlierRejection
+    if 'Hogg' in name:
+        s = Hogg
+    if 'Sum' in name:
+        s = Sum
+    return s(**dictionary)
 
 
 class Stacker(Talker):
@@ -27,9 +28,14 @@ class Stacker(Talker):
     def stackCosmics(self, cube):
         pass
 
+class Sum(Stacker):
+    '''This is just a dummy to prevent the pick function from breaking when all we want is a name.'''
+    def __init__(self, **kwargs):
+        self.name = 'Sum'
+
 class SumWithOutlierRejection(Stacker):
     '''Binning with TruncatedMean = break into subsets, reject the highest and lowest points from each and take the mean of the rest, sum these truncated means.'''
-    def __init__(self, n=10, threshold=10.0, memory=0.90, safetybuffer=2.0, diagnostics=False):
+    def __init__(self, n=10, threshold=10.0, memory=0.90, safetybuffer=2.0, diagnostics=False, **kwargs):
         '''Initialize an outlierwith decay Strategy.
 
         n = the number of subexposures in each "chunk"
@@ -149,9 +155,106 @@ class SumWithOutlierRejection(Stacker):
         return photons.squeeze(), cosmics.squeeze(), noiseless.squeeze(), unmitigated.squeeze()
 
 
+class Hogg(Stacker):
+    '''Binning with TruncatedMean = break into subsets, reject the highest and lowest points from each and take the mean of the rest, sum these truncated means.'''
+    def __init__(self, Q=3.0, alpha=0.02, beta=1.0, diagnostics=False, **kwargs):
+        '''Create a streaming iteratively reweighted least squares.
+
+        '''
+        Stacker.__init__(self)
+
+        # store the parameters of the filter
+        self.Q = Q
+        self.alpha = alpha
+        self.beta = beta
+        self.cadencenumber =0
+
+        # define a name for this filter
+        self.name = 'Hogg (alpha={alpha}, Q={Q})'.format(**self.__dict__)
+
+        # for testing, keep a diagnostics flag to say whether to display the mean + std. estimates
+        self.diagnostics = diagnostics
+
+    def stack(self, cube, nsubexposures):
+
+        # figure out the original shape
+        xpixels, ypixels, subexposures = cube.photons.shape
+        exposures = subexposures/nsubexposures
+        assert(subexposures % nsubexposures == 0)
+
+        # reshape into something more convenient for summing
+        unsplit = cube.photons
+
+        # create an array to store the final binned timeseries
+        finaltimeseries = np.zeros((xpixels, ypixels, exposures))
+
+        try:
+            self.running_mean
+            self.running_var
+            cadencenumber0 = self.cadencenumber
+
+        except AttributeError:
+
+            # make sure we're not reseting in the middle of a segment
+            assert(self.cadencenumber == 0)
+
+            # initialize these estimates with the first chunk (rejecting no outliers)
+            self.running_mean = np.mean(unsplit[:,:,0:1], -1)
+            self.running_var = 10.0*(unsplit[:,:,1] - unsplit[:,:,0])**2
+            self.numerator = self.running_mean
+            self.denominator = np.ones_like(self.running_mean)
+            self.cadencenumber = 2
+            cadencenumber0 = 0
+
+        def currentnumber():
+            return self.cadencenumber - cadencenumber0
+
+        beenthroughloop = False
+        # loop over the binned exposures, and chunks within exposures
+        while currentnumber() < unsplit.shape[-1]:
+
+            yn = unsplit[:,:,currentnumber()]
+            deltasquaredn = (yn - self.running_mean)**2
+            chisqn = deltasquaredn/self.running_var
+            this_alpha = max(1.0/self.cadencenumber, self.alpha)
+            alphan = this_alpha*self.Q/(self.Q + chisqn) # "this is the magic"
+            self.running_mean = alphan*yn + (1.0 - alphan)*self.running_mean
+            self.running_var = self.beta*alphan*deltasquaredn + (1 - self.beta*alphan)*self.running_var
+
+            self.speak('this_alpha = {0}'.format(this_alpha))
+            self.numerator += alphan*yn
+            self.denominator += alphan
+            #self.speak('numerator/denominator = {0}'.format(self.numerator[0]/self.denominator[0]))
+            #print
+            assert(self.numerator.shape == self.denominator.shape)
+            self.cadencenumber += 1
+            if currentnumber() % nsubexposures == 0:
+                self.speak('populating the stacked exposure')
+                finaltimeseries[:,:,currentnumber()/nsubexposures-1] = self.numerator/self.denominator*nsubexposures
+                assert((finaltimeseries[:,:,currentnumber()/nsubexposures-1] > 0).all())
+                self.numerator *= 0.
+                self.denominator *=0.
+                assert((finaltimeseries > 0).all())
+            beenthroughloop = True
+        assert(beenthroughloop)
+
+        photons = finaltimeseries
+        assert((photons > 0).all())
+
+        cosmics = np.sum(cube.cosmics.reshape(xpixels, ypixels, exposures, nsubexposures), -1)
+
+        noiseless = np.sum(cube.noiseless.reshape(xpixels, ypixels, exposures, nsubexposures), -1)
+
+        # sum the unmitigated image
+        unmitigated = np.sum(cube.photons.reshape(xpixels, ypixels, exposures, nsubexposures), -1)
+        assert((unmitigated > 1).all())
+
+        #bla = self.input('???')
+        return photons.squeeze(), cosmics.squeeze(), noiseless.squeeze(), unmitigated.squeeze()
+
 class SumWithHybrid(Stacker):
     '''Binning with TruncatedMean = break into subsets, reject the highest and lowest points from each and take the mean of the rest, sum these truncated means.'''
-    def __init__(self, n=10, threshold=10.0, memory=0.50, safetybuffer=2.0, diagnostics=False):
+    def __init__(self, n=10, threshold=10.0, memory=0.50, safetybuffer=2.0, diagnostics=False, **kwargs):
         '''Initialize an outlierwith decay Strategy.
 
         n = the number of subexposures in each "chunk"
@@ -275,7 +378,7 @@ class SumWithHybrid(Stacker):
 
 class SumOfTruncatedMean(Stacker):
     '''Binning with TruncatedMean = break into subsets, reject the highest and lowest points from each and take the mean of the rest, sum these truncated means.'''
-    def __init__(self, n=10, m=None):
+    def __init__(self, n=10, m=None, **kwargs):
         Stacker.__init__(self)
         self.n = n
         if m is None:

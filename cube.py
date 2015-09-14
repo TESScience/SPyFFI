@@ -1,13 +1,13 @@
 '''Generate TESS pixel lightcurve cubes with dimensions (xpix)x(ypix)x(time).'''
 from imports import *
-import SPyFFI, CR.Strategies, Stacker
+import Camera, CR.Strategies, Stacker
 
 subexposurecadence = 2
 class Cube(Talker):
 	'''Cube to handle simulated postage stamp pixel light curves;
 			has dimensions of (xpixels, ypixels, time).'''
 
-	def __init__(self, subject='test', size=32, n=900, cadence=2, jitter=False, stacker='Sum'):
+	def __init__(self, subject='test', size=32, n=900, cadence=2, jitter=False, stacker=dict(name='Sum'), **kwargs):
 		'''Initialize a cube object.
 
 		keyword arguments:
@@ -56,7 +56,8 @@ class Cube(Talker):
 		self.shape = (self.xpixels, self.ypixels, self.n)
 
 		# create a TESS camera and point it at the subject
-		self.camera = SPyFFI.Camera(ra=self.ra, dec=self.dec, subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera = Camera.Camera(ra=self.ra, dec=self.dec, subarray=self.size, cadence=self.cadence, testpattern=self.testpattern)
+		self.camera.populateCatalog(name='testpattern', **kwargs)
 		self.camera.cartographer.pithy = True
 
 		# create a blank image with the camera
@@ -130,7 +131,7 @@ class Cube(Talker):
 			phrase = 'with'
 		else:
 			phrase = 'without'
-		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter_{intrapixel}_{stacker}.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase, intrapixel=self.camera.psf.intrapixel.name, stacker=self.stacker.replace(' ',''))
+		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter_{intrapixel}_{stacker}.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase, intrapixel=self.camera.psf.intrapixel.name, stacker=Stacker.pick(self.stacker).name.replace(' ', ''))
 
 	def simulate(self):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
@@ -145,12 +146,12 @@ class Cube(Talker):
 
 
 		# if we're using a "Sum" stacking strategy, then don't generate the individual 2-second frames
-		if (self.stacker.lower() == 'sum') | (self.cadence == subexposurecadence):
+		if (self.stacker['name'].lower() == 'sum') | (self.cadence == subexposurecadence):
 			# loop over (already stacked) exposures, creating them
 			for i in range(self.n):
 				self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
 
-				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy')
+				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy', correctcosmics=False)
 			self.unmitigated = self.photons
 			# store some useful accessory information about
 			self.background = self.ccd.backgroundimage
@@ -295,12 +296,17 @@ class Cube(Talker):
 		cosmicsnormalized = self.cosmics/normalizationarray
 		noiselessnormalized = self.noiseless/normalizationarray
 
+		something = cosmicsnormalized > 0
+		cosmicsnormalized[something] += noiselessnormalized[something]
+
 		# set up a logarithmic color scale (going between 0 and 1)
 		def color(x):
-			zero = np.min(np.log(self.master()))
+			zero = np.min(np.log(self.master()*0.5))
 			span = np.max(np.log(self.master())) - zero
+			#normalized = (np.log(x) -  zero)/span
 			normalized = (np.log(x) -  zero)/span
-			return plt.matplotlib.cm.YlGn(normalized)
+			return plt.matplotlib.cm.Blues_r(normalized)
+			#return plt.matplotlib.cm.YlGn(normalized)
 
 		# create a plot
 		scale = 1.5
@@ -323,8 +329,8 @@ class Cube(Talker):
 
 
 				ax.plot(photonsnormalized[i,j,:], color='black')
-				ax.plot(noiselessnormalized[i,j,:], color='blue', alpha=0.3)
-				ax.plot(cosmicsnormalized[i,j,:], color='green', alpha=0.3)
+				ax.plot(noiselessnormalized[i,j,:], color='blue', alpha=0.5)
+				ax.plot(cosmicsnormalized[i,j,:], color='red', alpha=0.8)
 
 				if i == 0 and j == 0:
 					plt.setp(ax.get_xticklabels(), rotation=90)

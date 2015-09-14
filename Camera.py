@@ -8,7 +8,7 @@ from Jitter import Jitter
 # define a camera class
 class Camera(Talker):
     '''Keep track of one camera's entire field of view.'''
-    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1):
+    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1, magnitudes=[10]):
         '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
 
         # decide whether or not this Camera is chatty
@@ -185,8 +185,10 @@ class Camera(Talker):
     def pos_string(self):
         '''Return the position string for this field.'''
         if self.testpattern:
-            return self.catalog.name
-
+            try:
+                return self.catalog.name
+            except:
+                return 'testpattern'
         else:
             coords = astropy.coordinates.ICRS(ra=self.ra*astropy.units.degree, dec=self.dec*astropy.units.degree)
             return "{0:02}h{1:02}m{2:02}s{3:+03}d{4:02}m{5:02}s".format(np.int(coords.ra.hms[0]),np.int(coords.ra.hms[1]),np.int(coords.ra.hms[2].round()), np.int(coords.dec.dms[0]),np.int(np.abs(coords.dec.dms[1])),np.int(np.abs(coords.dec.dms[2].round())))

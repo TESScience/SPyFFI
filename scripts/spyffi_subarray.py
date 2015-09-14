@@ -1,4 +1,4 @@
 #!/usr/bin/env python
 import SPyFFI.Observation
-ncp = SPyFFI.Observation.SkySubarray(ra=270.0, dec=66.56070833333332)
-ncp.create(todo={2:3,120:3,1800:100}, label='subarray')
+ncp = SPyFFI.Observation.SkySubarray(ra=83.0016666667, dec=-0.299095, subarray=170)
+ncp.create(todo={2:20,20:20,120:1,1800:1}, label='withcosmics', correctcosmics=False)
