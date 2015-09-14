@@ -3,6 +3,7 @@ from imports import *
 import settings, relations
 import matplotlib.animation
 from astroquery.vizier import Vizier
+import Lightcurve
 
 def makeCatalog(**kwargs):
 	'''Use keywords to select a kind of Catalog, enter its parameters, and construct the necessary catalog.'''
@@ -16,10 +17,6 @@ def makeCatalog(**kwargs):
 		kwargs['ra'], kwargs['dec'] = star.icrs.ra.deg, star.icrs.dec.deg
 		cat = UCAC4(**kwargs)
 	return cat
-
-
-
-
 
 
 
@@ -40,6 +37,17 @@ class Catalog(Talker):
 		# decide whether or not this Catalog is chatty
 		Talker.__init__(self, mute=False, pithy=False)
 
+	def addLCs(self, nmax=None):
+		'''populate a catalog with light curves'''
+		ntotal = len(self.tmag)
+		if nmax is None:
+			self.lightcurves = [Lightcurve.random() for i in range(ntotal)]
+		else:
+			constant = Lightcurve.constant()
+			self.lightcurves = [constant]*ntotal
+			for i in np.random.choice(ntotal, nmax, replace=False):
+				self.lightcurves[i] = Lightcurve.random()
+
 	def arrays(self):
 		'''return (static) arrays of positions, magnitudes, and effective temperatures'''
 		return self.ra, self.dec, self.tmag, self.temperature
@@ -52,7 +60,7 @@ class Catalog(Talker):
 		ra, dec = self.atEpoch(epoch)
 
 		# determine brightness of star
-		tmag = self.tmag
+		tmag = self.tmag + np.array([lc.model(bjd) for lc in self.lightcurves])
 
 		# determine color of star
 		temperature = self.temperature

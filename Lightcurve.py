@@ -16,6 +16,23 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
+def random(options=['trapezoid', 'sin']):
+    name = np.random.choice(options)
+    if name == 'sin':
+        P=10**np.random.uniform(*np.log10([0.1, 100.0]))
+        E=np.random.uniform(0,P)
+        A=10**np.random.uniform(*np.log10([0.1, 1.0]))
+        return sin(**locals())
+
+    if name == 'trapezoid':
+        P=10**np.random.uniform(*np.log10([0.1, 100.0]))
+        E=np.random.uniform(0,P)
+        D=10**np.random.uniform(*np.log10([0.001, 1.0]))
+        T14=10**np.random.uniform(*np.log10([0.001*P, 0.1*P]))
+        T23=10**np.random.uniform(0, T14)
+        return trapezoid(**locals())
+
+
 class Cartoon(Talker):
     def __init__(self):
         Talker.__init__(self)
@@ -49,9 +66,16 @@ class Cartoon(Talker):
         return '<{0}>'.format(self.code)
 
 
+class constant(Cartoon):
+    def __init__(self, **kw):
+        self.traits = {}
+        Cartoon.__init__(self)
+
+    def model(self, t):
+        return 0.0
 
 class sin(Cartoon):
-    def __init__(self, P=3.1415926, E=0.0, A=0.1):
+    def __init__(self, P=3.1415926, E=0.0, A=0.1, **kw):
         self.traits = dict(P=P, E=E, A=A)
         Cartoon.__init__(self)
 
@@ -59,7 +83,7 @@ class sin(Cartoon):
         return self.traits['A']*np.sin(2*np.pi*(t - self.traits['E'])/self.traits['P'])
 
 class trapezoid(Cartoon):
-    def __init__(self, P=3.1415926, E=0.0, D=0.01, T23=0.1, T14=0.1):
+    def __init__(self, P=3.1415926, E=0.0, D=0.01, T23=0.1, T14=0.1, **kw):
         self.traits = dict(P=P, E=E, D=D, T23=T23, T14=T14)
         Cartoon.__init__(self)
 
