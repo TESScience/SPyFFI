@@ -277,7 +277,10 @@ class CCD(Talker):
 			self.camera.populateCatalog()
 
 		# pull out positions, magnitudes, and temperatures
+		self.speak('taking a snapshot at {0} = {1}'.format(self.bjd, self.epoch))
 		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd)
+		self.speak('  done!')
+
 		self.camera.cartographer.ccd = self
 
 		# create coordinate object for the stars
@@ -293,7 +296,8 @@ class CCD(Talker):
 		self.stary = y[ok]
 		self.starmag = np.array(tmag)[ok]
 		self.startemp = np.array(temperatures)[ok]
-
+		self.starlc = np.array(self.camera.catalog.lightcurvecodes)[ok]
+		self.starbasemag = np.array(self.camera.catalog.tmag)[ok]
 		# keep track of which CCD we projected onto
 		self.starsareon = self.name
 
@@ -301,7 +305,9 @@ class CCD(Talker):
 		if write:
 			if self.camera.counter == 0:
 				outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
-				np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f'])
+				t = astropy.table.Table(data= [ras[ok], decs[ok], self.starx, self.stary, self.starbasemag, self.starlc], names=['ra', 'dec', 'x', 'y', 'tmag', 'lc'])
+				t.write(outfile, format='ascii.fixed_width', delimiter=' ')
+				#np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag, self.starlc], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f', '%s'])
 				self.speak("save projected star catalog {0}".format(outfile))
 
 	def addStar(self, ccdx, ccdy, mag, temp, verbose=False, plot=False):
@@ -372,8 +378,10 @@ class CCD(Talker):
 			# propagate proper motions and project onto the detector
 			self.projectCatalog()
 
+
 			#for threshold in magnitude_thresholds:
 			if True:
+				self.speak('adding {0} stars to image'.format(len(self.starx)))
 				threshold = np.max(magnitude_thresholds)
 				# define a filename for this magnitude range
 				self.note = 'starsbrighterthan{0:02d}'.format(threshold)

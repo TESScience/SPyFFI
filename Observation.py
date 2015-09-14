@@ -32,7 +32,7 @@ class Observation(Talker):
 	def create(self, **kwargs):
 		try:
 			todo = kwargs['todo']
-		except:
+		except KeyError:
 			todo = {2:3, 120:3, 1800:int(27.4*48)}
 
 		try:

@@ -37,16 +37,25 @@ class Catalog(Talker):
 		# decide whether or not this Catalog is chatty
 		Talker.__init__(self, mute=False, pithy=False)
 
-	def addLCs(self, nmax=None):
+	def addLCs(self, magmax=None, fmax=1.0):
 		'''populate a catalog with light curves'''
 		ntotal = len(self.tmag)
-		if nmax is None:
-			self.lightcurves = [Lightcurve.random() for i in range(ntotal)]
-		else:
-			constant = Lightcurve.constant()
-			self.lightcurves = [constant]*ntotal
-			for i in np.random.choice(ntotal, nmax, replace=False):
-				self.lightcurves[i] = Lightcurve.random()
+
+		constant = Lightcurve.constant()
+		self.lightcurves = [constant]*ntotal
+
+		if magmax is None:
+			magmax = np.max(self.tmag) + 1
+
+
+		brightenough = (self.tmag <= magmax).nonzero()[0]
+		nbrightenough = len(brightenough)
+		self.speak('{0} stars are brighter than {1}; populating {2:.1f}% of them with light curves'.format(nbrightenough, magmax, fmax*100))
+		for i in np.random.choice(brightenough, len(brightenough)*fmax, replace=False):
+			self.lightcurves[i] = Lightcurve.random()
+
+
+		self.lightcurvecodes = [lc.code for lc in self.lightcurves]
 
 	def arrays(self):
 		'''return (static) arrays of positions, magnitudes, and effective temperatures'''

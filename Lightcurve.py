@@ -21,13 +21,13 @@ def random(options=['trapezoid', 'sin']):
     if name == 'sin':
         P=10**np.random.uniform(*np.log10([0.1, 100.0]))
         E=np.random.uniform(0,P)
-        A=10**np.random.uniform(*np.log10([0.1, 1.0]))
+        A=10**np.random.uniform(*np.log10([0.001, 1.0]))
         return sin(**locals())
 
     if name == 'trapezoid':
-        P=10**np.random.uniform(*np.log10([0.1, 100.0]))
+        P=10**np.random.uniform(*np.log10([0.1, 30.0]))
         E=np.random.uniform(0,P)
-        D=10**np.random.uniform(*np.log10([0.001, 1.0]))
+        D=10**np.random.uniform(*np.log10([0.0001, 1.0]))
         T14=10**np.random.uniform(*np.log10([0.001*P, 0.1*P]))
         T23=10**np.random.uniform(0, T14)
         return trapezoid(**locals())
@@ -51,10 +51,11 @@ class Cartoon(Talker):
     @property
     def code(self):
         '''returns a string describing the cartoon lightcurve'''
-        s = '{0}|'.format(self.__class__.__name__)
+        t = ''
         for k, v in self.traits.iteritems():
-            s += '{k}={v},'.format(k=k,v=v)
-        return s[:-1]
+            t += '{k}={v},'.format(k=k,v=v)
+
+        return '{0}({1})'.format(self.__class__.__name__, t[:-1])
 
     def integrated(self, t, exptime=30.0/60.0/24.0, resolution=10):
 
