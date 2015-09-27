@@ -61,7 +61,7 @@ class Catalog(Talker):
 		'''return (static) arrays of positions, magnitudes, and effective temperatures'''
 		return self.ra, self.dec, self.tmag, self.temperature
 
-	def snapshot(self, bjd):
+	def snapshot(self, bjd, exptime=0.5/24.0):
 		'''return a snapshot of positions, magnitudes, and effective temperatures (all of which may be time-varying)'''
 
 		# propagate proper motions
@@ -69,7 +69,7 @@ class Catalog(Talker):
 		ra, dec = self.atEpoch(epoch)
 
 		# determine brightness of star
-		tmag = self.tmag + np.array([lc.model(bjd) for lc in self.lightcurves])
+		tmag = self.tmag + np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves])
 
 		# determine color of star
 		temperature = self.temperature
