@@ -83,8 +83,16 @@ class Cartoon(Talker):
 
     def integrated(self, t, exptime=30.0/60.0/24.0, resolution=100):
 
+        if self.__class__.__name__ == 'constant':
+            return self.model(t)
+            
         nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
+        try:
+            t.shape
+        except AttributeError:
+            t = np.array([t])
         subsampled = t.reshape(1, t.shape[0]) + nudges.reshape(nudges.shape[0], 1)
+
         return np.log(np.exp(self.model(subsampled)).mean(0))
 
     def __repr__(self):
@@ -97,7 +105,7 @@ class constant(Cartoon):
         Cartoon.__init__(self)
 
     def model(self, t):
-        return 0.0
+        return np.zeros_like(t)
 
 class sin(Cartoon):
     def __init__(self, P=3.1415926, E=0.0, A=0.1, **kw):

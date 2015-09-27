@@ -278,7 +278,7 @@ class CCD(Talker):
 
 		# pull out positions, magnitudes, and temperatures
 		self.speak('taking a snapshot at {0} = {1}'.format(self.bjd, self.epoch))
-		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd)
+		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd, exptime=self.camera.cadence/60.0/60.0/24.0)
 		self.speak('  done!')
 
 		self.camera.cartographer.ccd = self
