@@ -1,6 +1,8 @@
 '''Simulate some toy model light curves.'''
 
 from imports import *
+import zachopy.units as u
+
 
 def parseCode(code):
     '''extract name and traits from a lightcurve code'''
@@ -19,32 +21,54 @@ def generate(code):
 def random(options=['trapezoid', 'sin']):
     name = np.random.choice(options)
     if name == 'sin':
-        P=10**np.random.uniform(*np.log10([0.1, 100.0]))
+        P=10**np.random.uniform(*np.log10([0.1, 30.0]))
         E=np.random.uniform(0,P)
-        A=10**np.random.uniform(*np.log10([0.001, 1.0]))
+        A=10**np.random.uniform(*np.log10([0.0001, 0.02]))
         return sin(**locals())
 
     if name == 'trapezoid':
         P=10**np.random.uniform(*np.log10([0.1, 30.0]))
         E=np.random.uniform(0,P)
-        D=10**np.random.uniform(*np.log10([0.0001, 1.0]))
-        T14=10**np.random.uniform(*np.log10([0.001*P, 0.1*P]))
-        T23=10**np.random.uniform(0, T14)
+
+        mass = np.random.uniform(0.1, 1.5)
+        radius = mass
+        stellar_density = 3*mass*u.Msun/(4*np.pi*(radius*u.Rsun)**3)
+        rsovera = (3*np.pi/u.G/(P*u.day)**2/stellar_density)**(1.0/3.0)
+        T14 = rsovera*P/np.pi
+        T23=np.random.uniform(0, T14)
+        D=10**np.random.uniform(*np.log10([0.0001, 0.01]))
+
         return trapezoid(**locals())
 
+def test(n=100,step=0.01, **kw):
+    plt.cla()
+    f = plt.figure(figsize=(5,10))
+    ax = plt.subplot()
+    o =0
+    for i in range(n):
+        lc = random(**kw)
+        lc.demo(offset=o, ax=ax)
+        o += step
+
+    ax.set_ylim(step*n, 0)
+    plt.draw()
 
 class Cartoon(Talker):
     def __init__(self):
         Talker.__init__(self)
 
-    def demo(self, tmin=0, tmax=27.4, cadence=30.0/60.0/24.0):
+    def demo(self, tmin=0, tmax=27.4, cadence=30.0/60.0/24.0, offset=0, raw=False, ax=None):
         t = np.arange(tmin, tmax, cadence)
-        plt.figure(figsize=(8,3))
+        if ax is None:
+            plt.figure('demo', figsize=(8,3))
+        else:
+            plt.sca(ax)
         y = self.model(t)
-        plt.plot(t, y, alpha=0.25, linewidth=4, color='royalblue')
-        plt.plot(t, self.integrated(t), alpha=0.5, linewidth=4, color='darkorange')
+        if raw:
+            plt.plot(t, y+offset, alpha=0.25, linewidth=4, color='royalblue')
+        plt.plot(t, self.integrated(t)+offset, alpha=0.5, linewidth=4, color='darkorange')
         plt.xlim(tmin,tmax)
-        plt.ylim(np.max(y)+0.01, np.min(y)-0.01)
+        #plt.ylim(np.max(y)+0.01, np.min(y)-0.01)
         plt.xlabel('Time (days)')
         plt.ylabel('Flux (mag.)')
 
@@ -57,7 +81,7 @@ class Cartoon(Talker):
 
         return '{0}({1})'.format(self.__class__.__name__, t[:-1])
 
-    def integrated(self, t, exptime=30.0/60.0/24.0, resolution=10):
+    def integrated(self, t, exptime=30.0/60.0/24.0, resolution=100):
 
         nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
         subsampled = t.reshape(1, t.shape[0]) + nudges.reshape(nudges.shape[0], 1)
