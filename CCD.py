@@ -216,8 +216,8 @@ class CCD(Talker):
 		#	x += quad[0]*
 
 		# modify the camera's WCS, based on the CCD number
-		self.header['CRPIX1'] = x
-		self.header['CRPIX2'] = y
+		self.header['CRPIX1'] = x + 0.5
+		self.header['CRPIX2'] = y + 0.5
 
 		# write the file to FITS
 		#astropy.io.fits.PrimaryHDU(np.transpose(savetype(image)), header=self.header).writeto(filename, clobber=True)
@@ -280,7 +280,7 @@ class CCD(Talker):
 		self.speak('taking a snapshot at {0} = {1}'.format(self.bjd, self.epoch))
 		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd, exptime=self.camera.cadence/60.0/60.0/24.0)
 		self.speak('  done!')
-
+		assert(ras.shape == tmag.shape)
 		self.camera.cartographer.ccd = self
 
 		# create coordinate object for the stars

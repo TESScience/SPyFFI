@@ -18,16 +18,31 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
-def random(options=['trapezoid', 'sin']):
+def random(options=['trapezoid', 'sin'], extreme=False):
+    if extreme:
+        opens = ['sin']
     name = np.random.choice(options)
     if name == 'sin':
-        P=10**np.random.uniform(*np.log10([0.1, 30.0]))
+        if extreme:
+            p = [0.001, 0.1]
+            a = [0.1, 1]
+        else:
+            p = [0.1, 30.0]
+            a = [0.0001, 0.02]
+
+        P=10**np.random.uniform(*np.log10(p))
         E=np.random.uniform(0,P)
-        A=10**np.random.uniform(*np.log10([0.0001, 0.02]))
+        A=10**np.random.uniform(*np.log10(a))
         return sin(**locals())
 
     if name == 'trapezoid':
-        P=10**np.random.uniform(*np.log10([0.1, 30.0]))
+        if extreme:
+            p = [0.001, 0.3]
+            d = [0.1, 1]
+        else:
+            p = [0.1, 30.0]
+            d = [0.0001, 0.01]
+        P=10**np.random.uniform(*np.log10(p))
         E=np.random.uniform(0,P)
 
         mass = np.random.uniform(0.1, 1.5)
@@ -36,7 +51,7 @@ def random(options=['trapezoid', 'sin']):
         rsovera = (3*np.pi/u.G/(P*u.day)**2/stellar_density)**(1.0/3.0)
         T14 = rsovera*P/np.pi
         T23=np.random.uniform(0, T14)
-        D=10**np.random.uniform(*np.log10([0.0001, 0.01]))
+        D=10**np.random.uniform(*np.log10(d))
 
         return trapezoid(**locals())
 
@@ -65,8 +80,8 @@ class Cartoon(Talker):
             plt.sca(ax)
         y = self.model(t)
         if raw:
-            plt.plot(t, y+offset, alpha=0.25, linewidth=4, color='royalblue')
-        plt.plot(t, self.integrated(t)+offset, alpha=0.5, linewidth=4, color='darkorange')
+            plt.plot(t, y+offset, alpha=0.25, linewidth=1, color='royalblue')
+        plt.plot(t, self.integrated(t)+offset, alpha=0.5, linewidth=1, color='darkorange')
         plt.xlim(tmin,tmax)
         #plt.ylim(np.max(y)+0.01, np.min(y)-0.01)
         plt.xlabel('Time (days)')
@@ -83,17 +98,25 @@ class Cartoon(Talker):
 
     def integrated(self, t, exptime=30.0/60.0/24.0, resolution=100):
 
+        # don't waste time on this if the light curve is a constant
         if self.__class__.__name__ == 'constant':
             return self.model(t)
-            
-        nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
+
+        # deal with the edge case of only a single time point being passed
         try:
             t.shape
         except AttributeError:
             t = np.array([t])
+
+        # create a high-resolution subsampled timeseries
+        nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
         subsampled = t.reshape(1, t.shape[0]) + nudges.reshape(nudges.shape[0], 1)
 
-        return np.log(np.exp(self.model(subsampled)).mean(0))
+        # make sure the average is photon-weighted (as opposed to magnitude weighted)
+        flux = 10**(-0.4*self.model(subsampled))
+        mag = -2.5*np.log10(flux.mean(0))
+        assert(mag.shape == t.shape)
+        return mag
 
     def __repr__(self):
         return '<{0}>'.format(self.code)

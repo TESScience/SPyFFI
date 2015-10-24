@@ -37,7 +37,7 @@ class Catalog(Talker):
 		# decide whether or not this Catalog is chatty
 		Talker.__init__(self, mute=False, pithy=False)
 
-	def addLCs(self, magmax=None, fmax=1.0):
+	def addLCs(self, magmax=None, fmax=1.0, **kw):
 		'''populate a catalog with light curves'''
 		ntotal = len(self.tmag)
 
@@ -52,7 +52,7 @@ class Catalog(Talker):
 		nbrightenough = len(brightenough)
 		self.speak('{0} stars are brighter than {1}; populating {2:.1f}% of them with light curves'.format(nbrightenough, magmax, fmax*100))
 		for i in np.random.choice(brightenough, len(brightenough)*fmax, replace=False):
-			self.lightcurves[i] = Lightcurve.random()
+			self.lightcurves[i] = Lightcurve.random(**kw)
 
 
 		self.lightcurvecodes = [lc.code for lc in self.lightcurves]
@@ -61,19 +61,27 @@ class Catalog(Talker):
 		'''return (static) arrays of positions, magnitudes, and effective temperatures'''
 		return self.ra, self.dec, self.tmag, self.temperature
 
-	def snapshot(self, bjd, exptime=0.5/24.0):
+	def snapshot(self, bjd=None, epoch=None, exptime=0.5/24.0):
 		'''return a snapshot of positions, magnitudes, and effective temperatures (all of which may be time-varying)'''
 
 		# propagate proper motions
-		epoch = (bjd - 2451544.5)/365.25 + 2000.0
+		if bjd is not None:
+			epoch = (bjd - 2451544.5)/365.25 + 2000.0
+		else:
+			bjd = (epoch - 2000.0)*365.25 + 2451544.5
+
 		ra, dec = self.atEpoch(epoch)
 
 		# determine brightness of star
-		tmag = self.tmag + np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves])
+		try:
+			moment = np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves]).flatten()
+		except AttributeError:
+			moment = 0.0
+		tmag = self.tmag + moment
 
 		# determine color of star
 		temperature = self.temperature
-
+		assert(ra.shape == tmag.shape)
 		return ra, dec, tmag, temperature
 
 
@@ -101,7 +109,7 @@ class Catalog(Talker):
 			self.ax.cla()
 		except:
 			self.ax = plt.subplot()
-		ra, dec, tmag, temperature = self.snapshot(epoch)
+		ra, dec, tmag, temperature = self.snapshot(epoch=epoch)
 		deltamag = 20.0 - tmag
 		size = deltamag**2*5
 		try:

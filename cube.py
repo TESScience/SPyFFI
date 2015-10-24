@@ -133,7 +133,7 @@ class Cube(Talker):
 			phrase = 'without'
 		return self.directory + 'cube_{n:.0f}exp_at{cadence:.0f}s_{phrase}jitter_{intrapixel}_{stacker}.npy'.format(n=self.n, cadence=self.cadence, phrase=phrase, intrapixel=self.camera.psf.intrapixel.name, stacker=Stacker.pick(self.stacker).name.replace(' ', ''))
 
-	def simulate(self):
+	def simulate(self, correctcosmics=False):
 		'''Use TESS simulator to paint stars (and noise and cosmic rays) into the image cube.'''
 
 
@@ -151,7 +151,7 @@ class Cube(Talker):
 			for i in range(self.n):
 				self.speak('filling exposure #{0:.0f}/{1:.0f}'.format(i, self.n))
 
-				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy', correctcosmics=False)
+				self.photons[:,:,i], self.cosmics[:,:,i], self.noiseless[:,:,i] = self.ccd.expose(jitter=self.jitter, write=False, smear=False, remake=i==0, terse=True, cosmics='fancy', correctcosmics=correctcosmics)
 			self.unmitigated = self.photons
 			# store some useful accessory information about
 			self.background = self.ccd.backgroundimage
