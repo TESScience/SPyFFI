@@ -3,6 +3,37 @@
 from imports import *
 import zachopy.units as u
 
+# kludge to figure out path to data resources
+import os
+datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
+print datadir
+
+# read the McQuillan table (once)
+print "[lightcurve.py] reading McQuillan rotation table"
+rotationtable = astropy.io.ascii.read(datadir+'/rotation_McQuillan.txt')
+def drawRotation():
+    row = rotationtable[np.random.randint(0, len(rotationtable))]
+    P=row['PRot']
+    E=np.random.uniform(0,P)
+    A=row['Rper']/1.0e6
+    return sin(**locals())
+
+
+# read the Kepler TCE table (once)
+print "[lightcurve.py] reading Kepler TCE table"
+transittable = astropy.io.ascii.read(datadir+'/keplerTCE_DR24.txt')
+transittable = transittable[transittable['tce_depth']>1.0]
+def drawTransit():
+    #from Seader et al. "The search includes a total of $198,646$ targets, of which $112,001$ were observed in every quarter and $86,645$ were observed in a subset of the 17 quarters.""
+
+    row = transittable[np.random.randint(0, len(transittable))]
+    P=row['tce_period']
+    E=row['tce_time0bk']+2545833.0
+    T14=row['tce_duration']/24.0
+    T23=T14 - 2*row['tce_ingress']/24.0
+    T23=np.maximum(T23, 0)
+    D=row['tce_depth']/1.0e6
+    return trapezoid(**locals())
 
 def parseCode(code):
     '''extract name and traits from a lightcurve code'''
@@ -19,6 +50,22 @@ def generate(code):
     return globals()[name](**traits)
 
 def random(options=['trapezoid', 'sin'], extreme=False):
+
+
+    fractionrotators = len(rotationtable)/133030.0
+    fractiontransiting = len(transittable)/112001.0
+
+    if 'trapezoid' in options:
+        if np.random.uniform(0,1) < fractiontransiting:
+            return drawTransit()
+
+    if 'sin' in options:
+        if np.random.uniform(0,1) < fractionrotators:
+            return drawRotation()
+
+    return constant()
+
+def cartoonrandom(options=['trapezoid', 'sin'], extreme=False):
     if extreme:
         opens = ['sin']
     name = np.random.choice(options)
