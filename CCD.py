@@ -143,8 +143,10 @@ class CCD(Talker):
 		self.header['COUNTER'] = self.camera.counter, '# of exposures since start, for this field'
 		self.bjd0 = 2457827.0
 		self.bjd = self.bjd0 + self.camera.counter*self.camera.cadence/24.0/60.0/60.0
+		self.bjdantisun = self.bjd0 + 13.7
 		self.header['BJD0'] = self.bjd0, '[day] base time subtracted from all BJD'
 		self.header['BJD'] = self.bjd - self.bjd0, '[day] mid-exposure time - BJD0'
+		self.header['ANTISUN'] = self.bjdantisun - self.bjd0, '[day] time when field center points antisun - BJD0'
 		self.epoch = (self.bjd - 2451544.5)/365.25 + 2000.0
 		self.header['EPOCH'] = self.epoch, '[years] epoch of mid-exposure time'
 
@@ -287,6 +289,10 @@ class CCD(Talker):
 		stars = self.camera.cartographer.point(ras, decs, 'celestial')
 		x,y = stars.ccdxy.tuple
 
+		# apply differential velocity aberration, based on the time offset from antisun
+		dt = self.bjd - self.bjdantisun
+		dx,dy = self.aberrations(stars, dt)
+
 		# trim everything down to only those stars that could be relevant for this camera
 		buffer = 10
 		ok = (x > -buffer) & (x < self.xsize + buffer) & (y > -buffer) & (y < self.ysize + buffer)
@@ -309,6 +315,38 @@ class CCD(Talker):
 				t.write(outfile, format='ascii.fixed_width', delimiter=' ')
 				#np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag, self.starlc], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f', '%s'])
 				self.speak("save projected star catalog {0}".format(outfile))
+
+	def aberrations(self, stars, dt):
+
+		# make sure the cartographer is defined
+		try:
+			assert(self.aberrator.ccd == self)
+		except AttributeError:
+			self.aberrator = Aberrator(self.camera.cartographer)
+
+
+		# sign will definitely be wrong on this
+		beta = 29.8*zachopy.units.km/zachopy.units.c
+
+		fieldcenter = self.camera.cartographer.point(0,0,type='focalxy')
+		theta = stars.ecliptic.elon - fieldcenter.ecliptic.elon + 360.0*dt/365.25
+		x, y = stars.ccdxy.tuple
+		delon = beta*np.cos(theta*np.pi/180.0)*180/np.pi
+		self.delon = delon
+		return self.aberrator.derivatives['x'](x,y)*delon, self.aberrator.derivatives['y'](x,y)*delon
+
+		#
+		#A = np.vstack([ccdx,ccdy,np.ones(len(ccdx))]).T
+		#coefs = np.linalg.lstsq(A,delon)[0]
+		#model = coefs[0]*ccdx + coefs[1]*ccdy + coefs[2]
+		'''
+		MAKE THE PARSABLE FUNCTION STRING (ONCE PER FIELD?)
+		MAKE A FIELD START MOMENT FOR THE FIELD
+		DEFINE OFFSET FROM FIELD START, USE TO DETERMINE ABERRATION
+		(SUBTRACT A WEIGHTED AVERAGE FROM ABERRATION?)
+		'''
+
+
 
 	def addStar(self, ccdx, ccdy, mag, temp, verbose=False, plot=False):
 		'''Add one star to an image, given position, magnitude, and effective temperature.'''
@@ -731,6 +769,60 @@ class CCD(Talker):
 		if write==False:
 			return self.image, cosmics, stars
 
+
+class Aberrator(Talker):
+	'''object to keep track of how to apply velocity abberation; must be reset for each CCD'''
+	def __init__(self, cartographer):
+		Talker.__init__(self)
+
+		# create a grid of stars spanning the CCD
+		ccd = cartographer.ccd
+		self.ccd = ccd
+		ngrid = 20
+		xgrid,ygrid = np.meshgrid(np.linspace(ccd.xmin, ccd.xmax, ngrid),
+							 np.linspace(ccd.ymin, ccd.ymax, ngrid))
+		x, y = xgrid.flatten(), ygrid.flatten()
+
+		# estimate dx/delon and dy/delon
+		delta=0.1 # step, in pixels, for calculating numerical derivative
+		notnudged = cartographer.point(x,y,type='ccdxy')
+
+
+		self.strings, self.derivatives = {}, {}
+		self.raw = {}
+		template = '{0:+.10f}*ccdx{1:+.10f}*ccdy{2:+.10f}'
+		A = np.vstack([x,y,np.ones(len(x))]).T
+
+
+
+		nudgedinx = cartographer.point(x+delta,y,type='ccdxy')
+		dxdelon = delta/(nudgedinx.ecliptic.elon - notnudged.ecliptic.elon)
+		coefsx = np.linalg.lstsq(A,dxdelon)[0]
+		def model_dxdelon(x,y):
+			return coefsx[0]*x + coefsx[1]*y + coefsx[2]
+		self.derivatives['x'] = model_dxdelon
+		self.strings['x'] = template.format(*coefsx)
+		self.raw['x'] = dxdelon
+
+		nudgediny = cartographer.point(x,y+delta,type='ccdxy')
+		dydelon = delta/(nudgediny.ecliptic.elon - notnudged.ecliptic.elon)
+		coefsy = np.linalg.lstsq(A,dydelon)[0]
+		def model_dydelon(x,y):
+			return coefsy[0]*x + coefsy[1]*y + coefsy[2]
+		self.derivatives['y'] = model_dydelon
+		self.strings['y'] = template.format(*coefsy)
+		self.raw['y'] = dydelon
+
+		plt.ion()
+		plt.figure()
+		gs = plt.matplotlib.gridspec.GridSpec(2,3)
+		for i,k in enumerate(['x','y']):
+			plt.subplot(gs[i,0])
+			plt.scatter(x, self.raw[k], c=y)
+			plt.subplot(gs[i,1])
+			plt.scatter(x, self.derivatives[k](x,y), c=y)
+			plt.subplot(gs[i,2])
+			plt.scatter(x, self.raw[k] - self.derivatives[k](x,y), c=y)
 
 
 

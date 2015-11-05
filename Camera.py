@@ -215,6 +215,8 @@ class Camera(Talker):
             self.catalog = Catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=size/np.sqrt(2)*1.01, **kwargs)
 
 
+
+
 	'''def c1(self, image):
 
 		return image[self.xsize - self.subarraysize:, self.ysize - self.subarraysize:]
