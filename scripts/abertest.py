@@ -2,8 +2,8 @@
 # create an observation centered at the north ecliptic pole (midlatitude)
 
 import SPyFFI.Observation
-o = SPyFFI.Observation.SkySubarray(ra=0, dec=0, label='aberrationtest', subarray=200)
-#o = SPyFFI.Observation.TestPattern(subarray=4000, spacing=2000.0, label='aberrationtest')
+#o = SPyFFI.Observation.SkySubarray(ra=270.0, dec=66.0, label='aberrationtest', subarray=200)
+o = SPyFFI.Observation.TestPattern(subarray=4000, spacing=2000.0, label='aberrationtest')
 ccds = o.camera.ccds*1
 for c in ccds:
     o.camera.ccds = [c]
@@ -25,11 +25,14 @@ for bjd in bjds:
     delon.append(o.ccd.delon)
 
 import matplotlib.pyplot as plt
-trend = np.mean(dx,1)
 plt.figure()
 plt.plot(bjds,dx, alpha=0.3)
+plt.plot(bjds,dy, alpha=0.3)
 plt.axvline(o.ccd.bjd0+27.4)
 
 plt.figure()
-plt.plot(bjds,dx-trend.reshape(len(bjds),1), alpha=0.3)
+plt.plot(bjds,dx-np.mean(dx,1).reshape(len(bjds),1), alpha=0.3)
 plt.axvline(o.ccd.bjd0+27.4)
+
+plt.figure()
+plt.plot(bjds, np.array(delon)*60*60)

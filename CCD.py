@@ -146,7 +146,7 @@ class CCD(Talker):
 		self.bjdantisun = self.bjd0 + 13.7
 		self.header['BJD0'] = self.bjd0, '[day] base time subtracted from all BJD'
 		self.header['BJD'] = self.bjd - self.bjd0, '[day] mid-exposure time - BJD0'
-		self.header['ANTISUN'] = self.bjdantisun - self.bjd0, '[day] time when field center points antisun - BJD0'
+		self.header['ANTISUN'] = self.bjdantisun - self.bjd0, '[day] time of antisun - BJD0'
 		self.epoch = (self.bjd - 2451544.5)/365.25 + 2000.0
 		self.header['EPOCH'] = self.epoch, '[years] epoch of mid-exposure time'
 
@@ -167,7 +167,7 @@ class CCD(Talker):
 		return np.ones((self.xsize, self.ysize))
 
 	def zodicalBackground(self,elon, elat):
-		'''Calcaulte the zodiacal background at a given ecliptic (lat, long).'''
+		'''Calcaulte the zodiacal background at a given celestial (lat, long).'''
 
 		# from Josh and Peter's memo
 		Vmax = 23.345
@@ -323,28 +323,41 @@ class CCD(Talker):
 			assert(self.aberrator.ccd == self)
 		except AttributeError:
 			self.aberrator = Aberrator(self.camera.cartographer)
+			self.header['ABERRATE'] = ''
+			self.header['ABNOTE'] = '', 'd?=BETA*cos(l-FC+DLON)*ab?func(x,y) [l=ecl. lon.]'
 
+			for pix in ['x','y']:
+				self.header['ABD{0}_C'.format(pix.upper())] = '{0:+.10f}'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}_CX'.format(pix.upper())] = '{1:+.10f}'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}_CY'.format(pix.upper())] = '{2:+.10f}'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}_CXX'.format(pix.upper())] = '{3:+.10f}'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}_CYY'.format(pix.upper())] = '{4:+.10f}'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}_CXY'.format(pix.upper())] = '{5:+.10f}'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}FUNC'] = 'C + CX*x + CY*y + CXX*x**2 + CYY*y**2 + CXY*x*y'#'{0:+.3f}{1:+.3f}*x{2:+.3f}*y{3:+.3f}*x**2{4:+.3f}*y**2{5:+.3f}*x*y'.format(*self.aberrator.coefs[pix])
 
 		# sign will definitely be wrong on this
-		beta = 29.8*zachopy.units.km/zachopy.units.c
+		beta = 29.8*zachopy.units.km/zachopy.units.c # unitless (radians)
+		self.header['AB_BETA'] = beta, '[radians] v/c (from orbit tangential velocity)'
 
+		# what is the celestial longitude of the field center?
 		fieldcenter = self.camera.cartographer.point(0,0,type='focalxy')
-		theta = stars.ecliptic.elon - fieldcenter.ecliptic.elon + 360.0*dt/365.25
-		x, y = stars.ccdxy.tuple
-		delon = beta*np.cos(theta*np.pi/180.0)*180/np.pi
-		self.delon = delon
+		self.header['AB_FC'] = fieldcenter.ecliptic.elon, '[deg] ecliptic lon. of focal plane center'
+
+		# how much is each star offset from antisun, at this time?
+		dtheta = 360.0*dt/365.25
+		theta = stars.ecliptic.elon - fieldcenter.ecliptic.elon + dtheta
+		self.header['AB_DLON'] = dtheta, '[deg] motion of Earth (projected in ecliptic lon.)'
+
+		# calculate the current positions and the nudge of celestial longitude
+		x, y = stars.ccdxy.tuple	# pixels
+		delon = beta*np.cos(theta*np.pi/180.0)*180/np.pi # degrees
+
+		self.delon = delon # for testing
+
+		# the linear plane model is probably going to break down at the pole!
 		return self.aberrator.derivatives['x'](x,y)*delon, self.aberrator.derivatives['y'](x,y)*delon
 
-		#
-		#A = np.vstack([ccdx,ccdy,np.ones(len(ccdx))]).T
-		#coefs = np.linalg.lstsq(A,delon)[0]
-		#model = coefs[0]*ccdx + coefs[1]*ccdy + coefs[2]
-		'''
-		MAKE THE PARSABLE FUNCTION STRING (ONCE PER FIELD?)
-		MAKE A FIELD START MOMENT FOR THE FIELD
-		DEFINE OFFSET FROM FIELD START, USE TO DETERMINE ABERRATION
-		(SUBTRACT A WEIGHTED AVERAGE FROM ABERRATION?)
-		'''
+
 
 
 
@@ -615,9 +628,9 @@ class CCD(Talker):
 			except:
 				# define a blank background image
 				self.backgroundimage = self.zeros()
-				# define coordinates (equatorial, Galactic, ecliptic) at every pixel in the image
+				# define coordinates (equatorial, Galactic, celestial) at every pixel in the image
 				ra, dec = self.pixels().celestial.tuple
-				elon, elat = self.pixels().ecliptic.tuple
+				elon, elat = self.pixels().celestial.tuple
 				glon, glat = self.pixels().galactic.tuple
 
 				# add the zodiacal light, using the simple model from Josh and Peter on the TESS wiki
@@ -783,48 +796,70 @@ class Aberrator(Talker):
 							 np.linspace(ccd.ymin, ccd.ymax, ngrid))
 		x, y = xgrid.flatten(), ygrid.flatten()
 
+
 		# estimate dx/delon and dy/delon
-		delta=0.1 # step, in pixels, for calculating numerical derivative
-		notnudged = cartographer.point(x,y,type='ccdxy')
 
 
-		self.strings, self.derivatives = {}, {}
+		self.strings, self.derivatives, self.coefs, self.inputs = {}, {}, {}, {}
 		self.raw = {}
 		template = '{0:+.10f}*ccdx{1:+.10f}*ccdy{2:+.10f}'
-		A = np.vstack([x,y,np.ones(len(x))]).T
+		A = np.vstack([np.ones(len(x)), x,y,x**2,y**2, x*y]).T
 
+		delta=1.0/60.0/60.0 # step, in degrees, for calculating numerical derivative
+		notnudged = cartographer.point(x,y,type='ccdxy')
+		elon,elat = notnudged.celestial.tuple
 
-
-		nudgedinx = cartographer.point(x+delta,y,type='ccdxy')
-		dxdelon = delta/(nudgedinx.ecliptic.elon - notnudged.ecliptic.elon)
-		coefsx = np.linalg.lstsq(A,dxdelon)[0]
+		nudgedinlon = cartographer.point(elon+delta,elat,type='celestial')
+		dxdelon = (nudgedinlon.ccdxy.x - x)/delta
+		self.coefs['x'] = np.linalg.lstsq(A,dxdelon)[0]
 		def model_dxdelon(x,y):
-			return coefsx[0]*x + coefsx[1]*y + coefsx[2]
+			return self.coefs['x'][0] +  self.coefs['x'][1]*x + self.coefs['x'][2]*y  + self.coefs['x'][3]*x**2 + self.coefs['x'][4]*y**2  + self.coefs['x'][5]*x*y # pixels/degree
 		self.derivatives['x'] = model_dxdelon
-		self.strings['x'] = template.format(*coefsx)
+		self.strings['x'] = template.format(*self.coefs['x'])
 		self.raw['x'] = dxdelon
+		self.inputs['x'] = x
 
-		nudgediny = cartographer.point(x,y+delta,type='ccdxy')
-		dydelon = delta/(nudgediny.ecliptic.elon - notnudged.ecliptic.elon)
-		coefsy = np.linalg.lstsq(A,dydelon)[0]
+		dydelon = (nudgedinlon.ccdxy.y - y)/delta
+		self.coefs['y'] = np.linalg.lstsq(A,dydelon)[0]
 		def model_dydelon(x,y):
-			return coefsy[0]*x + coefsy[1]*y + coefsy[2]
+			return self.coefs['y'][0] +  self.coefs['y'][1]*x + self.coefs['y'][2]*y  + self.coefs['y'][3]*x**2 + self.coefs['y'][4]*y**2  + self.coefs['y'][5]*x*y # pixels/degree
+
 		self.derivatives['y'] = model_dydelon
-		self.strings['y'] = template.format(*coefsy)
+		self.strings['y'] = template.format(*self.coefs['y'])
 		self.raw['y'] = dydelon
+		self.inputs['y'] = y
 
 		plt.ion()
+		'''
 		plt.figure()
-		gs = plt.matplotlib.gridspec.GridSpec(2,3)
+		plt.scatter(x, 3600.0/dxdelon, c=y)
+		plt.ylabel('arcsec of longitude/xpix')
+		plt.figure()
+
+		plt.scatter(x, 3600.0/dxdelat, c=y)
+		plt.ylabel('arcsec of longitude/xpix')
+
+		assert(False)
+		'''
+		plt.figure(figsize=(20,10))
+		gs = plt.matplotlib.gridspec.GridSpec(2,3, hspace=0.3, bottom=.2)
 		for i,k in enumerate(['x','y']):
 			plt.subplot(gs[i,0])
-			plt.scatter(x, self.raw[k], c=y)
+			plt.scatter(self.inputs[k], self.raw[k], c=y, edgecolor='none')
+			plt.ylabel('dccd{0}/delon (pixels/degrees)'.format(k))
+			if i == 1:
+				plt.xlabel('directly\ncalculated')
 			plt.subplot(gs[i,1])
-			plt.scatter(x, self.derivatives[k](x,y), c=y)
+			plt.scatter(self.inputs[k], self.derivatives[k](x,y), c=y, edgecolor='none')
+			if i == 1:
+				plt.xlabel('model')
+
 			plt.subplot(gs[i,2])
-			plt.scatter(x, self.raw[k] - self.derivatives[k](x,y), c=y)
+			plt.scatter(self.inputs[k], self.raw[k] - self.derivatives[k](x,y), c=y, edgecolor='none')
+			if i == 1:
+				plt.xlabel('residuals')
 
-
+		plt.savefig(self.ccd.directory + 'aberrationgeometry.pdf')
 
 def gauss(x, y, xcenter, ycenter):
 	rsquared = (x - xcenter)**2 + (y - ycenter)**2
