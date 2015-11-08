@@ -8,7 +8,7 @@ from Jitter import Jitter
 # define a camera class
 class Camera(Talker):
     '''Keep track of one camera's entire field of view.'''
-    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1, magnitudes=[10]):
+    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1, magnitudes=[10], warpspaceandtime=False, counterstep=1):
         '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
 
         # decide whether or not this Camera is chatty
@@ -24,6 +24,8 @@ class Camera(Talker):
         self.subarray = subarray
         self.label = label
         self.testpattern = testpattern
+        self.warpspaceandtime = warpspaceandtime
+        self.counterstep=counterstep
 
         # decide whether to point the Camera either at real stars (from the sky) or at a test pattern (a grid of stars)
         if self.testpattern:
@@ -195,7 +197,7 @@ class Camera(Talker):
 
     def advanceCounter(self):
         '''Take one step forward in time with this Camera.'''
-        self.counter +=1
+        self.counter += self.counterstep
 
     def populateCatalog(self, **kwargs):
         '''Create a catalog of stars that are visible with this Camera.'''
@@ -213,7 +215,6 @@ class Camera(Talker):
             self.catalog = Catalogs.TestPattern(size=size*3600.0, **kwargs)
         else:
             self.catalog = Catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=size/np.sqrt(2)*1.01, **kwargs)
-
 
 
 

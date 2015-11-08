@@ -119,7 +119,7 @@ class CCD(Talker):
 
 		# fill it with some CCD details
 		self.header['CCD'] = ''
-		self.header['IMAGNOTE'] = ('', 'Details of this individual image')
+		self.header['CCDNOTE'] = ('', 'Details of this individual image')
 		self.header['EXPTIME'] = (self.camera.cadence, '[s] exposure time ')
 		self.header['NREADS'] = (np.round(self.camera.cadence/self.camera.singleread).astype(np.int), '# of reads summed')
 		self.header['SUBEXPTI'] = (self.camera.singleread, '[s] exposure in a single subexposure')
@@ -132,9 +132,13 @@ class CCD(Talker):
 		# fill in the timestamp for this CCD image
 		self.setTime()
 
-		# leave space to talk about the inputs to this image
-		self.header['INPUTS'] = ''
-		self.header['INPUNOTE'] = ('', 'Ingredients for simulated images.')
+	def addInputLabels(self):
+		try:
+			self.header['INPUTS']
+		except KeyError:
+			# leave space to talk about the inputs to this image
+			self.header['INPUTS'] = ''
+			self.header['INPUNOTE'] = ('', 'Ingredients for simulated images.')
 
 	def setTime(self):
 		'''Based on the camera counter, apply a timestamp to this image.'''
@@ -275,7 +279,7 @@ class CCD(Talker):
 		# make sure the camera has a catalog defined
 		try:
 			self.camera.catalog
-		except:
+		except AttributeError:
 			self.camera.populateCatalog()
 
 		# pull out positions, magnitudes, and temperatures
@@ -292,6 +296,8 @@ class CCD(Talker):
 		# apply differential velocity aberration, based on the time offset from antisun
 		dt = self.bjd - self.bjdantisun
 		dx,dy = self.aberrations(stars, dt)
+		x+=dx-np.mean(dx)
+		y+=dy-np.mean(dy)
 
 		# trim everything down to only those stars that could be relevant for this camera
 		buffer = 10
@@ -315,7 +321,6 @@ class CCD(Talker):
 				t.write(outfile, format='ascii.fixed_width', delimiter=' ')
 				#np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag, self.starlc], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f', '%s'])
 				self.speak("save projected star catalog {0}".format(outfile))
-
 	def aberrations(self, stars, dt):
 
 		# make sure the cartographer is defined
@@ -324,19 +329,24 @@ class CCD(Talker):
 		except AttributeError:
 			self.aberrator = Aberrator(self.camera.cartographer)
 			self.header['ABERRATE'] = ''
-			self.header['ABNOTE'] = '', 'd?=BETA*cos(l-FC+DLON)*ab?func(x,y) [l=ecl. lon.]'
+			self.header['AB_NOTE'] = '', 'Velocity aberration ingredients.'
+			self.header['AB_DEF'] = 'd?(t)=BETA*cos(l-FC+DLON)*AB?FUNCT(x,y)', "defines [dx,dy] vel. ab. [l=stars' ecl. lon., xy=CCD coords.]"
 
 			for pix in ['x','y']:
-				self.header['ABD{0}_C'.format(pix.upper())] = '{0:+.10f}'.format(*self.aberrator.coefs[pix])
-				self.header['ABD{0}_CX'.format(pix.upper())] = '{1:+.10f}'.format(*self.aberrator.coefs[pix])
-				self.header['ABD{0}_CY'.format(pix.upper())] = '{2:+.10f}'.format(*self.aberrator.coefs[pix])
-				self.header['ABD{0}_CXX'.format(pix.upper())] = '{3:+.10f}'.format(*self.aberrator.coefs[pix])
-				self.header['ABD{0}_CYY'.format(pix.upper())] = '{4:+.10f}'.format(*self.aberrator.coefs[pix])
-				self.header['ABD{0}_CXY'.format(pix.upper())] = '{5:+.10f}'.format(*self.aberrator.coefs[pix])
-				self.header['ABD{0}FUNC'] = 'C + CX*x + CY*y + CXX*x**2 + CYY*y**2 + CXY*x*y'#'{0:+.3f}{1:+.3f}*x{2:+.3f}*y{3:+.3f}*x**2{4:+.3f}*y**2{5:+.3f}*x*y'.format(*self.aberrator.coefs[pix])
+				self.header['ABD{0}_C'.format(pix.upper())] = self.aberrator.coefs[pix][0]
+				self.header['ABD{0}_CX'.format(pix.upper())] =  self.aberrator.coefs[pix][1]
+				self.header['ABD{0}_CY'.format(pix.upper())] =  self.aberrator.coefs[pix][2]
+				self.header['ABD{0}_CXX'.format(pix.upper())] =  self.aberrator.coefs[pix][3]
+				self.header['ABD{0}_CYY'.format(pix.upper())] =  self.aberrator.coefs[pix][4]
+				self.header['ABD{0}_CXY'.format(pix.upper())] = self.aberrator.coefs[pix][5]
+				self.header['ABD{0}FUNC'.format(pix.upper())] = 'C + CX*x + CY*y + CXX*x**2 + CYY*y**2 + CXY*x*y'#'{0:+.3f}{1:+.3f}*x{2:+.3f}*y{3:+.3f}*x**2{4:+.3f}*y**2{5:+.3f}*x*y'.format(*self.aberrator.coefs[pix])
 
 		# sign will definitely be wrong on this
 		beta = 29.8*zachopy.units.km/zachopy.units.c # unitless (radians)
+		if self.camera.warpspaceandtime:
+			warp=0.001
+			beta/=warp
+			self.header['AB_WARP'] = 'speed of light is {0}X what it should be'.format(warp), '(for testing)'
 		self.header['AB_BETA'] = beta, '[radians] v/c (from orbit tangential velocity)'
 
 		# what is the celestial longitude of the field center?
@@ -346,7 +356,7 @@ class CCD(Talker):
 		# how much is each star offset from antisun, at this time?
 		dtheta = 360.0*dt/365.25
 		theta = stars.ecliptic.elon - fieldcenter.ecliptic.elon + dtheta
-		self.header['AB_DLON'] = dtheta, '[deg] motion of Earth (projected in ecliptic lon.)'
+		self.header['AB_DLON'] = dtheta, '[deg] motion of Earth (in ecliptic lon.)'
 
 		# calculate the current positions and the nudge of celestial longitude
 		x, y = stars.ccdxy.tuple	# pixels
@@ -471,6 +481,7 @@ class CCD(Talker):
 
 		self.image += self.starimage
 		self.show()
+		self.addInputLabels()
 		if self.camera.testpattern:
 			self.header['ISTARS'] = ('True', 'stars from a test pattern')
 		else:
@@ -478,6 +489,8 @@ class CCD(Talker):
 
 		if jitter:
 			self.header['IJITTER'] = ('True', 'spacecraft jitter, motion between images')
+		else:
+			self.header['IJITTER'] = ('False', 'no spacecraft jitter apply')
 		return self.starimage
 
 	def addGalaxies(self):
@@ -505,6 +518,7 @@ class CCD(Talker):
 			self.writeToFITS(image, cosmicsfilename)
 
 		# add the cosmics into the running image
+		self.addInputLabels()
 		if (correctcosmics == False) or self.camera.cadence <= 2:
 			self.image += image
 			self.header['ICOSMICS'] = ('True', 'cosmic rays injected')
@@ -605,6 +619,7 @@ class CCD(Talker):
 			self.writeToFITS(self.image - untouched,saturationfilename)
 
 		# update image header
+		self.addInputLabels()
 		self.header['ISATURAT'] = ('True', 'bleed trails for saturated pixels')
 
 		self.show()
@@ -634,13 +649,14 @@ class CCD(Talker):
 				glon, glat = self.pixels().galactic.tuple
 
 				# add the zodiacal light, using the simple model from Josh and Peter on the TESS wiki
-				print "   including smooth model for zodiacal light."
+				self.speak( "   including smooth model for zodiacal light.")
 				elon, elat
 				self.backgroundimage += self.zodicalBackground(elon, elat)*self.camera.cadence
+				self.addInputLabels()
 				self.header['IZODIACA'] = ('True', 'zodiacal light, treated as smooth')
 
 				# add unresolved background light, using the simple model from Josh and Peter on the TESS wiki
-				print "   including smooth model for unresolved stars in the Galaxy."
+				self.speak( "   including smooth model for unresolved stars in the Galaxy.")
 				self.backgroundimage += self.unresolvedBackground(glon, glat)*self.camera.cadence
 				self.header['IUNRESOL'] = ('True', 'unresolved stars, treated as smooth background')
 
@@ -670,6 +686,7 @@ class CCD(Talker):
 		noisefilename = self.directory + self.note + '.fits'
 		if not os.path.exists(noisefilename):
 			self.writeToFITS(noise,noisefilename)
+		self.addInputLabels()
 		self.header['IPHOTNOI'] = ('True', 'photon noise')
 		self.show()
 
@@ -689,6 +706,7 @@ class CCD(Talker):
 			self.noiseimage = np.sqrt(noise_variance)
 
 		# update image header
+		self.addInputLabels()
 		self.header['IREADNOI'] = ('True', 'read noise')
 		self.show()
 
@@ -709,6 +727,7 @@ class CCD(Talker):
 			self.writeToFITS(self.image - untouched,smearfilename)
 
 		# update header
+		self.addInputLabels()
 		self.header['ISMEAR'] = ('True', 'smearing during transer to frame store')
 		self.show()
 

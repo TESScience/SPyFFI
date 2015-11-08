@@ -37,20 +37,26 @@ class Catalog(Talker):
 		# decide whether or not this Catalog is chatty
 		Talker.__init__(self, mute=False, pithy=False)
 
-	def addLCs(self, magmax=None, fmax=1.0, **kw):
+	def addLCs(self, magmax=None, fmax=1.0, seed=None, **kw):
 		'''populate a catalog with light curves'''
+
+		# total number of stars we need to deal with
 		ntotal = len(self.tmag)
 
+		# make sure everything is at least populated as a constant
 		constant = Lightcurve.constant()
 		self.lightcurves = [constant]*ntotal
 
+		# make sure that the maximum magnitude for variable stars is defined
 		if magmax is None:
 			magmax = np.max(self.tmag) + 1
 
-
+		# pull only the stars that pass the brightness cut
 		brightenough = (self.tmag <= magmax).nonzero()[0]
 		nbrightenough = len(brightenough)
 		self.speak('{0} stars are brighter than {1}; populating {2:.1f}% of them with light curves'.format(nbrightenough, magmax, fmax*100))
+
+		# use the input seed, to ensure it wor
 		for i in np.random.choice(brightenough, len(brightenough)*fmax, replace=False):
 			self.lightcurves[i] = Lightcurve.random(**kw)
 
