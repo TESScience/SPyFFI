@@ -40,12 +40,13 @@ class Catalog(Talker):
 	def addLCs(self, magmax=None, fmax=1.0, seed=None, **kw):
 		'''populate a catalog with light curves'''
 
+		np.random.seed(seed)
 		# total number of stars we need to deal with
 		ntotal = len(self.tmag)
 
 		# make sure everything is at least populated as a constant
 		constant = Lightcurve.constant()
-		self.lightcurves = [constant]*ntotal
+		self.lightcurves = np.array([constant]*ntotal)
 
 		# make sure that the maximum magnitude for variable stars is defined
 		if magmax is None:
@@ -60,8 +61,9 @@ class Catalog(Talker):
 		for i in np.random.choice(brightenough, len(brightenough)*fmax, replace=False):
 			self.lightcurves[i] = Lightcurve.random(**kw)
 
-
-		self.lightcurvecodes = [lc.code for lc in self.lightcurves]
+	@property
+	def lightcurvecodes(self):
+		return [lc.code for lc in self.lightcurves]
 
 	def arrays(self):
 		'''return (static) arrays of positions, magnitudes, and effective temperatures'''
@@ -82,7 +84,7 @@ class Catalog(Talker):
 		try:
 			moment = np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves]).flatten()
 		except AttributeError:
-			moment = 0.0
+			moment = np.array([0.0])
 		tmag = self.tmag + moment
 
 		# determine color of star
@@ -145,6 +147,22 @@ class Catalog(Talker):
 				self.plot(e)
 				self.writer.grab_frame()
 		self.speak('saved movie to {0}'.format(filename))
+
+	def writeProjected(self, ccd=None, outfile='catalog.txt'):
+		# take a snapshot projection of the catalog
+		ras, decs, tmag, temperatures = self.snapshot(ccd.bjd,
+										exptime=ccd.camera.cadence/60.0/60.0/24.0)
+
+		# calculate the CCD coordinates of these stars
+		stars = ccd.camera.cartographer.point(ras, decs, 'celestial')
+		x,y = stars.ccdxy.tuple
+
+		basemag = self.tmag
+		lc = self.lightcurvecodes
+		t = astropy.table.Table(data= [ras, decs, x, y, basemag, lc],
+								names=['ra', 'dec', 'x', 'y', 'tmag', 'lc'])
+		t.write(outfile, format='ascii.fixed_width', delimiter=' ')
+		self.speak("save projected star catalog {0}".format(outfile))
 
 
 class TestPattern(Catalog):
@@ -260,3 +278,18 @@ class UCAC4(Catalog):
 		self.temperature = temperatures[ok]
 		self.epoch = 2000.0
 		#return ras[ok], decs[ok], rmag[ok], jmag[ok], imag[ok], temperatures[ok]
+
+class Trimmed(Catalog):
+	'''a trimed catalog, created by removing elements from another catalog'''
+	def __init__(self, inputcatalog, keep):
+		'''inputcatalog = the catalog to start with
+		keep = an array indices indicating which elements of inputcatalog to use'''
+
+		Catalog.__init__(self)
+		# define the keys to propagate from old catalog to the new one
+		keystotransfer = ['ra', 'dec', 'pmra', 'pmdec', 'tmag', 'temperature', 'lightcurves']
+
+		for k in keystotransfer:
+			self.__dict__[k] = inputcatalog.__dict__[k][keep]
+
+		self.epoch = inputcatalog.epoch

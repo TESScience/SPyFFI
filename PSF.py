@@ -59,7 +59,7 @@ class PSF(Talker):
             # try loading these from a file
             self.initial_binning, self.subpixelsforintegrating_size, self.numberof_subpixelsforintegrating  = np.load(arraysfilename)
             self.speak('loaded PSF subpixel array definitions from {0}'.format(arraysfilename))
-        except:
+        except IOError:
             # otherwise, create them from scratch
             if self.version == 'original':
                 # details related to the orginal PSF files from Deb, by way of Peter.
@@ -132,7 +132,7 @@ class PSF(Talker):
             # maybe we can load from a preprocessed file?
             (self.monochromaticlibrary, self.focalplaneradii, self.wavelengths)  = np.load(monochromatic_filename)
             self.speak("loaded high-resolution monochromatic library from {0}".format(monochromatic_filename))
-        except:
+        except IOError:
             # load the high resolution PSF's from a FITs file
             deb_filename = settings.prefix + 'inputs/psfs_3p33.fits'
             data = astropy.io.fits.open(deb_filename)[0].data
@@ -511,7 +511,7 @@ class PSF(Talker):
         try:
             (self.binned, self.focalr, self.temperatures, self.focaltheta, self.xoffsets, self.yoffsets) = np.load(binned_filename)
             self.speak('loaded binned PSFs from {0}'.format(binned_filename))
-        except:
+        except IOError:
             self.speak('creating a new library of binned PSFs')
             self.populateHighResolutionJitteredLibrary()
 
@@ -522,13 +522,13 @@ class PSF(Talker):
             self.focalr = np.linspace(0, np.max(self.focalplaneradii),self.nradii)
             try:
                 self.binned
-            except:
+            except AttributeError:
                 self.binned = {}
                 for radius in self.focalr:
                     self.speak('adding focal plane radius of {0:.1f} pixels'.format(radius), 1)
                     try:
                         self.binned[radius]
-                    except:
+                    except KeyError:
                         self.binned[radius] = {}
 
                         for temperature in self.temperatures:
@@ -536,21 +536,21 @@ class PSF(Talker):
 
                             try:
                                 self.binned[radius][temperature]
-                            except:
+                            except KeyError:
                                 self.binned[radius][temperature] = {}
 
                                 for theta in self.focaltheta:
                                     self.speak('adding focal plane theta of {0:.0f} degrees'.format(theta), 3)
                                     try:
                                         self.binned[radius][temperature][theta]
-                                    except:
+                                    except KeyError:
                                         self.binned[radius][temperature][theta] = {}
                                         position = self.cartographer.point(radius, theta/180.0*np.pi, 'focalrtheta')
                                         for xoffset in self.xoffsets:
                                             self.speak('adding xoffset of {0:.2f} pixels'.format(xoffset), 4)
                                             try:
                                                 self.binned[radius][temperature][theta][xoffset]
-                                            except:
+                                            except KeyError:
                                                 self.binned[radius][temperature][theta][xoffset] = {}
 
                                                 for yoffset in self.yoffsets:
@@ -628,7 +628,7 @@ class PSF(Talker):
         # make sure the binned PSF library is already loaded
         try:
             self.binned
-        except:
+        except AttributeError:
             self.populateBinned()
 
         # need to determine [radius][temperature][theta][xoffset][yoffset] to pull out of library

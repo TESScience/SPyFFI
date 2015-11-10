@@ -2,18 +2,24 @@
 # import necessary packages
 import settings
 from imports import *
-import Cosmics
+import Cosmics, Catalogs
 
 # setup basic output options for this Python session
 np.set_printoptions(threshold = 1e6, linewidth = 300)
-plt.ion()
 
 zipsuffix = ''
 
 # define mapping between CCD number and quadrant
 quadrants = {1:(1,1), 2:(-1,1), 3:(-1,-1), 4:(1,-1), 0:None}
 
+
+def dndmag(m):
+	# a rough fit to a random (small) field
+	f = np.exp(-3.293 + 0.697*m)
+	return f
+
 class CCD(Talker):
+
 	def __init__(self, number=1, camera=None, subarray=None, label='', display=False):
 		'''Turn on a TESS CCD, which can be used to make simulated images.
 
@@ -270,7 +276,130 @@ class CCD(Talker):
 			self.note = 'withoutbackground_{0:06.0f}'.format(self.camera.counter)
 			self.writeToFITS(self.image - self.image_background, self.directory + self.note + '.fits')
 
+	def createStamps(self, x, y, radius=5):
 
+		# create an empty array
+		mask = self.zeros()
+
+		# create a (currently fixed size and shape) aperture
+		diameter = radius*2 + 1
+		xgrid,ygrid = np.meshgrid(np.arange(-radius,radius+1),np.arange(-radius,radius+1))
+		aperture = np.zeros_like(xgrid)
+
+		#make a circular aperture
+		r = np.sqrt(xgrid**2 + ygrid**2)
+		aperture[r <= radius] = 1
+
+
+		# loop over stars
+		for i in range(len(x)):
+			thisx = np.minimum(np.maximum(np.round(x[i]).astype(np.int) + xgrid, 0), self.xsize-1)
+			thisy = np.minimum(np.maximum(np.round(y[i]).astype(np.int) + ygrid, 0), self.ysize-1)
+			mask[thisy,thisx] += aperture
+
+		self.stampimage = mask
+		self.note = 'stampdefinition'
+		stampfilename = self.directory + self.note + '.fits'
+		self.writeToFITS(self.stampimage,stampfilename)
+
+	def stampify(self):
+		self.image *= self.stampimage != 0
+
+	def setupCatalog(self, write=True):
+		'''setup the CCD's catalog, by creating it from the camera and then trimming'''
+
+		self.speak("setting up this CCD's starmap")
+
+		# make sure the camera has a catalog defined
+		try:
+			self.camera.catalog
+			self.speak("the camera already had a catalog of {0} elements defined; using it!".format(len(self.camera.catalog.ra)))
+		except AttributeError:
+			self.speak("populating a new catalog for the camera")
+			self.camera.populateCatalog()
+
+		# we want to make a trimmed catalog for this CCD.
+		# first figure out which ones are on the CCD
+
+		# pull out positions, magnitudes, and temperatures at the time of the first exposure
+		self.speak('taking an intial snapshot at {0} = {1}'.format(self.bjd, self.epoch))
+		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd,
+								exptime=self.camera.cadence/60.0/60.0/24.0)
+		self.speak('  done!')
+		assert(ras.shape == tmag.shape)
+
+		# assign the cartrographer's CCD to this one
+		self.camera.cartographer.ccd = self
+
+		# create coordinate object for the stars
+		stars = self.camera.cartographer.point(ras, decs, 'celestial')
+		x,y = stars.ccdxy.tuple
+
+		# trim everything down to only those stars that could be relevant for this ccd
+		buffer = 10
+		ok = (x > -buffer) & (x < self.xsize + buffer) & (y > -buffer) & (y < self.ysize + buffer)
+
+		# trim to postage stamps, if desired
+		if self.camera.stamps is not None:
+
+			# select (randomly?) some target stars
+			np.random.seed(self.number)
+
+
+			# currently a kludge -- eventually replace with actual target selection
+			'''# this is how the weights were estimated, from a small field
+			hy, edges = np.histogram(tmag)
+			hx = 0.5*(edges[1:] + edges[:-1])
+			plt.figure()
+			plt.plot(hy, hx)
+			np.polyfit(hx, np.log(hy), 1)'''
+
+
+			# weight stars inversely to their abundance, to give roughly uniform distribution of magnitudes
+
+
+
+			# start with targets with centers on the chip
+			onccd = (np.round(x) > 0) & \
+					(np.round(x) < self.xsize) & \
+					(np.round(y) > 0) & \
+					(np.round(y) < self.ysize)
+			weights = (1.0/dndmag( self.camera.catalog.tmag)*( self.camera.catalog.tmag >= 6)*( self.camera.catalog.tmag <= 16))[onccd]
+			weights /= np.sum(weights)
+		 	itargets = np.random.choice(onccd.nonzero()[0],
+										size=np.minimum(self.camera.stamps, np.sum(weights != 0)),
+										replace=False,
+										p=weights)
+
+
+			# pull out the target stars, and write them to disk
+			self.targetstarcatalog = Catalogs.Trimmed(self.camera.catalog, itargets)
+			targetsoutfile = self.directory + 'postagestamptargets_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
+			self.targetstarcatalog.writeProjected(ccd=self, outfile=targetsoutfile)
+
+			#for t in range(len(self.targetstarcatalog.ra)):
+			#	i = (self.camera.catalog.ra == self.targetstarcatalog.ra[t])*(self.camera.catalog.dec == self.targetstarcatalog.dec[t])
+			#	assert(np.array(self.camera.catalog.lightcurvecodes)[i] == np.array(self.targetstarcatalog.lightcurvecodes)[t])
+
+			# make a stamp image centered on target stars
+			self.createStamps(x[itargets], y[itargets])
+
+			# test which stars fall in the mask
+			ix, iy = np.round(x[onccd]).astype(np.int), np.round(y[onccd]).astype(np.int)
+
+			# mask out those stars that fall outside stamps (or detector)
+			ok *= onccd
+			ok[onccd] *= self.stampimage[iy,ix]
+
+		# keep track of whether this is a stamp catalog or not
+		self.stamps = self.camera.stamps
+
+		# create the CCD catalog
+		self.catalog = Catalogs.Trimmed(self.camera.catalog, ok)
+
+		# write the catalog out to a text file
+		outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
+		self.catalog.writeProjected(ccd=self, outfile=outfile)
 
 	def projectCatalog(self, write=True):
 		'''Create using the camera's star catalog, and project stars using this CCD.'''
@@ -278,13 +407,15 @@ class CCD(Talker):
 
 		# make sure the camera has a catalog defined
 		try:
-			self.camera.catalog
-		except AttributeError:
-			self.camera.populateCatalog()
+			self.catalog
+			assert(self.stamps == self.camera.stamps)
+		except (AttributeError,AssertionError):
+			self.setupCatalog()
+
 
 		# pull out positions, magnitudes, and temperatures
 		self.speak('taking a snapshot at {0} = {1}'.format(self.bjd, self.epoch))
-		ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd, exptime=self.camera.cadence/60.0/60.0/24.0)
+		ras, decs, tmag, temperatures = self.catalog.snapshot(self.bjd, exptime=self.camera.cadence/60.0/60.0/24.0)
 		self.speak('  done!')
 		assert(ras.shape == tmag.shape)
 		self.camera.cartographer.ccd = self
@@ -296,6 +427,8 @@ class CCD(Talker):
 		# apply differential velocity aberration, based on the time offset from antisun
 		dt = self.bjd - self.bjdantisun
 		dx,dy = self.aberrations(stars, dt)
+		fieldcenter = self.camera.cartographer.point(0,0,'focalxy')
+		centerx,centery = self.aberrations(fieldcenter,dt)
 		x+=dx-np.mean(dx)
 		y+=dy-np.mean(dy)
 
@@ -313,14 +446,6 @@ class CCD(Talker):
 		# keep track of which CCD we projected onto
 		self.starsareon = self.name
 
-		# write the catalog to a text file
-		if write:
-			if self.camera.counter == 0:
-				outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
-				t = astropy.table.Table(data= [ras[ok], decs[ok], self.starx, self.stary, self.starbasemag, self.starlc], names=['ra', 'dec', 'x', 'y', 'tmag', 'lc'])
-				t.write(outfile, format='ascii.fixed_width', delimiter=' ')
-				#np.savetxt(outfile, np.c_[ras[ok], decs[ok], self.starx, self.stary, self.starmag, self.starlc], fmt=['%.6f', '%.6f', '%.3f', '%.3f', '%.3f', '%s'])
-				self.speak("save projected star catalog {0}".format(outfile))
 	def aberrations(self, stars, dt):
 
 		# make sure the cartographer is defined
@@ -330,16 +455,16 @@ class CCD(Talker):
 			self.aberrator = Aberrator(self.camera.cartographer)
 			self.header['ABERRATE'] = ''
 			self.header['AB_NOTE'] = '', 'Velocity aberration ingredients.'
-			self.header['AB_DEF'] = 'd?(t)=BETA*cos(l-FC+DLON)*AB?FUNCT(x,y)', "defines [dx,dy] vel. ab. [l=stars' ecl. lon., xy=CCD coords.]"
+			self.header['AB_DEF'] = 'd?=BETA*cos(L-FCLON+DLON)*AB?FUNC(x,y)-FCD?', "[L=stars' ec. lon.]"
 
 			for pix in ['x','y']:
+				self.header['ABD{0}FUNC'.format(pix.upper())] = 'C + CX*x + CY*y + CXX*x**2 + CYY*y**2 + CXY*x*y'#'{0:+.3f}{1:+.3f}*x{2:+.3f}*y{3:+.3f}*x**2{4:+.3f}*y**2{5:+.3f}*x*y'.format(*self.aberrator.coefs[pix])
 				self.header['ABD{0}_C'.format(pix.upper())] = self.aberrator.coefs[pix][0]
 				self.header['ABD{0}_CX'.format(pix.upper())] =  self.aberrator.coefs[pix][1]
 				self.header['ABD{0}_CY'.format(pix.upper())] =  self.aberrator.coefs[pix][2]
 				self.header['ABD{0}_CXX'.format(pix.upper())] =  self.aberrator.coefs[pix][3]
 				self.header['ABD{0}_CYY'.format(pix.upper())] =  self.aberrator.coefs[pix][4]
 				self.header['ABD{0}_CXY'.format(pix.upper())] = self.aberrator.coefs[pix][5]
-				self.header['ABD{0}FUNC'.format(pix.upper())] = 'C + CX*x + CY*y + CXX*x**2 + CYY*y**2 + CXY*x*y'#'{0:+.3f}{1:+.3f}*x{2:+.3f}*y{3:+.3f}*x**2{4:+.3f}*y**2{5:+.3f}*x*y'.format(*self.aberrator.coefs[pix])
 
 		# sign will definitely be wrong on this
 		beta = 29.8*zachopy.units.km/zachopy.units.c # unitless (radians)
@@ -351,7 +476,7 @@ class CCD(Talker):
 
 		# what is the celestial longitude of the field center?
 		fieldcenter = self.camera.cartographer.point(0,0,type='focalxy')
-		self.header['AB_FC'] = fieldcenter.ecliptic.elon, '[deg] ecliptic lon. of focal plane center'
+		self.header['AB_FCLON'] = fieldcenter.ecliptic.elon, '[deg] ecliptic lon. of focal plane center'
 
 		# how much is each star offset from antisun, at this time?
 		dtheta = 360.0*dt/365.25
@@ -362,10 +487,23 @@ class CCD(Talker):
 		x, y = stars.ccdxy.tuple	# pixels
 		delon = beta*np.cos(theta*np.pi/180.0)*180/np.pi # degrees
 
-		self.delon = delon # for testing
+		# calculate the aberration at the center of the camera FOV
+		fcx, fcy = fieldcenter.ccdxy.tuple
+		dfcelon = beta*np.cos(dtheta*np.pi/180.0)*180/np.pi
+		fcdx, fcdy = self.aberrator.derivatives['x'](fcx, fcy)*dfcelon, self.aberrator.derivatives['y'](fcx,fcy)*dfcelon
+		self.header['AB_FCDX'] = fcdx, '[pix] dx of FOV center'
+		self.header['AB_FCDY'] = fcdy, '[pix] dy of FOV center'
 
+		self.delon = delon # for testing
+		self.fcdx, self.fcdy = fcdx, fcdy
+
+		# calculate the absolute velocity aberration
 		# the linear plane model is probably going to break down at the pole!
-		return self.aberrator.derivatives['x'](x,y)*delon, self.aberrator.derivatives['y'](x,y)*delon
+		vax, vay = self.aberrator.derivatives['x'](x,y)*delon, self.aberrator.derivatives['y'](x,y)*delon
+
+		# subtract the field centers
+		dx, dy = vax-fcdx, vay-fcdy
+		return dx, dy
 
 
 
@@ -491,6 +629,11 @@ class CCD(Talker):
 			self.header['IJITTER'] = ('True', 'spacecraft jitter, motion between images')
 		else:
 			self.header['IJITTER'] = ('False', 'no spacecraft jitter apply')
+
+		if self.camera.aberrate:
+			self.header['IVELABER'] = ('True'), 'differential velocity aberration applied'
+		else:
+			self.header['IVELABER'] = ('False'), 'no differential velocity aberration'
 		return self.starimage
 
 	def addGalaxies(self):
@@ -732,7 +875,7 @@ class CCD(Talker):
 		self.show()
 
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True, **kwargs):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True, skipcosmics=False, **kwargs):
 		'''Expose an image on this CCD.'''
 		self.plot = plot
 		self.terse = terse
@@ -771,8 +914,9 @@ class CCD(Talker):
 		# add the photon noise from stars, galaxies, and backgrounds
 		self.addPhotonNoise()
 
-		# add cosmic rays to the image (after noise, because the *sub-Poisson* noise is already modeled with the Fano factor)
-		cosmics = self.addCosmics(write=write, version=cosmics, diffusion=diffusion, correctcosmics=correctcosmics)
+		if skipcosmics == False:
+			# add cosmic rays to the image (after noise, because the *sub-Poisson* noise is already modeled with the Fano factor)
+			cosmics = self.addCosmics(write=write, version=cosmics, diffusion=diffusion, correctcosmics=correctcosmics)
 
 		# add smear from the finite frame transfer time
 		if smear:
@@ -787,6 +931,9 @@ class CCD(Talker):
 
 		# finally, update the header for the image
 		#self.populateHeader()
+
+		if self.camera.stamps is not None:
+			self.stampify()
 
 		# write the image
 		if write:
@@ -848,7 +995,7 @@ class Aberrator(Talker):
 		self.raw['y'] = dydelon
 		self.inputs['y'] = y
 
-		plt.ion()
+		#plt.ion()
 		'''
 		plt.figure()
 		plt.scatter(x, 3600.0/dxdelon, c=y)
@@ -879,6 +1026,53 @@ class Aberrator(Talker):
 				plt.xlabel('residuals')
 
 		plt.savefig(self.ccd.directory + 'aberrationgeometry.pdf')
+
+	def plotPossibilities(self, n=100):
+		x, y = np.random.uniform(0, self.ccd.xsize, n), np.random.uniform(0, self.ccd.ysize, n)
+		stars = self.ccd.camera.cartographer.point(x,y,type='ccdxy')
+
+		dx,dy,delon = [],[], []
+		fcdx, fcdy = [], []
+		bjds = np.linspace(0,365,1000)+self.ccd.bjd0
+		for bjd in bjds:
+			nudges = self.ccd.aberrations(stars,bjd)
+			dx.append(nudges[0])
+			dy.append(nudges[1])
+			fcdx.append(self.ccd.fcdx)
+			fcdy.append(self.ccd.fcdy)
+			delon.append(self.ccd.delon)
+
+		dx = np.array(dx)
+		dy = np.array(dy)
+		fcdx = np.array(fcdx)
+		fcdy = np.array(fcdy)
+		plt.figure(figsize=(8,8))
+		gs = plt.matplotlib.gridspec.GridSpec(2,2, left=0.15, wspace=0.3)
+		bjds -= min(bjds)
+		# top row is uncorrected
+		ax = plt.subplot(gs[0,0])
+		plt.axvline(27.4, color='gray', alpha=1)
+		ax.plot(bjds,dx+fcdx.reshape(len(bjds),1), alpha=0.3)
+		plt.ylabel('velocity\naberration (pixels)')
+		plt.title('x')
+		ax = plt.subplot(gs[0,1],sharey=ax,sharex=ax)
+		ax.plot(bjds,dy+fcdy.reshape(len(bjds),1), alpha=0.3)
+		plt.axvline(27.4, color='gray', alpha=1)
+		plt.xlim(-1+ min(bjds), max(bjds)+1)
+		plt.title('y')
+
+		ax = plt.subplot(gs[1,0])
+		ax.plot(bjds,dx, alpha=0.3)
+		plt.axvline(27.4, color='gray', alpha=1)
+		plt.xlabel('Time (days)')
+		plt.ylabel('differential velocity\naberration (pixels)')
+
+		ax = plt.subplot(gs[1,1],sharey=ax,sharex=ax)
+		ax.plot(bjds,dy, alpha=0.3)
+		plt.axvline(27.4, color='gray', alpha=1)
+		plt.xlim(-1 + min(bjds), max(bjds)+1)
+		plt.xlabel('Time (days)')
+		plt.savefig(self.ccd.directory+'aberrationoveroneyear.pdf')
 
 def gauss(x, y, xcenter, ycenter):
 	rsquared = (x - xcenter)**2 + (y - ycenter)**2

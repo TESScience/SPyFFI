@@ -2,16 +2,17 @@
 # create an observation centered at the north ecliptic pole (midlatitude)
 
 import SPyFFI.Observation
-o = SPyFFI.Observation.SkySubarray(ra=50, dec=20, label='aberrationtest', subarray=200)
+o = SPyFFI.Observation.SkySubarray(ra=50, dec=20, label='aberrationtest', subarray=400, counterstep=350, warpspaceandtime=True)
+o = SPyFFI.Observation.SkyFFI(ra=50, dec=20, label='aberrationtest')
 #o = SPyFFI.Observation.TestPattern(subarray=200, spacing=500.0, label='aberrationtest', ra=270.0, dec=66.0, warpspaceandtime=False, counterstep=3500)
 ccds = o.camera.ccds*1
-for i in enumerate(ccd):
+o.camera.catalog.addLCs(fmax=0.0, magmax=None, seed=0)
+for i, c in enumerate(ccds):
     o.camera.ccds = [c]
-    o.camera.catalog.addLCs(fmax=0.1, magmax=None, seed=c.number)
-    o.create(todo={1800:10})
+    o.create(todo={1800:1}, stamps=100, skipcosmics=True)
+    c.aberrator.plotPossibilities()
 
-
-
+'''
 ra,dec,mag,teff = o.camera.catalog.snapshot(o.ccd.bjd)
 stars = o.camera.cartographer.point(ra,dec,type='celestial')
 
@@ -52,3 +53,4 @@ plt.axvline(27.4, color='gray', alpha=1)
 plt.xlim(-1 + min(bjds), max(bjds)+1)
 plt.xlabel('Time (days)')
 plt.savefig(o.ccd.directory+'aberrationoveroneyear.pdf')
+'''

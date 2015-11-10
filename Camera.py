@@ -8,7 +8,7 @@ from Jitter import Jitter
 # define a camera class
 class Camera(Talker):
     '''Keep track of one camera's entire field of view.'''
-    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1, magnitudes=[10], warpspaceandtime=False, counterstep=1):
+    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1, magnitudes=[10], warpspaceandtime=False, counterstep=1, aberrate=True):
         '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
 
         # decide whether or not this Camera is chatty
@@ -26,6 +26,7 @@ class Camera(Talker):
         self.testpattern = testpattern
         self.warpspaceandtime = warpspaceandtime
         self.counterstep=counterstep
+        self.aberrate=True
 
         # decide whether to point the Camera either at real stars (from the sky) or at a test pattern (a grid of stars)
         if self.testpattern:
