@@ -469,7 +469,7 @@ class CCD(Talker):
 		# sign will definitely be wrong on this
 		beta = 29.8*zachopy.units.km/zachopy.units.c # unitless (radians)
 		if self.camera.warpspaceandtime:
-			warp=0.001
+			warp=self.camera.warpspaceandtime
 			beta/=warp
 			self.header['AB_WARP'] = 'speed of light is {0}X what it should be'.format(warp), '(for testing)'
 		self.header['AB_BETA'] = beta, '[radians] v/c (from orbit tangential velocity)'
