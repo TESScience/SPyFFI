@@ -226,8 +226,9 @@ class ccdxy(position):
     @property
     def focalxy(self):
         xcenter, ycenter = self.ccd.center
-        x = self.x + xcenter - self.ccd.xsize/2.0
-        y = self.y + ycenter - self.ccd.ysize/2.0
+        x = self.x + xcenter - (self.ccd.xsize-1)/2.0
+        y = self.y + ycenter - (self.ccd.ysize-1)/2.0
+
         return focalxy(x,y,self.cartographer)
 
     @property

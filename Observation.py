@@ -9,7 +9,7 @@ import Camera, Catalogs
 from imports import *
 
 class Observation(Talker):
-	def __init__(self, nexposures=1, **kwargs):
+	def __init__(self, nexposures=1,  **kwargs):
 
 		Talker.__init__(self)
 		self.nexposures = nexposures
@@ -22,27 +22,24 @@ class Observation(Talker):
 		for i in range(self.nexposures):
 			self.ccd.expose(write=write, remake=remake, jitter=jitter, **kwargs)
 
-	def createCamera(self, cadence=2, ra=0.0, dec=0.0, subarray=100, **kwargs):
-		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
+	def createCamera(self, cadence=2, ra=0.0, dec=0.0, subarray=100, warpspaceandtime=False, counterstep=1, **kwargs):
+		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray, warpspaceandtime=warpspaceandtime, counterstep=counterstep)
 		try:
 			self.camera.label = kwargs['label']
 		except KeyError:
 			pass
 
-	def create(self, **kwargs):
+	def create(self, stamps=None, **kwargs):
 		try:
 			todo = kwargs['todo']
 		except KeyError:
 			todo = {2:3, 120:3, 1800:int(27.4*48)}
 
-		#try:
-		#	self.camera.label = kwargs['label']
-		#except KeyError:
-		#	pass
 
 		for k in todo.keys():
 			self.camera.setCadence(k)
 			self.camera.counter = 0
+			self.camera.stamps = stamps
 			self.nexposures = todo[k]
 			self.expose(**kwargs)
 
