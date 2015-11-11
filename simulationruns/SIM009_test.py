@@ -8,7 +8,7 @@ o.camera.catalog.addLCs(fmax=1.0, magmax=None, seed=0)
 
 n = 5
 ccds = o.camera.ccds*1
-for i in [0,2]:
+for i in [0]:
     c = ccds[i]
     o.camera.ccds = [c]
     o.create(todo={120:n*15}, stamps=500, skipcosmics=True)
