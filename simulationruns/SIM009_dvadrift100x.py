@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # create an observation centered orion, with two opposite CCDs
-
+import matplotlib
+matplotlib.use('agg')
 import SPyFFI.Observation
 o = SPyFFI.Observation.SkyFFI(ra=82.0, dec=1.0, label='SIM009_dvadrift100x', warpspaceandtime=0.01)
 o.camera.catalog.addLCs(fmax=1.0, magmax=None, seed=0)
