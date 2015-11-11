@@ -389,7 +389,7 @@ class CCD(Talker):
 
 			# mask out those stars that fall outside stamps (or detector)
 			ok *= onccd
-			ok[onccd] *= self.stampimage[iy,ix]
+			ok[onccd] *= self.stampimage[iy,ix].astype(np.bool)
 
 		# keep track of whether this is a stamp catalog or not
 		self.stamps = self.camera.stamps
