@@ -875,7 +875,7 @@ class CCD(Talker):
 		self.show()
 
 
-	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True, skipcosmics=False, **kwargs):
+	def expose(self, plot=False, jitter=False, write=False, split=False, remake=False, smear=True, terse=False, cosmics='fancy', diffusion=False, correctcosmics=True, writenoiseless=True, skipcosmics=False, jitterscale=1.0, **kwargs):
 		'''Expose an image on this CCD.'''
 		self.plot = plot
 		self.terse = terse
@@ -886,7 +886,7 @@ class CCD(Talker):
 		self.populateHeader()
 		# jitter the camera, or at least update the
 		if jitter:
-			self.camera.jitter.jitter(self.camera.counter, header=self.header)
+			self.camera.jitter.jitter(self.camera.counter, header=self.header, scale=jitterscale)
 
 		# add stars to the image
 		self.addStars(jitter=jitter, remake=remake)

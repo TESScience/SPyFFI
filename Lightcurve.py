@@ -51,7 +51,9 @@ def generate(code):
 
 def random(options=['trapezoid', 'sin'], extreme=False):
 
-
+    if extreme:
+        return cartoonrandom(options=options, extreme=extreme)
+        
     fractionrotators = len(rotationtable)/133030.0
     fractiontransiting = len(transittable)/112001.0
 

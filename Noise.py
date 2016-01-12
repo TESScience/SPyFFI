@@ -14,22 +14,26 @@ try:
 except:
     pass
 
+
+import os
+relationsdir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'relations'))
+
 # create an interpolator to estimate the best number of pixels in a photometric aperture
-optimalpixelsdata = astropy.io.ascii.read('relations/optimalnumberofpixels.txt')
+optimalpixelsdata = astropy.io.ascii.read(relationsdir + '/optimalnumberofpixels.txt')
 optimalpixelsinterpolator = scipy.interpolate.interp1d(optimalpixelsdata['tmag'], optimalpixelsdata['npix'], kind='linear', bounds_error=True)
 def optimal_npix(imag):
     '''Return the average best number of pixels to use in a photometric aperture, given a Cousins I magnitude.'''
     return optimalpixelsinterpolator(imag)
 
 # create an interpolator to estimate the average enclosed flux fraction for a aperture size
-encloseddata = astropy.io.ascii.read('relations/enclosedfractionofflux.txt')
+encloseddata = astropy.io.ascii.read(relationsdir + '/enclosedfractionofflux.txt')
 enclosedinterpolator = scipy.interpolate.interp1d(encloseddata['npix'], encloseddata['fraction'])
 def enclosed_fraction(npix):
     '''Return the average fraction of enclosed energy in a given number of pixels.'''
     return enclosedinterpolator(npix)
 
 # create an interpolator to estimate the TESS magnitude for a star, given is Cousin I magnitude and effective temperature
-fluxesdata = astropy.io.ascii.read('relations/fluxes.txt')
+fluxesdata = astropy.io.ascii.read(relationsdir + '/fluxes.txt')
 fluxesinterpolator = scipy.interpolate.interp1d(fluxesdata['teff'], fluxesdata['icminust']/1000.0)
 def IctoT(Icmag, teff=5000.0):
     '''Return the TESS magnitude of a star, given its Cousin I magnitude and effective temperature.'''
