@@ -38,8 +38,19 @@ class Catalog(Talker):
 		Talker.__init__(self, mute=False, pithy=False)
 
 	def addLCs(self, magmax=None, fmax=1.0, seed=None, **kw):
-		'''populate a catalog with light curves'''
+		'''
+		addLCs() populates a catalog with light curves.
 
+		addLCs() makes use of these keywords:
+			magmax=None (what's the faintest magnitude star that should be populated with a lightcurve?)
+			fmax=1.0 (what fraction of eligible stars should be populated with lightcurves, from 0 to 1)
+			seed=None (if you want the exact light curves on multiple calls, set a value for the seed)
+		addLCs() passes additional keywords to SPyFFI.Lightcurve.random(**kw):
+		    random() makes use of these keyword arguments:
+		        options=['trapezoid', 'sin'] (a list of the kinds of a variability to choose from)
+		        extreme=False (should we allow extreme variability [good for movies] or no?)
+
+		'''
 		np.random.seed(seed)
 		# total number of stars we need to deal with
 		ntotal = len(self.tmag)

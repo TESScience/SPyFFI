@@ -5,13 +5,17 @@ import zachopy.units as u
 
 # kludge to figure out path to data resources
 import os
-datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
-print datadir
+datadir = os.path.abspath(os.path.join(codedir, 'data'))
+
+rotationtable = None
+transittable = None
 
 # read the McQuillan table (once)
-print "[lightcurve.py] reading McQuillan rotation table"
-rotationtable = astropy.io.ascii.read(datadir+'/rotation_McQuillan.txt')
 def drawRotation():
+    global rotationtable
+    if rotationtable is None:
+        print "[lightcurve.py] reading McQuillan rotation table"
+        rotationtable = astropy.io.ascii.read(datadir+'/rotation_McQuillan.txt')
     row = rotationtable[np.random.randint(0, len(rotationtable))]
     P=row['PRot']
     E=np.random.uniform(0,P)
@@ -20,11 +24,13 @@ def drawRotation():
 
 
 # read the Kepler TCE table (once)
-print "[lightcurve.py] reading Kepler TCE table"
-transittable = astropy.io.ascii.read(datadir+'/keplerTCE_DR24.txt')
-transittable = transittable[transittable['tce_depth']>1.0]
 def drawTransit():
     #from Seader et al. "The search includes a total of $198,646$ targets, of which $112,001$ were observed in every quarter and $86,645$ were observed in a subset of the 17 quarters.""
+    global transittable
+    if transittable is None:
+        print "[lightcurve.py] reading Kepler TCE table"
+        transittable = astropy.io.ascii.read(datadir+'/keplerTCE_DR24.txt')
+        transittable = transittable[transittable['tce_depth']>1.0]
 
     row = transittable[np.random.randint(0, len(transittable))]
     P=row['tce_period']
@@ -49,11 +55,18 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
-def random(options=['trapezoid', 'sin'], extreme=False):
+def random(options=['trapezoid', 'sin'], extreme=False, **kw):
+    '''
+    random() returns random Lightcurve.
+
+    random() makes use of these keyword arguments:
+        options=['trapezoid', 'sin'] (a list of the kinds of a variability to choose from)
+        extreme=False (should we allow extreme variability [good for movies] or no?)
+    '''
 
     if extreme:
         return cartoonrandom(options=options, extreme=extreme)
-        
+
     fractionrotators = len(rotationtable)/133030.0
     fractiontransiting = len(transittable)/112001.0
 

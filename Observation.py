@@ -12,6 +12,7 @@ class Observation(Talker):
 	def __init__(self, nexposures=1,  **kwargs):
 
 		Talker.__init__(self)
+		self.speak("Creating a new Observation.")
 		self.nexposures = nexposures
 		self.createCamera(**kwargs)
 		self.createCatalog(**kwargs)
@@ -23,11 +24,16 @@ class Observation(Talker):
 			self.ccd.expose(write=write, remake=remake, jitter=jitter, **kwargs)
 
 	def createCamera(self, cadence=2, ra=0.0, dec=0.0, subarray=100, warpspaceandtime=False, counterstep=1, **kwargs):
+		self.speak('Setting up the camera for this Observation.')
 		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray, warpspaceandtime=warpspaceandtime, counterstep=counterstep)
 		try:
 			self.camera.label = kwargs['label']
 		except KeyError:
 			pass
+
+	# testing!
+	def addLCs(self, **kwargs):
+		self.camera.catalog.addLCs(**kwargs)
 
 	def create(self, stamps=None, **kwargs):
 		try:
@@ -49,6 +55,7 @@ class Sky(Observation):
 		self.camera.testpattern=False
 
 	def createCatalog(self, radius=0.2, **kwargs):
+		self.speak('Setting up catalog, using real stars.')
 		# determine the size of the catalog from the camera's subarray size (in pixels)
 		ra, dec = self.camera.ra, self.camera.dec
 		radius = self.camera.subarray*self.camera.pixelscale/60.0/60.0

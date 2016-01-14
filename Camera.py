@@ -46,7 +46,7 @@ class Camera(Talker):
         # define scales for the Camera
         self.pixelscale = 21.1#24.0/4096*60*60							# arcsec!! (from Peter's paper)
         self.entrance_pupil_diameter = 10.5								# cm (from Peter's paper)
-        self.effective_area = 69.1										# cm^2 (from Peter's paper)
+        self.effective_area = 69.1										# cm^2 (from Peter's paper) should be 63.0
         self.physicalpixelsize = 15.0/1e4								# cm
         self.physicalpixeldepth = 100.0/1e4								# cm
         self.read_noise = 10.0											# electrons per read
