@@ -67,8 +67,8 @@ def random(options=['trapezoid', 'sin'], extreme=False, **kw):
     if extreme:
         return cartoonrandom(options=options, extreme=extreme)
 
-    fractionrotators = len(rotationtable)/133030.0
-    fractiontransiting = len(transittable)/112001.0
+    fractionrotators = 34030.0/133030.0
+    fractiontransiting = 20152/112001.0
 
     if 'trapezoid' in options:
         if np.random.uniform(0,1) < fractiontransiting:

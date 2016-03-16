@@ -228,7 +228,7 @@ class UCAC4(Catalog):
 			jmagtag = 'Jmag'
 			vmagtag = 'Vmag'
 			pmratag, pmdectag = 'pmRA', 'pmDE'
-			columns = ['_RAJ2000','_DECJ2000','pmRA', 'pmDE','f.mag','Jmag', 'Vmag']
+			columns = ['_RAJ2000','_DECJ2000','pmRA', 'pmDE','f.mag','Jmag', 'Vmag', 'UCAC4']
 
 		# create a query through Vizier
 		v = Vizier(catalog=vcat,columns=columns)

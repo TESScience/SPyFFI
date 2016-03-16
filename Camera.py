@@ -40,7 +40,7 @@ class Camera(Talker):
 
         # assign the cadence for this camera
         self.singleread = 2.0											# seconds
-        self.readouttime = 0.005										# seconds
+        self.readouttime = 0.05										# seconds
         self.setCadence(cadence)                                        # seconds
 
         # define scales for the Camera
@@ -170,6 +170,8 @@ class Camera(Talker):
 
         # the pixel scale, in degrees
         self.wcs.wcs.cdelt = [-self.pixelscale/60.0/60.0,self.pixelscale/60.0/60.0]
+
+
 
         # the celestial coordinates at the reference position (input by user)
         nudged_ra, nudged_dec = zachopy.spherical.rotate(self.ra, self.dec,  self.nudge['x']/60.0/60.0, self.nudge['y']/60.0/60.0)

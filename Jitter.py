@@ -12,21 +12,46 @@ class Jitter(Talker):
             # store the input camera
             self.camera = camera
 
+            # set up the initial raw jitter file
+            self.rawfile = settings.prefix + "inputs/AttErrTimeArcsec_80k.dat"
+
             # update the jitterball to one that has been binned to this cadence
             self.load()
 
 
     def load(self, remake=False):
-        '''Load the jitterball for this camera, binned to the appropriate cadence.'''
+        '''make sure that a jitterball (timeseries of roll,pitch,yaw) has
+            been loaded and binned to the appropriate exposure times'''
 
         try:
-            # if the jitterball is already loaded and of the correct cadence, we're all set!
+            # if the jitterball is already loaded into memory
+            #  *and* of the correct cadence, we're all set!
             self.jitterball
 
             # make sure the we're using the right jitterball for this cadence
             assert(self.jittercadence == self.camera.cadence)
-        except:
-            self.speak('Populating the jitterball for {0:.0f} second cadence.'.format(self.camera.cadence))
+
+            # make sure we're not trying to remake the jitterball
+            assert(remake == False)
+
+        except (AttributeError, AssertionError):
+            # load the processed jitterball
+            self.loadProcessedJitterball()
+
+    @property
+    def processedfile(self):
+        '''determine what the processed filename should be (based on rawfile)'''
+        return self.rawfile + '.processed.npy'
+
+    def loadProcessedJitterball(self):
+            '''load a pre-processed jitterball'''
+
+            # if not, populate the jitterball for this cadence
+            self.speak(
+                'populating the jitterball for {0:.0f} second cadence.'.format(
+                    self.camera.cadence)
+            )
+
             # if the jitterball isn't already loaded (or has wrong cadence), then load/create a new one!
             jitterfile = settings.prefix + 'intermediates/jitter_{0:04.0f}.npy'.format(self.camera.cadence)
             try:
@@ -125,7 +150,7 @@ class Jitter(Talker):
 
                 # save the necessary jitter files so we don't have to go through this again
                 self.speak('Saving the jitter files for this cadence to {0}'.format(jitterfile))
-                np.save(jitterfile,( self.jitterball, self.jittermap))
+                np.save(jitterfile, (self.jitterball, self.jittermap))
 
     def plothist2d(self, hist, title=None, log=False, xtitle=None, ytitle=None):
         '''Plot a 2D histogram. (Used for load plots -- should probably move all this to new Jitterball object.)'''
