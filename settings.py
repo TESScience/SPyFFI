@@ -16,7 +16,7 @@ if not os.path.exists(prefix):
 			just to set your environemnt variable).
 			""")
 
-	prefix = raw_input('[enter SPyFFI data path]:)
+	prefix = raw_input('[enter SPyFFI data path]:')
 	assert(os.path.exists(prefix))
 
 # create dirs that will store inputs and outputs
@@ -28,3 +28,9 @@ dirs = dict(	plots=prefix + 'plots/',
 # make sure all those directories exist
 for k in dirs.keys():
 	zachopy.utils.mkdir(dirs[k])
+
+# shortcuts
+plots = dirs['plots']
+inputs = dirs['inputs']
+outputs = dirs['outputs']
+intermediates = dirs['intermediates']

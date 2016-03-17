@@ -14,6 +14,9 @@ class Camera(Talker):
         # decide whether or not this Camera is chatty
         Talker.__init__(self, mute=False, pithy=False)
 
+        # KLUDGE (or is it?)
+        self.stamps = None
+
         # keep track of which exposure is being simulated
         self.counter = 0
 
