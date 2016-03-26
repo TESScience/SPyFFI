@@ -8,38 +8,64 @@ from Jitter import Jitter
 # define a camera class
 class Camera(Talker):
     '''Keep track of one camera's entire field of view.'''
-    def __init__(self, cadence=1800, ra=270,dec=66.56070833333332, testpattern=False, subarray=None, label='', number=1, magnitudes=[10], warpspaceandtime=False, counterstep=1, aberrate=True):
+    def __init__(self,
+                        cadence=1800, # what cadence for exposures?
+                        ra=270, dec=66.56070833333332, # field center,
+                        testpattern=False, # is this using a test pattern?
+                        subarray=None, # define a subarray at field center?
+                        label='', # a special label for this field?
+                        cameranumber=1, # which camera is this? (not used yet)
+                        warpspaceandtime=False, # slow the speed of light?
+                        counterstep=1, # jump by multiple exposures each time?
+                        aberrate=True, # apply velocity aberration?
+                        positionangle=None, # position angle of the field
+                        stamps=None # how many postage stamps?
+                ):
         '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
 
         # decide whether or not this Camera is chatty
-        Talker.__init__(self, mute=False, pithy=False)
+        Talker.__init__(self)
 
         # KLUDGE (or is it?)
-        self.stamps = None
+        self.stamps = stamps
 
         # keep track of which exposure is being simulated
         self.counter = 0
 
         # [self.speak will only report for this object if mute and pithy are turned off]
-        self.speak("Turning on a new TESS camera object.")
+        self.speak("turning on a new TESS camera object.")
 
         # keep track of any special features with this Camera
         self.subarray = subarray
         self.label = label
+
+        # will this camera see a test pattern?
         self.testpattern = testpattern
+        self.speak('the camera expects the stars to be drawn from {}'.format(
+            {True:'the sky', False:'a test pattern'}[self.testpattern]))
+
+        # warping time (for enhanced aberration)
         self.warpspaceandtime = warpspaceandtime
-        self.counterstep=counterstep
+        if self.warpspaceandtime:
+            self.speak('the camera will warp space and time by slowing '
+                'the speed of light to {}c'.format(self.warpspaceandtime))
+
+        # should positions be aberrated?
         self.aberrate=True
 
-        # decide whether to point the Camera either at real stars (from the sky) or at a test pattern (a grid of stars)
-        if self.testpattern:
-            # pretend a test pattern is pointed at (ra, dec) = (0.0, 0.0)
-            self.ra = 0.0
-            self.dec = 0.0
-        else:
-            # if real stars, use the input (ra, dec)
-            self.ra = ra
-            self.dec = dec
+        # speeding up time
+        self.counterstep=counterstep
+        if self.counterstep > 1:
+            self.speak('the camera will speed up time'
+                            ' by a factor of {}'.format(self.counterstep))
+
+
+        # if real stars, use the input (ra, dec)
+        self.ra = ra
+        self.dec = dec
+        self.speak('the camera FOV is centered at (ra,dec) = {:.2f}, {:.2f} deg.'.format(
+                        self.ra, self.dec))
+
 
         # assign the cadence for this camera
         self.singleread = 2.0											# seconds
@@ -47,7 +73,7 @@ class Camera(Talker):
         self.setCadence(cadence)                                        # seconds
 
         # define scales for the Camera
-        self.pixelscale = 21.1#24.0/4096*60*60							# arcsec!! (from Peter's paper)
+        self.pixelscale = 21.1                  						# arcsec!! (from Peter's paper)
         self.entrance_pupil_diameter = 10.5								# cm (from Peter's paper)
         self.effective_area = 69.1										# cm^2 (from Peter's paper) should be 63.0
         self.physicalpixelsize = 15.0/1e4								# cm
@@ -67,14 +93,15 @@ class Camera(Talker):
         if self.subarray is None:
             # if we're not dealing with a subarray, then turn on CCD's 1,2,3,4
             self.ccdnumbers = np.arange(4) + 1
+            self.speak("populating camera with 4 CCDs")
         else:
             # if this is a subarray, then turn on one (imaginary) CCD and call it 0
             self.ccdnumbers = np.arange(1)
+            self.speak("populating camera with one, centered, CCD subarray")
         self.ccds = [CCD(n,subarray=self.subarray,camera=self) for n in self.ccdnumbers]
 
         # assign a cartographer to this Camera and start it out on the first CCD
         self.cartographer = Cartographer(camera=self, ccd=self.ccds[0])
-
 
 
         # start the camera out unjittered from its nominal position
@@ -91,9 +118,9 @@ class Camera(Talker):
         self.jitter = Jitter(camera=self)
 
 
-
     @property
     def fielddirectory(self):
+        '''define the field directory for this camera'''
         if self.label == '':
             d = settings.prefix + 'outputs/{pos}/'.format(pos=self.pos_string())
         else:
@@ -148,7 +175,7 @@ class Camera(Talker):
 
         # set the cadence
         self.cadence = cadence
-        self.speak("Setting cadence to {0} seconds = {1} reads.".format(self.cadence, self.cadence/self.singleread))
+        self.speak("setting cadence to {0} seconds = {1:.0f} reads.".format(self.cadence, self.cadence/self.singleread))
 
     def point(self, ra=None, dec=None):
         '''Point this Camera at the sky, by using the field-specified (ra,dec) and (if active) the jitter nudge for this exposure.'''
@@ -161,7 +188,7 @@ class Camera(Talker):
         try:
             self.ra
             self.dec
-            self.speak('Pointing the camera at (ra,dec) = {0:.6f},{1:.6f}'.format(self.ra, self.dec))
+            self.speak('pointing the camera at (ra,dec) = {0:.6f},{1:.6f}'.format(self.ra, self.dec))
         except:
             self.report("Please point your telescope somewhere. No RA or DEC defined.")
 
@@ -217,12 +244,23 @@ class Camera(Talker):
         # make a test pattern or a catalog of real stars
         if self.testpattern:
             # figure out how big a test pattern to create (in arcsec)
-
             self.catalog = Catalogs.TestPattern(size=size*3600.0, **kwargs)
         else:
             self.catalog = Catalogs.UCAC4(ra=self.ra, dec=self.dec, radius=size/np.sqrt(2)*1.01, **kwargs)
 
+    @property
+    def effective_fov(self):
+        '''return the radius (degrees) needed to reach the detector corners'''
 
+        # is it a subarray or no?
+        if self.subarray is None:
+            # set the radius to be the actual radial FOV of the camera
+            radius = self.fov/np.sqrt(2)
+        else:
+            # set the radius to the corner of the subarray
+            radius = self.subarray*self.pixelscale/60.0/60.0
+
+        return radius
 
 	'''def c1(self, image):
 

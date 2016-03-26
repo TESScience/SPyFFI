@@ -11,6 +11,6 @@ ccds = o.camera.ccds*1
 for i in [0]:
     c = ccds[i]
     o.camera.ccds = [c]
-    o.create(todo={120:n*15}, stamps=500, skipcosmics=True)
+    o.create(cadencestodo={120:n*15}, stamps=500, skipcosmics=True)
     c.aberrator.plotPossibilities()
-    o.create(todo={1800:n}, skipcosmics=True)
+    o.create(cadencestodo={1800:n}, skipcosmics=True)

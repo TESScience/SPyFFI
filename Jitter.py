@@ -3,7 +3,7 @@ from imports import *
 import settings
 
 class Jitter(Talker):
-  def __init__(self, camera=None, jitterrms=None):
+  def __init__(self, camera=None, jitterrms=None, rawjitterbasename="AttErrTimeArcsec_80k.dat"):
       # decide whether or not this CCD is chatty
       Talker.__init__(self, mute=False, pithy=False)
 
@@ -15,7 +15,7 @@ class Jitter(Talker):
 
       # set up the initial raw jitter file
       # (this one cam from Roland, some time ago)
-      self.rawfile = settings.prefix + "inputs/AttErrTimeArcsec_80k.dat"
+      self.rawfile = settings.prefix + "inputs/" + rawjitterbasename
 
       # what do you want the RMS to be rescaled to?
       self.jitterrms = jitterrms

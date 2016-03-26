@@ -7,7 +7,7 @@ class Intrapixel(Talker):
     def __init__(self, nsubpixels=240, supersample=8):
         # decide whether or not this PSF is chatty
         Talker.__init__(self, mute=False, pithy=False)
-        self.speak("Creating an intrapixel sensitivity map called {0}".format(self.name))
+        self.speak("creating an intrapixel sensitivity map called {0}".format(self.name))
         self.nsubpixels = nsubpixels
         self.supersample = supersample
         #self.createSmoothedArray()

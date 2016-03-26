@@ -3,6 +3,7 @@ import settings
 import Intrapixel
 from CCD import CCD
 from Cartographer import Cartographer
+
 # define everything related to PSFs
 class PSF(Talker):
 
@@ -11,11 +12,10 @@ class PSF(Talker):
 
         # decide whether or not this PSF is chatty
         Talker.__init__(self, mute=False, pithy=False)
-        self.speak("Initializing the TESS point spread function painter.")
+        self.speak("initializing the TESS point spread function painter.")
 
         # link this PSF to a Camera (hopefully one with a Cartographer)
         self.setCamera(camera)
-
 
         # parameters used for generating the binned PSF library
         self.version = 'original'

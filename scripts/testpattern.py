@@ -1,8 +1,14 @@
 #!/usr/bin/env python
 # create an observation centered at the north ecliptic pole (midlatitude)
-import matplotlib
-matplotlib.use('agg')
-import SPyFFI.Observation
-o = SPyFFI.Observation.TestPattern(subarray=4196, random=True, magnitudes=[6,16], label='20150914')
-o.camera.catalog.addLCs(fmax=0.1, magmax=None)
+from SPyFFI.Observation import Observation, default
+
+# start from the default settings
+inputs = default
+
+inputs['camera']['label'] = 'newtest'
+inputs['catalog']['name'] = 'testpattern'
+inputs['camera']['subarray'] = 100
+inputs['catalog']['testpatternkw']['randomizemagnitudes'] = True
+inputs['observation']['cadencestodo'] = {2:16, 120:16, 1800:16}
+o = Observation(inputs)
 o.create()

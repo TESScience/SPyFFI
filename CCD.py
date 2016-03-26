@@ -29,7 +29,7 @@ class CCD(Talker):
       label='' is a special label you can add for experimenting
       '''
     # decide whether or not this CCD is chatty
-    Talker.__init__(self, mute=False, pithy=False)
+    Talker.__init__(self)
 
     # keep track of where this image is
     self.number = number
@@ -68,19 +68,41 @@ class CCD(Talker):
     self.display = display
     self.plot = False
 
+    self.speak('created CCD #{}, of size {}x{}'.format(
+                    self.number, self.xsize, self.ysize))
 
     # start populating the image header (seems like we can't do this until we're sure camera has pointed somewhere)
     #self.populateHeader()
 
   def show(self):
     '''Display the current (possibly in-progress image.)'''
+
     if self.display:
 
       try:
         self.ds9
-      except:
-        self.ds9 = zachopy.display.ds9(self.name.replace(' ',''))
-      self.ds9.one(self.image)
+      except AttributeError:
+        from zachopy.displays.ds9 import ds9
+        self.ds9 = ds9(self.name.replace(' ',''))
+        self.ds9.clear()
+
+      frame = self.camera.counter/self.camera.counterstep
+      self.maxds9frames = 9
+      if frame > self.maxds9frames:
+          frame = 9
+          note = ' (maxed out at {} frames)'.format(self.maxds9frames)
+      else:
+          note = ''
+      self.ds9.one(self.image, frame=frame)
+      self.speak('showing exposure {} of {} in frame {}'.format(
+            self.camera.counter, self.name, frame))
+      if note != '':
+          self.speak(note)
+
+      if self.camera.counter == 0:
+          # set the scales, for the first time
+          self.ds9.limits = np.percentile(self.image, [0,99])
+          self.ds9.scale(scale='log', limits=self.ds9.limits)
 
   @property
   def name(self):
@@ -218,7 +240,9 @@ class CCD(Talker):
     '''General FITS writer for this CCD.'''
 
     # print status
-    self.speak('saving {0}x{0} image to {1} with type {2}'.format(image.shape[0],path,savetype.__name__))
+    self.speak('saving {0}x{0} image with type {1} to'.format(image.shape[0],savetype.__name__))
+    self.speak('  {}'.format(path))
+
     cr = self.camera.cartographer.point(0.0, 0.0, 'focalxy')
     x, y = cr.ccdxy.tuple
 
@@ -249,9 +273,9 @@ class CCD(Talker):
       image = astropy.io.fits.open(path)[0].data
       self.speak("       ...success!")
       return image
-    except:
-      self.speak("       ...failed.")
-      assert(False)
+    except IOError:
+      self.speak("       ...failed")
+      raise RuntimeError('failed tring to load {}'.format(path))
 
   @property
   def fileidentifier(self):
@@ -268,7 +292,8 @@ class CCD(Talker):
     finalfilename = self.directory + self.note + '.fits' + zipsuffix
 
     # write the image to FITS
-    self.speak('saving final TESS image')
+    self.speak('saving simulated exposure {} for {}'.format(
+                    self.camera.counter, self.name))
     self.writeToFITS(self.image, finalfilename, savetype=np.int32)
 
     # optionally, write some other outputs too!
@@ -325,7 +350,6 @@ class CCD(Talker):
     self.speak('taking an intial snapshot at {0} = {1}'.format(self.bjd, self.epoch))
     ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd,
                 exptime=self.camera.cadence/60.0/60.0/24.0)
-    self.speak('  done!')
     assert(ras.shape == tmag.shape)
 
     # assign the cartrographer's CCD to this one
@@ -550,12 +574,12 @@ class CCD(Talker):
 
 
   def addStars(self, remake=False, jitter=False):
-    self.speak("Adding stars.")
+    #self.speak("adding stars")
     self.starcounter = 0
     self.nstars =0
     if jitter:
       remake=True
-    self.camera.cartographer.pithy = True
+    self.camera.cartographer._pithy = True
     # define a grid of magnitude thresholds, will save an image containing all stars brighter than each
     dthreshold = 1
     magnitude_thresholds = np.arange(6,18,dthreshold)
@@ -580,8 +604,8 @@ class CCD(Talker):
 
       #for threshold in magnitude_thresholds:
       if True:
-        self.speak('adding {0} stars to image'.format(len(self.starx)))
         threshold = np.max(magnitude_thresholds)
+
         # define a filename for this magnitude range
         self.note = 'starsbrighterthan{0:02d}'.format(threshold)
         starsfilename = self.directory + self.note + '.fits'
@@ -590,7 +614,7 @@ class CCD(Talker):
         try:
           assert(remake==False)
           self.starimage = self.loadFromFITS(starsfilename)
-        except:
+        except (IOError,AssertionError):
           # if this is the smallest threshold, include all the stars brighter than it
           #if threshold == np.min(magnitude_thresholds):
           minimum = -100
@@ -607,6 +631,10 @@ class CCD(Talker):
           mag = self.starmag[ok]
           temp = self.startemp[ok]
 
+          self.speak('adding {0} stars between {1:.1f} and {2:.1f} magnitudes'.format(
+            len(x), np.min(mag), np.max(mag)))
+
+
           if np.sum(ok) > 0:
             self.nstars += np.sum(ok)
             for i in range(len(x)):
@@ -615,10 +643,9 @@ class CCD(Talker):
 
             if jitter == False:
               self.writeToFITS(self.starimage, starsfilename)
-          self.show()
 
     self.image += self.starimage
-    self.show()
+
     self.addInputLabels()
     if self.camera.testpattern:
       self.header['ISTARS'] = ('True', 'stars from a test pattern')
@@ -645,7 +672,7 @@ class CCD(Talker):
     '''Add cosmic rays to image.'''
 
     # print update
-    self.speak('Adding cosmic rays')
+    self.speak('adding cosmic rays')
 
     # filenames, in case saving is required
 
@@ -667,13 +694,13 @@ class CCD(Talker):
       self.header['ICOSMICS'] = ('True', 'cosmic rays injected')
     else:
       self.header['ICOSMICS'] = ('False', 'cosmic rays injected')
-    self.show()
+
     return image
 
   def bleedSaturated(self, plot=False):
     '''Bleed saturated pixels in the image.'''
 
-    self.speak('Bleeding saturated pixels.')
+    self.speak('bleeding saturated pixels')
 
     # keep track of the original image
     untouched = self.image + 0.0
@@ -747,11 +774,9 @@ class CCD(Talker):
                   self.image[leftedge,x] += leftoverflux/2.0
               except:
                 self.speak("this star seems to saturate the entire detector!")
-      self.speak("on pass #{0} through saturation filter: the max saturation fraction is {1}; and the flux change over entire image is {2} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
-      #self.display=True
-      #self.show()
-      #self.display=False
-      #self.input('saturation?')
+      self.speak("    on pass #{0} through saturation filter:".format(count))
+      self.speak("        the max saturation fraction is {1:.2f}; flux change over entire image is {2:.2f} electrons".format(count, np.max(self.image)/saturation_limit, np.sum(self.image) - original))
+
 
       # KLUDGE to prevent endless loops
       stilloversaturated = (self.image > saturation_limit).any() and count < 10
@@ -765,15 +790,13 @@ class CCD(Talker):
     self.addInputLabels()
     self.header['ISATURAT'] = ('True', 'bleed trails for saturated pixels')
 
-    self.show()
-
   def addBackgrounds(self):
     '''Add smooth backgrounds (zodiacal light and unresolved stars) to background.'''
 
     # set up filenames for saving background, if need be
     self.note = 'backgrounds'
     backgroundsfilename = self.directory + self.note + '.fits'
-    self.speak("Adding backgrounds.")
+    self.speak("adding backgrounds")
 
     # if the background image already exists, just load it
     try:
@@ -792,14 +815,14 @@ class CCD(Talker):
         glon, glat = self.pixels().galactic.tuple
 
         # add the zodiacal light, using the simple model from Josh and Peter on the TESS wiki
-        self.speak( "   including smooth model for zodiacal light.")
+        self.speak( "   including smooth model for zodiacal light")
         elon, elat
         self.backgroundimage += self.zodicalBackground(elon, elat)*self.camera.cadence
         self.addInputLabels()
         self.header['IZODIACA'] = ('True', 'zodiacal light, treated as smooth')
 
         # add unresolved background light, using the simple model from Josh and Peter on the TESS wiki
-        self.speak( "   including smooth model for unresolved stars in the Galaxy.")
+        self.speak( "   including smooth model for unresolved stars in the Galaxy")
         self.backgroundimage += self.unresolvedBackground(glon, glat)*self.camera.cadence
         self.header['IUNRESOL'] = ('True', 'unresolved stars, treated as smooth background')
 
@@ -808,13 +831,12 @@ class CCD(Talker):
 
     # add the background image to the total image
     self.image += self.backgroundimage
-    self.show()
 
   def addPhotonNoise(self):
     '''Add photon noise into an image.'''
 
     self.noiseimage = self.zeros()
-    self.speak("Adding photon noise [sqrt(photons from stars and various backgrounds)].")
+    self.speak("adding photon noise [sqrt(photons from stars and various backgrounds)]")
     noise_variance = self.image
     ok = noise_variance > 0
 
@@ -831,12 +853,11 @@ class CCD(Talker):
       self.writeToFITS(noise,noisefilename)
     self.addInputLabels()
     self.header['IPHOTNOI'] = ('True', 'photon noise')
-    self.show()
 
   def addReadNoise(self):
     '''Add read noise to image.'''
-    self.speak("Adding read noise.")
-    self.speak("    = quadrature sum of [{0} seconds]/[{1} seconds] = {2} reads with {3} e- each.".format(self.camera.cadence,self.camera.singleread, self.camera.cadence/self.camera.singleread, self.camera.read_noise))
+    self.speak("adding read noise")
+    self.speak("    = quadrature sum of {2:.0f} reads with {3} e- each.".format(self.camera.cadence,self.camera.singleread, self.camera.cadence/self.camera.singleread, self.camera.read_noise))
 
     # calculate the variance due to read noise
     noise_variance = self.camera.cadence/self.camera.singleread*self.camera.read_noise**2
@@ -851,12 +872,11 @@ class CCD(Talker):
     # update image header
     self.addInputLabels()
     self.header['IREADNOI'] = ('True', 'read noise')
-    self.show()
 
 
   def addSmear(self):
     '''Smear the image along the readout direction.'''
-    self.speak("Adding readout smear.")
+    self.speak("adding readout smear")
     self.speak("    assuming {0} second readout times on {1} second exposures.".format(self.camera.readouttime,self.camera.singleread))
 
 
@@ -872,29 +892,34 @@ class CCD(Talker):
     # update header
     self.addInputLabels()
     self.header['ISMEAR'] = ('True', 'smearing during transer to frame store')
-    self.show()
 
 
   def expose(self,
                     plot=False, # should we make plots with this exposure?
                     jitter=False, # should this exposure be jittered?
-                    write=False, # should this exposure write out to file(s)?
+                    writesimulated=False, # should this exposure write to file?
                     remake=False, # should we remake stars (might try not to)?
                     smear=True, # should readout smear be included?
-                    cosmics='fancy', # what kind of cosmics should be included?
-                    diffusion=False, # should diffusion of cosmics be done?
-                    correctcosmics=True, # should we pretend cosmics don't exist?
-                    writenoiseless=True, # should we write an image with no noise?
+                    cosmicsversion='fancy', # what kind of cosmics should be included?
+                    cosmicsdiffusion=False, # should diffusion of cosmics be done?
                     skipcosmics=False, # should we skip cosmic injection?
+                    correctcosmics=False, # should we pretend cosmics don't exist?
+                    writecosmics=False, # should the cosmics image write to file?
+                    writenoiseless=False, # should we write an image with no noise?
                     jitterscale=1.0, # should we rescale the jitter?
+                    display=False, # should we display this image in ds9?
                     **kwargs):
+
     '''Expose an image on this CCD.'''
     self.plot = plot
+    self.display=display
 
     # create a blank image
     self.image = self.zeros()
 
+    # populate the basics of the header
     self.populateHeader()
+
     # jitter the camera, or at least update the
     if jitter:
       self.camera.jitter.applyNudge(self.camera.counter, header=self.header, scale=jitterscale)
@@ -905,11 +930,10 @@ class CCD(Talker):
     # add galaxies to the image
     self.addGalaxies()
 
-
     # add background to the image
     self.addBackgrounds()
 
-    if write==False:
+    if writesimulated==False:
       stars = self.image + 0.0
 
     if writenoiseless:
@@ -927,7 +951,7 @@ class CCD(Talker):
 
     if skipcosmics == False:
       # add cosmic rays to the image (after noise, because the *sub-Poisson* noise is already modeled with the Fano factor)
-      cosmics = self.addCosmics(write=write, version=cosmics, diffusion=diffusion, correctcosmics=correctcosmics)
+      cosmics = self.addCosmics(write=writecosmics, version=cosmicsversion, diffusion=cosmicsdiffusion, correctcosmics=correctcosmics)
 
     # add smear from the finite frame transfer time
     if smear:
@@ -948,7 +972,7 @@ class CCD(Talker):
       self.speak('no stamps found; skipping stampify!')
 
     # write the image
-    if write:
+    if writesimulated:
       self.writeFinal()
 
     self.report("created image #{counter:07d} of {pos_string} with {cadence:.0f}s cadence".format(counter=self.camera.counter, pos_string=self.pos_string, cadence=self.camera.cadence))
@@ -957,7 +981,9 @@ class CCD(Talker):
     if self == self.camera.ccds[-1]:
       self.camera.advanceCounter()
 
-    if write==False:
+    self.show()
+
+    if writesimulated==False:
       return self.image, cosmics, stars
 
 

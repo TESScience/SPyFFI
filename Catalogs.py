@@ -135,7 +135,6 @@ class Catalog(Talker):
     # return the current positions
     return raindegrees, decindegrees
 
-
   def plot(self, epoch=2018.0):
     plt.ion()
     plt.figure('star chart')
@@ -190,7 +189,6 @@ class Catalog(Talker):
     t.write(outfile, format='ascii.fixed_width', delimiter=' ')
     self.speak("save projected star catalog {0}".format(outfile))
 
-
 class TestPattern(Catalog):
   '''a test pattern catalog, creating a grid of stars to fill an image'''
   def __init__(self, **kwargs):
@@ -200,28 +198,49 @@ class TestPattern(Catalog):
     Catalog.__init__(self)
     self.load(**kwargs)
 
-  def load(self, size=3000.0, spacing=200.0, magnitudes=[6,16], ra=0.0, dec=0.0, random=False, nudge=21.1, pm=0.0, **kwargs):
+  def load(self,
+                    size=3000.0, # the overall size of the grid
+                    spacing=200.0, # how far apart are stars from each other (")
+                    magnitudes=[6,16], # list of min, max magnitudes
+                    ra=0.0, dec=0.0, # made-up center of pattern
+                    randomizenudgesby = 21.1, # how far to nudge stars (")
+                    randomizepropermotionsby = 0.0, # random prop. mot. (mas/yr)
+                    randomizemagnitudes=False, # randomize the magnitudes?
+                    **kwargs):
 
+    # set the name of the catalog
     self.name = 'testpattern_{0:.0f}to{1:.0f}'.format(np.min(magnitudes), np.max(magnitudes))
+
     # how many stars do we need?
     pixels = np.maximum(np.int(size/spacing), 1)
     n = pixels**2
 
     # construct a linear grid of magnitudes
     self.tmag = np.linspace(np.min(magnitudes), np.max(magnitudes),n)[::-1]
+
+    # create a rigid grid of RA and Dec, centered at 0
     ras, decs = np.meshgrid(np.arange(pixels)*spacing, np.arange(pixels)*spacing)
+
+    # offset these (not, make small angle approximations which will fail!)
     self.dec = ((decs - np.mean(decs))/3600.0 + dec).flatten()
     self.ra = (ras - np.mean(ras)).flatten()/np.cos(self.dec*np.pi/180.0)/3600.0 + ra
-    if random:
-      self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
-      offset = nudge*(np.random.rand(2, n) - 0.5)/3600.0
-      self.dec += offset[0,:]
-      self.ra += offset[1,:]
 
-    if pm > 0:
-      self.pmra, self.pmdec = np.random.normal(0,pm,n), np.random.normal(0,pm, n)
+    # randomly nudge all of the stars (to prevent hitting same parts of pixels)
+    if randomizenudgesby > 0:
+      offset = randomizenudgesby*(np.random.rand(2, n) - 0.5)/3600.0
+      self.dec += offset[0,:]
+      self.ra += offset[1,:]*np.cos(self.dec*np.pi/180.0)
+
+    # draw the magnitudes of the stars totally randomly
+    if randomizemagnitudes:
+      self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
+    assert(randomizemagnitudes)
+    # make up some imaginary proper motions
+    if randomizepropermotionsby > 0:
+      self.pmra = np.random.normal(0,randomizepropermotionsby,n)
+      self.pmdec = np.random.normal(0,randomizepropermotionsby,n)
     else:
-      self.pmra, self.pmdec = 0, 0
+      self.pmra, self.pmdec = np.zeros(n), np.zeros(n)
     self.epoch = 2018.0
     self.temperature = 5800.0 + np.zeros_like(self.ra)
 
@@ -234,10 +253,13 @@ class UCAC4(Catalog):
   def __init__(self,   ra=0.0, dec=90.0,
             radius=0.2,
             write=True,
-            faint=10, **kwargs):
+            faint=10,
+            fast=False, **kwargs):
 
     # initialize this catalog
     Catalog.__init__(self)
+    if fast:
+        radius *= 0.1
     self.load(ra=ra, dec=dec, radius=radius, write=write)
 
   def load(self, ra=0.0, dec=90.0, radius=0.2, write=True):

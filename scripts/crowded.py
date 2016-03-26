@@ -7,4 +7,4 @@ ccds = o.camera.ccds*1
 for c in ccds:
     o.camera.ccds = [c]
     o.camera.catalog.addLCs(fmax=1.0, magmax=None)
-    o.create(todo={2:1})
+    o.create(cadencestodo={2:1})
