@@ -3,103 +3,346 @@ import settings
 import Intrapixel
 from CCD import CCD
 from Cartographer import Cartographer
+from scipy.io import loadmat
+from zachopy.displays.ds9 import ds9
 
 # define everything related to PSFs
 class PSF(Talker):
 
     # initialize the PSF class
-    def __init__(self, camera=None):
+    def __init__(self,  camera=None,
+                        version=None,
+                        debprefix='woods_prf_feb2016/RAYS_ptSrc_wSi_Oct27model_AP40.6_75C_F3p314adj',
+                        focus_toinclude=[0,10], stellartemp_toinclude=[4350],
+                        nsubpixelsperpixel=101, npixels=21):
 
         # decide whether or not this PSF is chatty
         Talker.__init__(self, mute=False, pithy=False)
-        self.speak("initializing the TESS point spread function painter.")
 
         # link this PSF to a Camera (hopefully one with a Cartographer)
         self.setCamera(camera)
 
-        # parameters used for generating the binned PSF library
-        self.version = 'original'
-        self.dtemperature = 10000    # the step in temperature, stamper will choose nearest
-        self.noffset = 21#5           # number of sub-pixel offsets, stamper will interpolate between offsets
-        self.drotation = 10#90         # number of rotation angles for PSF's (0-360), stamper will ???
-        self.nradii = 10           # number of radial focalplaneradius for PSF's, stamper will ???
+        # the debprefix sets the basic input of data to the PSFs
+        self.debprefix = debprefix
+        self.version=version
+        self.speak("initializing PSF painter, based on {}".format(self.debprefix))
 
-        # create the necessary x,y pixel grids for painting PSFs (at both high and low resolution)
-        self.setupPixelArrays()
+        # the basic geometry of the unbinned pixels
+        self.nsubpixelsperpixel = nsubpixelsperpixel
+        self.npixels = npixels
+
+        # limit the library, to keep things manageable memory-wise
+        self.focus_toinclude = focus_toinclude
+        self.stellartemp_toinclude = stellartemp_toinclude
 
         # fill in an intrapixel sensitivity
-        self.intrapixel = Intrapixel.Perfect(nsubpixels=self.numberof_subpixelsforintegrating)
+        self.intrapixel = Intrapixel.Perfect()
 
-        # if possible, associate a Camera object with this PSF
-        self.setCamera(camera)
-        #self.populateBinned()
-        self.populateHeader()
+        self.display = ds9('PSF')
+        #self.populateJitteredPSFLibrary()
+        self.populateBinned()
+        #self.populateHeader()
 
+    def findAvailable(self):
+        '''find the available matlab structure files from Deb'''
+        self.debfiles = []
+        for focus in self.focus_toinclude:
+            self.debfiles.extend(glob.glob(settings.inputs + self.debprefix + '_hx*_hy*_foc{:.0f}umPRFs.mat'.format(focus)))
+        self.speak('there are {} files from Deb, spanning focus of {}'.format(len(self.debfiles), self.focus_toinclude))
+        assert(len(self.debfiles)>0)
 
     @property
-    def versiondirectory(self):
-        d = settings.prefix + 'intermediates/' + self.version + '/'
+    def deblibrarydirectory(self):
+        f = '{:.0f}'.format
+        d = self.versiondirectory + 'focus{}_stellartemp{}/'.format(
+                                        'and'.join(map(f,self.focus_toinclude)),
+                                        'and'.join(map(f,self.stellartemp_toinclude)))
         zachopy.utils.mkdir(d)
         return d
 
+    def populateUnjitteredPSFLibrary(self):
+        '''populate (from scratch), a library of Deb's PRFs'''
+
+        filename = self.deblibrarydirectory + 'originaldeblibrary.npy'
+        try:
+            self.psflibrary = np.load(filename)[0]
+            self.speak('loaded original Deb library from {0}'.format(filename))
+        except IOError:
+
+            # figure out the available files to load
+            self.findAvailable()
+
+            # create an empty dictionary
+            self.psflibrary = {}
+            # will be indexed as focus, stellar stellartemp, fieldx, fieldy
+
+            # loop through the files, and populate the dictionary
+            for i, debfile in enumerate(self.debfiles):
+                self.speak('ingesting file {} of {}'.format(i, len(self.debfiles)))
+                self.ingestDebFile(debfile)
+
+            self.speak('saving original Deb library to {}'.format(filename))
+            np.save(filename, (self.psflibrary,))
+
+        # this library hasn't been jittered by anything
+        self.jitteredby = None
+
+        # summarize what exists in the library (and define the arrays)
+        self.summarizeLibrary()
+
+        # to deal with edge effects near x=0 and y=0
+        # rows (first indices are y, columns are x!)
+        for focus in self.unbinned_axes['focus']:
+            for stellartemp in self.unbinned_axes['stellartemp']:
+                # MAKE SURE I HAVE THE TRANSPOSES RIGHT!
+                # add entries that are flipped through x=0
+                fieldx = np.min(self.unbinned_axes['fieldx_mm'])
+                self.psflibrary[focus][stellartemp][-fieldx] = {}
+                for fieldy in self.unbinned_axes['fieldy_mm']:
+                    self.psflibrary[focus][stellartemp][-fieldx][fieldy] = self.psflibrary[focus][stellartemp][fieldx][fieldy][::1,::-1]
+
+                # add entries that are flipped through y=0
+                fieldy = np.min(self.unbinned_axes['fieldy_mm'])
+                self.psflibrary[focus][stellartemp][-fieldx][-fieldy] = self.psflibrary[focus][stellartemp][fieldx][fieldy][::-1,::-1]
+                for fieldx in self.unbinned_axes['fieldx_mm']:
+                    self.psflibrary[focus][stellartemp][fieldx][-fieldy] = self.psflibrary[focus][stellartemp][fieldx][fieldy][::-1,::1]
+
+        self.summarizeLibrary()
+
+    def snaptogrid(self, xvalue, yvalue):
+        '''Deb's models are almost but not exactly on a perfect grid in x and y
+            detector coordinates. So, we have to define a grid that they can
+            snap to, for the sake of making indexing work.
+
+            Be careful, this might be introducing some overall distortions
+            to the field geometry! (Or does it?)'''
+
+        # self.physicalpixelsize is in cm, positions are in mm
+        # have a position tolerance of about 2 pixels
+        tolerance = 2*self.camera.physicalpixelsize*10.0
+        # tolerance = 1.0/30.0 (kludge)
+        # tolerance = 3*21.0/60.0/60.0 (from degrees)
+
+        # find the closest in the grid, if it's within tolerance, snap to it!
+        #  otherwise, add new gridpoint, which subsequent points will snap to
+
+
+        try:
+            self.xgrid, self.ygrid
+        except AttributeError:
+            self.xgrid, self.ygrid = [xvalue],[yvalue]
+
+        def addorsnap(grid, value):
+            nearest = zachopy.utils.find_nearest(np.sort(grid), value)
+            offset = np.abs(value - nearest)
+            if offset < tolerance:
+                self.speak('snapped {:.5f} to {:.5f}'.format(value, nearest))
+                return nearest
+            else:
+                grid.append(value)
+                self.speak('added {:.5f} to grid')
+                for g in grid:
+                    self.speak('  {0:.5f}'.format(g))
+                return value
+
+        self.speak('snapping the x-coordinate')
+        xsnapped = addorsnap(self.xgrid, xvalue)
+        self.speak('snapping the y-coordinate')
+        ysnapped = addorsnap(self.ygrid, yvalue)
+
+        return xsnapped, ysnapped
+
+    def summarizeLibrary(self):
+        '''print out all the keys in the Deb library'''
+        keys = ['focus', 'stellartemp', 'fieldx_mm', 'fieldy_mm']
+        counts = {}
+        for k in keys:
+            counts[k] = 0
+
+        # create empty dictionary to store the axes along with the raw PSFs are sampled
+        self.unbinned_axes = {}
+
+        # loop through the nest of the dictionary
+        self.unbinned_axes['focus'] = np.sort(self.psflibrary.keys())
+        for focus in self.unbinned_axes['focus']:
+            counts['focus'] += 1
+            self.speak('focus={:.0f}um'.format(focus))
+            self.unbinned_axes['stellartemp'] = np.sort(self.psflibrary[focus].keys())
+            for stellartemp in self.unbinned_axes['stellartemp']:
+                counts['stellartemp'] += 1
+                self.speak('  stellartemp={:.0f}K'.format(stellartemp))
+                self.unbinned_axes['fieldx_mm'] = np.sort(self.psflibrary[focus][stellartemp].keys())
+                for fieldx in self.unbinned_axes['fieldx_mm']:
+                    counts['fieldx_mm'] += 1
+                    self.speak('    fieldx={:.3f}mm'.format(fieldx))
+                    self.unbinned_axes['fieldy_mm'] = np.sort(self.psflibrary[focus][stellartemp][fieldx].keys())
+                    for fieldy in self.unbinned_axes['fieldy_mm']:
+                        counts['fieldy_mm'] += 1
+                        self.speak('      fieldy={:.3f}mm'.format(fieldy))
+
+        # give a quick numerical summary
+        self.speak('library contains:')
+        for k in keys:
+            self.speak('   {} {} entries'.format(counts[k], k))
+
+        #
+        self.speak('it has been jittered by {}'.format(self.jitteredby))
 
     @property
-    def plotdirectory(self):
-        d = settings.prefix + 'plots/' + self.version + '/'
+    def quickloadingdirectory(self):
+        d = self.versiondirectory + 'scratch/'
         zachopy.utils.mkdir(d)
         return d
+
+    def ingestDebFile(self, debfile):
+        '''load a matlab structure containing PRFs at various subpixel offsets,
+            at a particular position on the detector (and focus)'''
+
+        self.speak('loading PSF from {}'.format(debfile))
+
+        quicksummaryfilename = self.quickloadingdirectory + os.path.basename(debfile) + '.summary.npy'
+        quickPSFfilename = self.quickloadingdirectory + os.path.basename(debfile) + '.PSF.npy'
+        try:
+            self.speak('trying to load quickfile from {}'.format(quickPSFfilename))
+            stellartemps, focuss, fieldxs, fieldys = np.load(quicksummaryfilename)
+            PSFs = np.load(quickPSFfilename)
+            self.speak(' ...succeeded!')
+        except IOError:
+            self.speak(' ...failed!')
+            self.speak('loading original from {}'.format(debfile))
+            mat = loadmat(debfile)['PRF_stellar']
+
+            # pull out the stuff we're interested in
+            n = mat['stellar_temp'][0,:].size
+            stellartemps = [mat['stellar_temp'][0,i][0][0] for i in range(n)]
+            focuss = [mat['focus_mm'][0,i][0][0] for i in range(n)]
+            fieldxs = [mat['field_position'][0,i][0][0] for i in range(n)]
+            fieldys = [mat['field_position'][0,i][0][1] for i in range(n)]
+            PSFs = np.array([mat['PSFimage'][0,i].astype(np.float32) for i in range(n)])
+            assert(np.isfinite(PSFs).all())
+
+            # save for faster future loading
+            np.save(quicksummaryfilename, (stellartemps, focuss, fieldxs, fieldys))
+            np.save(quickPSFfilename, PSFs)
+
+
+
+        for i in range(len(stellartemps)):
+            stellartemp = stellartemps[i]
+            if stellartemp in self.stellartemp_toinclude:
+                focus = focuss[i]
+                fieldx, fieldy = self.snaptogrid(fieldxs[i], fieldys[i])
+                # transpose the PSF, so rows become columsn
+                PSF = PSFs[i].T
+
+                # add it to the dictionary (with cascade of trys, to define nests)
+                try:
+                    self.psflibrary[focus]
+                except KeyError:
+                    self.psflibrary[focus] = {}
+                finally:
+                    try:
+                        self.psflibrary[focus][stellartemp]
+                    except KeyError:
+                        self.psflibrary[focus][stellartemp] = {}
+                    finally:
+                        try:
+                            self.psflibrary[focus][stellartemp][fieldx]
+                        except KeyError:
+                            self.psflibrary[focus][stellartemp][fieldx] = {}
+                        finally:
+                            try:
+                                self.psflibrary[focus][stellartemp][fieldx][fieldy]
+                            except KeyError:
+                                self.psflibrary[focus][stellartemp][fieldx][fieldy] = {}
+                            finally:
+                                self.psflibrary[focus][stellartemp][fieldx][fieldy] = PSF
+
+                self.speak('added PSF at:')
+                self.speak('   focus = {:.0f}'.format(focus))
+                self.speak('   stellartemp = {:.0f}'.format(stellartemp))
+                self.speak('   fieldx = {:.3f}'.format(fieldx))
+                self.speak('   fieldy = {:.3f}'.format(fieldy))
+
+        #self.display.one(PSF.T)
+        self.setupPixelArrays()
 
 
     def setupPixelArrays(self):
-        '''Set up the pixel coordinate arrays, neede both for integrating the high resolution PSFs and for painting on binned PSFs.'''
+        '''set up pixel coordinate arrays, for raw unbinned, for intermediate binned, and for pixel-integrated'''
 
-        # try to load the pixel coordinate arrays from saved file (this done not for speedup, but to ensure that all subsequent work will be using the correct arrays for this version)
-        arraysfilename = self.versiondirectory + 'pixelarrays.npy'
         try:
-            # try loading these from a file
-            self.initial_binning, self.subpixelsforintegrating_size, self.numberof_subpixelsforintegrating  = np.load(arraysfilename)
-            self.speak('loaded PSF subpixel array definitions from {0}'.format(arraysfilename))
-        except IOError:
-            # otherwise, create them from scratch
-            if self.version == 'original':
-                # details related to the orginal PSF files from Deb, by way of Peter.
-                self.initial_binning = 4                            # how much to bin the original (very high resolution, from Deb) PSFs before integrating over the pixels
-                self.subpixelsforintegrating_size = 0.25/15.0*self.initial_binning    # with this binning, how big is each subpixelsforintegratingel in the high resolution PSF?
-                self.numberof_subpixelsforintegrating = 960/self.initial_binning             # how many subpixelsforintegratingels are there in the high resolution PSF image?
-            # save these arrays for future use
-            np.save(arraysfilename, (self.initial_binning, self.subpixelsforintegrating_size, self.numberof_subpixelsforintegrating))
-            self.speak('save PSF subpixel array definitions to {0}'.format(arraysfilename))
-
-        # define grids of subpixel offsets (positive and negative, centered on 0.0, 0.0), over which the PSF integration will be carried out
-        # (how far are the *centers* of the subpixels from the star's focalplaneradius?)
-        self.dx_subpixelsforintegrating_axis = np.arange(self.numberof_subpixelsforintegrating)*self.subpixelsforintegrating_size
-        self.dx_subpixelsforintegrating_axis -= np.mean(self.dx_subpixelsforintegrating_axis)
-        self.dy_subpixelsforintegrating_axis = self.dx_subpixelsforintegrating_axis
-        self.dx_subpixelsforintegrating, self.dy_subpixelsforintegrating = np.meshgrid(self.dx_subpixelsforintegrating_axis, self.dy_subpixelsforintegrating_axis)
-
-        # create a grid of full pixels that would contain at least some subpixels, centered on 0.0, 0.0
-        left, right = self.subpixel2pixel((np.min(self.dx_subpixelsforintegrating), np.max(self.dx_subpixelsforintegrating)))
-        bottom, top = self.subpixel2pixel((np.min(self.dy_subpixelsforintegrating), np.max(self.dy_subpixelsforintegrating)))
-        self.dx_pixels_axis = np.arange(left, right+1)
-        self.dy_pixels_axis = np.arange(bottom, top+1)
-        self.dx_pixels, self.dy_pixels = np.meshgrid(self.dx_pixels_axis, self.dy_pixels_axis)
-
-        # define arrays for the edges of the pixels
-        self.dx_pixels_edges = np.zeros(self.dx_pixels_axis.size+1)
-        self.dx_pixels_edges[0:-1] = self.dx_pixels_axis - 0.5
-        self.dx_pixels_edges[-1] = self.dx_pixels_edges[-2] + 1.0
-        self.dy_pixels_edges = np.zeros(self.dy_pixels_axis.size+1)
-        self.dy_pixels_edges[0:-1] = self.dy_pixels_axis - 0.5
-        self.dy_pixels_edges[-1] = self.dy_pixels_edges[-2] + 1.0
+            self.dx_subpixels
+            return
+        except AttributeError:
+            self.speak('setting up the pixel arrays')
 
 
-        # create a subarray CCD with these parameters, to aid pixelization calculations
-        self.ccd = CCD(camera=self.camera, subarray=self.dx_pixels.shape[0], number=1, label='PSF')
-        self.cartographer = Cartographer(camera=self.ccd.camera, ccd=self.ccd)
-        self.cartographer.pithy = True
+            # how many subpixels are available per pixel
+            self.unbinned_nsubpixelsperpixel = self.nsubpixelsperpixel
+            # the size of an individual subpixel, in units of pixels
+            self.unbinned_subpixelsize = 1.0/self.unbinned_nsubpixelsperpixel
+            # how big is the stamp around the PSF, in pixels
+            self.unbinned_npixels = self.npixels
+            # the expected total size of the PSF in subpixels
+            self.unbinned_nsubpixels = self.unbinned_nsubpixelsperpixel*self.unbinned_npixels
+            # the actual size of the PSF image
+            self.dx_subpixelsize, self.dy_subpixelsize = self.npixels*self.nsubpixelsperpixel, self.npixels*self.nsubpixelsperpixel
+            # make sure the PSF image size is what we expect
+            assert(self.dx_subpixelsize == self.unbinned_nsubpixels)
+
+            # define arrays and grid of subpixel x-y coordinates (in pixels) for the PSF image
+            self.dx_subpixels_axis = np.arange(self.unbinned_nsubpixels)*self.unbinned_subpixelsize
+            self.dx_subpixels_axis -= np.mean(self.dx_subpixels_axis)
+            self.dy_subpixels_axis = self.dx_subpixels_axis + 0.0
+            self.dx_subpixels, self.dy_subpixels = np.meshgrid(self.dx_subpixels_axis, self.dy_subpixels_axis)
+
+            # create a grid of (rounded) full pixels that would contain at least some subpixels, centered on 0.0, 0.0
+            left, right = self.subpixel2pixel([np.min(self.dx_subpixels), np.max(self.dx_subpixels)])
+            bottom, top = self.subpixel2pixel([np.min(self.dy_subpixels), np.max(self.dy_subpixels)])
+            self.dx_pixels_axis = np.arange(left, right+1)
+            self.dy_pixels_axis = np.arange(bottom, top+1)
+            self.dx_pixels, self.dy_pixels = np.meshgrid(self.dx_pixels_axis, self.dy_pixels_axis)
+
+            # define arrays for the edges of the pixels
+            self.dx_pixels_edges = np.zeros(self.dx_pixels_axis.size+1)
+            self.dx_pixels_edges[0:-1] = self.dx_pixels_axis - 0.5
+            self.dx_pixels_edges[-1] = self.dx_pixels_edges[-2] + 1.0
+            self.dy_pixels_edges = np.zeros(self.dy_pixels_axis.size+1)
+            self.dy_pixels_edges[0:-1] = self.dy_pixels_axis - 0.5
+            self.dy_pixels_edges[-1] = self.dy_pixels_edges[-2] + 1.0
+
+            self.speak('created pixel coordinate arrays')
+
+            # create a subarray CCD with these parameters, to aid pixelization calculations
+            self.ccd = CCD(camera=self.camera, subarray=self.dx_pixels.shape[0], number=1, label='PSF')
+            self.cartographer = Cartographer(camera=self.ccd.camera, ccd=self.ccd)
+            self.cartographer.pithy = True
+
+    @property
+    def basedirectory(self):
+        '''the directory in which all processed PSF data will be stored'''
+        d = settings.intermediates + 'psfs/'
+        zachopy.utils.mkdir(d)
+        return d
+
+    @property
+    def versiondirectory(self):
+        '''the directory for this particular version of the PSFs'''
+        d = self.basedirectory + self.version + '/'
+        zachopy.utils.mkdir(d)
+        return d
+
+    @property
+    def plotdirectory(self):
+        '''the directory where plots should be stored'''
+        d = self.versiondirectory + 'plots/'
+        zachopy.utils.mkdir(d)
+        return d
+
 
     def subpixel2pixel(self,anysubpixel):
-        '''Convert from fractional pixel to an integer pixel (pixel centers are at 0.0's; edges are at 0.5's).'''
+        '''convert from fractional pixel to an integer pixel (pixel centers are at 0.0's; edges are at 0.5's).'''
         return np.round(anysubpixel).astype(np.int)
 
 
@@ -114,329 +357,166 @@ class PSF(Talker):
         self.header[''] = ('', '')
         self.header['PRF'] = ''
         self.header['PRFNOTE'] = ('','Pixel Response Function library parameters')
-        self.header['PLIBDTEM'] = (self.dtemperature, '[K] d(effective temperature)')
-        self.header['PLIBNOFF'] = (self.noffset, '# of subpixel offsets, in both x and y')
-        self.header['PLIBDROT'] = (self.drotation, '[deg] d(rotation around center)')
-        self.header['PLIBNRAD'] = (self.nradii, '# of radial distances from field center')
-        self.header['PSUBSIZE'] = (self.subpixelsforintegrating_size, '[pix] subpixel size in PSF integral')
-        #self.header['PNSUBPIX'] = (self.numberof_subpixelsforintegrating, '[pix] # of subpixels used for initial PSF integration')
+        #self.header['PLIBDTEM'] = (self.dstellartemp, '[K] d(effective stellartemp)')
+        #self.header['PLIBNOFF'] = (self.noffset, '# of subpixel offsets, in both x and y')
+        #self.header['PLIBDROT'] = (self.drotation, '[deg] d(rotation around center)')
+        #self.header['PLIBNRAD'] = (self.nradii, '# of radial distances from field center')
+        #self.header['PSUBSIZE'] = (unbinned_subpixelsize, '[pix] subpixel size in PSF integral')
+        #self.header['PNSUBPIX'] = (unbinned_nsubpixels, '[pix] # of subpixels used for initial PSF integration')
         #self.header['PPIXSIZE'] = (self.pixsize, '[pix] pixel size')
 
 
-    def populateHighResolutionMonochromaticLibrary(self, plot=True, inspect=False):
-        '''Load the high resolution PSFs from Deb, which are monochromatic and unjittered.'''
+    def populateJitteredPSFLibrary(self):
+        '''convolve Deb's PSFs with a jittermap, at the camera's cadence'''
+        self.speak('populating the jittered PSF library')
+        jitteredfilename = self.deblibrarydirectory + 'jitteredlibrary_{}.npy'.format(self.camera.jitter.basename)
 
-        self.speak("populating the raw, monochromatic, PSF library")
-        monochromatic_filename = self.versiondirectory + 'monochromatic_psfs.npy'
         try:
-            # maybe we can load from a preprocessed file?
-            (self.monochromaticlibrary, self.focalplaneradii, self.wavelengths)  = np.load(monochromatic_filename)
-            self.speak("loaded high-resolution monochromatic library from {0}".format(monochromatic_filename))
-        except IOError:
-            # load the high resolution PSF's from a FITs file
-            deb_filename = settings.prefix + 'inputs/psfs_3p33.fits'
-            data = astropy.io.fits.open(deb_filename)[0].data
-            self.speak("loaded high-resolution monochromatic library from {0}".format(deb_filename))
-
-            # trim the high resolution PSF, so that an even number of whole pixels is included
-            assert(data.shape[2] == data.shape[3])
-            binned = zachopy.utils.rebin(data,data.shape[0], data.shape[1], data.shape[2]/self.initial_binning, data.shape[3]/self.initial_binning)
-            ntrim = (binned.shape[2] - self.numberof_subpixelsforintegrating)/2
-            data = binned[:,:,ntrim:-ntrim,ntrim:-ntrim]
-
-            # define some useful counts
-            nfocalplaneradii, nwavelengths, nxs, nys = data.shape
-            assert(nxs == nys)
-
-            # create an empty monochromatic PSF library
-            self.monochromaticlibrary = {}
-
-            # input the focalplaneradius and wavelength coordinates that Deb used
-            focalplaneradii = np.array([0,0.5,1.0,np.sqrt(2)])*2048
-            wavelengths = 0.675 + np.arange(nwavelengths)*0.05
-
-            # keep track of these
-            self.focalplaneradii = focalplaneradii
-            self.wavelengths = wavelengths
-
-            if plot:
-                # create a grid of axes and set up the coordinate system
-                fi, ax_psf_fits  = plt.subplots(data.shape[0],data.shape[1], figsize=(25.95, 9.8), sharex=True, sharey=True)
-                extent=[self.dx_subpixelsforintegrating_axis.min(), self.dx_subpixelsforintegrating_axis.max(), self.dy_subpixelsforintegrating_axis.min(), self.dy_subpixelsforintegrating_axis.max()]
-
-            # loop over focalplaneradii
-            for i in range(nfocalplaneradii):
-                # populate a dictionary of dictionaries
-                self.monochromaticlibrary[focalplaneradii[i]] = {}
-
-                # loop over wavelengths
-                for j in range(nwavelengths):
-
-                    # store monochromatic PSF at right place in library
-                    self.monochromaticlibrary[focalplaneradii[i]][wavelengths[j]] = data[i,j,:,:]
-
-
-                    if plot:
-                        if inspect:
-                            try:
-                                # maybe we can clear and use existing axes
-                                for a in ax_psf_zoom:
-                                    a.cla()
-                            except:
-                                # create figure
-                                fig = plt.figure(figsize=(10,10))
-                                plt.subplots_adjust(hspace=0, wspace=0)
-                                ax_map = fig.add_subplot(2,2,3)
-                                ax_vert = fig.add_subplot(2,2,4, sharey=ax_map)
-                                ax_hori = fig.add_subplot(2,2,1, sharex=ax_map)
-                                ax_psf_zoom = [ax_map, ax_vert, ax_hori]
-
-                            # plot a big zoom of each monochromatic PSF, with histograms
-                            ax_hori.plot(self.dx_subpixelsforintegrating_axis, np.sum(self.monochromaticlibrary[focalplaneradii[i]][wavelengths[j]], 0))
-                            ax_vert.plot(np.sum(self.monochromaticlibrary[focalplaneradii[i]][wavelengths[j]], 1), self.dy_subpixelsforintegrating_axis)
-                            ax_map.imshow(np.sqrt(self.monochromaticlibrary[focalplaneradii[i]][wavelengths[j]]),extent=extent, cmap='gray_r', interpolation='nearest', vmin=0  )
-                            plt.draw()
-
-                        # populate a plot in the library grid
-                        ax_psf_fits[i,j].imshow(np.sqrt(self.monochromaticlibrary[focalplaneradii[i]][wavelengths[j]]), extent=extent, cmap='gray_r', interpolation='nearest', vmin=0 )
-                        if i == data.shape[0]-1:
-                            ax_psf_fits[i,j].set_xlabel("{0} micron".format(wavelengths[j]))
-
-                        if j == 0:
-                            ax_psf_fits[i,j].set_ylabel("{0:4.1f} pix.".format(focalplaneradii[i]))
-                        plt.subplots_adjust(hspace=0, wspace=0)
-            if plot:
-                plt.draw()
-                plotfilename = self.plotdirectory + 'monochromatic_psf_library.pdf'
-                plt.savefig(plotfilename)
-                self.speak('saved plot of high-resolution, monochromatic libarary to {0}'.format(plotfilename))
-
-            # save the library, so it'd be easier to load next time
-            np.save(monochromatic_filename,(self.monochromaticlibrary, self.focalplaneradii, self.wavelengths))
-            self.speak('saved high-resolution monochromatic to {0}'.format(monochromatic_filename))
-
-
-    def populateHighResolutionWavelengthIntegratedLibrary(self, plot=True):
-        '''Integrate the monochromatic PSFs into a (still unjittered) wavelength-integrated PSF library.'''
-
-        self.speak("populating the wavelength-integrated wavelength-integrated, high-resolution PSF library")
-        temperature_filename = self.versiondirectory + 'wavelengthintegrated_psfs.npy'
+            self.psflibrary
+            assert(self.jitteredby == self.camera.jitter.basename)
+            self.speak('already loaded into memory')
+            return
+        except (AttributeError,AssertionError):
+            self.speak('trying to load it from disk')
         try:
-            # maybe we can load a preprocessed file?
-            self.temperaturelibrary, self.temperatures, self.focalplaneradii = np.load(temperature_filename)
-            self.speak('loaded wavelength-integrated, high-resolution PSF library from {0}'.format(temperature_filename))
-        except:
-            self.speak('creating a wavelength-integrated, high-resolution PSF library')
-            # otherwise, we have to recalculate from scratch
-            try:
-                # make sure the monochromatic library has been populated
-                self.monochromaticlibrary
-            except:
-                self.populateHighResolutionMonochromaticLibrary()
+            # try to load the dictionary from memory
+            self.psflibrary, self.jitteredby = np.load(jitteredfilename)
 
-            # load weight coefficients calculated by Peter
-            weighting = astropy.io.fits.open(settings.prefix + 'inputs/ph_filt.fits')[0].data
+            # make sure the proper jittering has been applied
+            assert(self.jitteredby == self.camera.jitter.basename)
 
-            # create a grid of temperatures at which PSFs will be calculated
-            self.temperatures = np.arange(4000, 12001, self.dtemperature)
+            self.speak('loaded from {}'.format(jitteredfilename))
 
-            # define a handy function for plotting a PSF
-            if plot:
-                def plotPSF(psf, title=None, output=None):
-                    '''Plot a PSF.'''
-                    try:
-                        for a in self.ax_psf_zoom:
-                            a.cla()
-                    except:
-                        fig = plt.figure(figsize=(10,10))
-                        plt.subplots_adjust(hspace=0, wspace=0)
-                        ax_map = fig.add_subplot(2,2,3)
-                        ax_vert = fig.add_subplot(2,2,4, sharey=ax_map)
-                        ax_hori = fig.add_subplot(2,2,1, sharex=ax_map)
-                        self.ax_psf_zoom = (ax_map, ax_vert, ax_hori)
+            self.summarizeLibrary()
+        except (IOError,):
+            self.speak('could not load it, remaking it')
+            # make sure the unjittered library has been populated
+            self.populateUnjitteredPSFLibrary()
 
-                    (ax_map, ax_vert, ax_hori) = self.ax_psf_zoom
-                    ax_hori.plot(self.dx_subpixelsforintegrating_axis, np.sum(psf, 0)/np.sum(psf,0).max(), color='black', linewidth=3)
-                    ax_vert.plot(np.sum(psf, 1)/np.sum(psf,1).max(),self.dy_subpixelsforintegrating_axis, color='black', linewidth=3)
-                    ax_vert.semilogx()
-                    ax_hori.semilogy()
-                    ax_hori.set_ylim(1e-6,1e0)
-                    ax_vert.set_xlim(1e-6,1e0)
-
-                    ax_vert.tick_params(labelleft=False)
-                    ax_hori.tick_params(labelbottom=False)
-                    if title is not None:
-                        ax_hori.set_title(title)
-                    ax_map.imshow(np.sqrt(psf), cmap='gray_r', extent=[self.dx_subpixelsforintegrating_axis.min(), self.dx_subpixelsforintegrating_axis.max(), self.dy_subpixelsforintegrating_axis.min(), self.dy_subpixelsforintegrating_axis.max()],vmin=0.0,interpolation='nearest')
-                    plt.draw()
-                    if output is not None:
-                        ax_map.figure.savefig(output)
-                        self.speak("   saved PSF plot to {0}".format(output))
+            # jitter that library
+            self.speak('jittering all the PSFs in the library, using {} at cadence {}s'.format(self.camera.jitter.basename, self.camera.cadence))
+            for focus in self.unbinned_axes['focus']:
+                for stellartemp in self.unbinned_axes['stellartemp']:
+                    for fieldx in self.unbinned_axes['fieldx_mm']:
+                        for fieldy in self.unbinned_axes['fieldy_mm']:
+                            unjittered = self.psflibrary[focus][stellartemp][fieldx][fieldy]
+                            kernel = self.camera.jitter.jittermap[0]/np.sum(self.camera.jitter.jittermap[0])
+                            jittered = scipy.signal.convolve2d(unjittered, kernel, 'same', 'fill', 0).astype(np.float32)
+                            self.psflibrary[focus][stellartemp][fieldx][fieldy] = jittered
+                            self.speak('jittered focus={focus:.1f}, stellartemp={stellartemp:.0f}, fieldx={fieldx:.2f}, fieldy={fieldy:.2f}'.format(**locals()))
 
 
-            # loop over focal plane radii
-            self.speak('calculating wavelength-integrated PSFs at focalplaneradii of {0}'.format(self.focalplaneradii))
-            for focalplaneradius in self.focalplaneradii:
-                try:
-                    self.temperaturelibrary
-                except:
-                    self.temperaturelibrary = {}
+            # make sure to repopulate the summaries
+            self.summarizeLibrary()
 
-                # loop over stellar temperatures
-                self.speak('calculating wavelength-integrated PSFs at temperatures of {0}'.format(self.temperatures))
-                for temperature in self.temperatures:
-                    try:
-                        self.temperaturelibrary[focalplaneradius]
-                    except:
-                        self.temperaturelibrary[focalplaneradius] = {}
+            # this library hasn't been jittered by anything
+            self.jitteredby = self.camera.jitter.basename
 
-                    # create an empty psf image
-                    psf = np.zeros_like(self.dx_subpixelsforintegrating)
+            # save the jittered library
+            np.save(jitteredfilename, (self.psflibrary, self.jitteredby))
+            self.speak('saved jittered PSF library to {0}'.format(jitteredfilename))
 
-                    # loop over wavelengths, adding in monochromatic psfs according to their weights
-                    for w in np.arange(weighting.shape[1]):
-                        # loop over powers in the polynomial for weight vs. teff
-                        this_weight = 0.0
+    @property
+    def pixelstomm(self):
+        return self.camera.physicalpixelsize*10.0
 
-                        # loop over the terms of the temperature polynomial (this is stupidly slow, but it only has to happen once)
-                        for p in np.arange(weighting.shape[0]):
-                            this_weight += weighting[p,w]*(4000.0/temperature)**p
-                            psf += this_weight*self.monochromaticlibrary[focalplaneradius][self.wavelengths[w]]
-                            #self.speak("         {0} X [{1}]".format(this_weight, self.wavelengths[w]))
+    @property
+    def pixelstodeg(self):
+        return self.camera.pixelscale/3600.0
 
-                    # after having calculated PSF image, store it in the library
-                    self.temperaturelibrary[focalplaneradius][temperature] = psf/np.sum(psf)
+    #@profile
+    def highResolutionPSF(self, position, stellartemp=5000, focus=0, chatty=False):
+        '''Paint a high resolution PSF at a given (cartographer-style) position,
+            at a particular focus and stellar stellartemp.'''
 
-                    # save a plot of the PSF
-                    if plot:
-                        filename = self.plotdirectory + "wavelengthintegrated_{0:05.0f}Kat{1:.0f}".format(temperature, focalplaneradius) + '.pdf'
-                        plotPSF(psf, title="{0}K star at focalplaneradius (0,{1})".format(temperature, focalplaneradius),output= filename)
+        self.speak("generating high-resolution PSF for "
+                    "focus={focus}um, "
+                    "T={stellartemp}K, "
+                    "position={position}".format(
+                                                    position=position,
+                                                    stellartemp=stellartemp,
+                                                    focus=focus))
 
-            np.save(temperature_filename, (self.temperaturelibrary, self.temperatures, self.focalplaneradii))
-            self.speak('saved wavelength-integrated, high-resolution PSF library to {0}'.format(temperature_filename))
-            self.plotTemperatureDependence()
-
-
-    def plotTemperatureDependence(self):
-        '''Plot the unjittered PSF library, after binning over wavelengths for stars of different temperatures.'''
-        try:
-            self.temperaturelibrary
-        except:
-            self.populateHighResolutionWavelengthIntegratedLibrary()
-
-        # which radii and temperatures do we loop over?
-        focalplaneradii = self.temperaturelibrary.keys()
-        temperatures = self.temperaturelibrary[focalplaneradii[0]].keys()
-        focalplaneradii.sort()
-        temperatures.sort()
-
-        # create a grid of plotting axes
-        fi, ax = plt.subplots(len(focalplaneradii), len(temperatures), figsize=(len(temperatures)*4, len(focalplaneradii)*4), sharex=True, sharey=True)
-        extent=[self.dx_subpixelsforintegrating_axis.min(), self.dx_subpixelsforintegrating_axis.max(), self.dy_subpixelsforintegrating_axis.min(), self.dy_subpixelsforintegrating_axis.max()]
-        fi.suptitle("PSFs convolved with 2D jitter in a {0}s exposure.".format(self.camera.cadence))
-
-        for p in range(len(focalplaneradii)):
-            for t in range(len(temperatures)):
-
-                psf = self.temperaturelibrary[focalplaneradii[p]][temperatures[t]]
-
-                # plot this entry in the library
-                ax[p,t].imshow(np.sqrt(psf), extent=extent, cmap='gray_r', interpolation='nearest', vmin=0 )
-
-                # for the last row, include temperature xlabels
-                if p == len(focalplaneradii)-1:
-                    ax[p,t].set_xlabel("{0}K".format(temperatures[t]))
-
-                # for the first column, include position labels
-                if t == 0:
-                        ax[p,t].set_ylabel("{0:4.1f} pix.".format(focalplaneradii[p]))
-
-        # plot and save the figure
-        plt.subplots_adjust(hspace=0, wspace=0)
-        plt.savefig(self.plotdirectory + 'wavelengthintegratedpsfs{0:04.0f}_temperaturedependence.pdf'.format(self.camera.cadence))
-
-
-    def populateHighResolutionJitteredLibrary(self):
-        '''Convolve the high-resolution PSF with the jitter expected for the camera's cadence.'''
-        self.speak("populating the high-resolution PSF library for an expected jitter for a {0:04.0f}s cadence.".format(self.camera.cadence))
-        jittered_filename = self.versiondirectory + 'jittered{0:04.0f}s_psfs.npy'.format(self.camera.cadence)
-        try:
-            # maybe the jittered library can be loaded straightaway?
-            self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime = np.load(jittered_filename)
-            self.speak('loaded jittered, high-resolution PSF library from {0}'.format(jittered_filename))
-
-        except:
-            try:
-                self.temperaturelibrary
-            except:
-                self.populateHighResolutionWavelengthIntegratedLibrary()
-
-            self.jitteredlibrary = copy.copy(self.temperaturelibrary)
-            self.speak('calculating jittered PSFs at focalplaneradii of {0}'.format(self.focalplaneradii))
-            for focalplaneradius in self.focalplaneradii:
-                self.speak('calculating jittered PSFs at temperatures of {0}'.format(self.temperatures))
-                for temperature in self.temperatures:
-                    self.jitteredlibrary[focalplaneradius][temperature] = scipy.signal.convolve2d(self.temperaturelibrary[focalplaneradius][temperature], self.camera.jitter.jittermap[0]/np.sum(self.camera.jitter.jittermap[0]), 'same', 'fill', 0)
-                    self.jitteredlibrarytime = self.camera.cadence
-                    np.save(jittered_filename, (self.jitteredlibrary, self.temperatures, self.focalplaneradii, self.jitteredlibrarytime))
-                    self.speak('saved jittered, high-resolution PSF library to {0}'.format(jittered_filename))
-                    assert(self.jitteredlibrarytime == self.camera.cadence)
-
-
-    def highResolutionPSF(self, position, temperature=5000, chatty=False):
-        '''Paint a high resolution PSF at a given (cartographer-style) position, for a star of a given temperature.'''
-
-        if chatty:
-            self.speak("generating high-resolution PSF for {position} and T={temperature}K".format(position=position, temperature=temperature))
         # make sure a jittered library has been loaded
         try:
-            self.jitteredlibrary
-        except:
-            self.populateHighResolutionJitteredLibrary()
+            self.psflibrary
+            #assert(self.jitteredby == self.camera.jitter.basename)
+        except (AttributeError, AssertionError):
+            self.populateJitteredPSFLibrary()
 
         # get a cartographic object, so we can translate among coordinates
         focalx, focaly = position.focalxy.tuple
-        focalplaneradius, focalplanetheta = position.focalrtheta.tuple
 
-        # which available temperature is closest to ours?
-        rounded_temperature = zachopy.utils.find_nearest(self.temperatures, temperature)
+        # which available stellartemp is closest to ours?
+        rounded_focus = zachopy.utils.find_nearest(self.unbinned_axes['focus'], focus)
         if chatty:
-            self.speak('  assuming {temperature} can be approximated as {rounded_temperature}'.format(**locals()))
+            self.speak('rounding focus={focus}um to {rounded_focus}um'.format(**locals()))
 
-        # which two available library focal plane radii are closest to ours?
-        radiusbounds = zachopy.utils.find_two_nearest(self.focalplaneradii, focalplaneradius)
-        radius_below, radius_above = radiusbounds
-        fraction_below, fraction_above = zachopy.utils.interpolation_weights(radiusbounds, focalplaneradius)
-
-        below = self.jitteredlibrary[radius_below]
-        above = self.jitteredlibrary[radius_above]
+        # which available stellartemp is closest to ours?
+        rounded_stellartemp = zachopy.utils.find_nearest(self.unbinned_axes['stellartemp'], stellartemp)
         if chatty:
-            self.speak("  treating focal plane radius of {focalplaneradius} as {fraction_below}x{radius_below} + {fraction_above}x{radius_above}".format(**locals()))
-        unrotated_psf = below[rounded_temperature]*fraction_below + above[rounded_temperature]*fraction_above
+            self.speak('rounding stellartemp={stellartemp}K to {rounded_stellartemp}K'.format(**locals()))
 
-        # rotate that PSF to the appropriate angle (IS THE ROTATION IN THE RIGHT DIRECTION???)
-        rotated_psf = scipy.ndimage.interpolation.rotate(unrotated_psf, -focalplanetheta*180/np.pi, reshape=False)
+        library = self.psflibrary[rounded_focus][rounded_stellartemp]
+
+        # which four focal plane positions are closest to ours?
+        x = np.abs(focalx*self.pixelstomm)
+        if focalx >= 0:
+            xdirection = 1
+        else:
+            xdirection = -1
+        xbounds = zachopy.utils.find_two_nearest(self.unbinned_axes['fieldx_mm'], x)
+        xweightbelow, xweightabove = zachopy.utils.interpolation_weights(xbounds, x)
+        xbelow, xabove = xbounds
+
+        y = np.abs(focaly*self.pixelstomm)
+        if focaly >= 0:
+            ydirection = 1
+        else:
+            ydirection = -1
+        ybounds = zachopy.utils.find_two_nearest(self.unbinned_axes['fieldy_mm'], y)
+        yweightbelow, yweightabove = zachopy.utils.interpolation_weights(ybounds, y)
+        ybelow, yabove = ybounds
+
+        psf =   xweightbelow*yweightbelow*library[xbelow][ybelow] + \
+                xweightbelow*yweightabove*library[xbelow][yabove] + \
+                xweightabove*yweightbelow*library[xabove][ybelow] + \
+                xweightabove*yweightabove*library[xabove][yabove]
+
+        if chatty:
+            self.speak("treating {position} as".format(**locals()))
+            self.speak(' {xweightbelow}*{yweightbelow}*library[{xbelow}][{ybelow}]'.format(**locals()))
+            self.speak(' {xweightbelow}*{yweightabove}*library[{xbelow}][{yabove}]'.format(**locals()))
+            self.speak(' {yweightbelow}*{yweightbelow}*library[{ybelow}][{ybelow}]'.format(**locals()))
+            self.speak(' {yweightbelow}*{yweightabove}*library[{ybelow}][{yabove}]'.format(**locals()))
+
+        # MAKE SURE THE TRANSPOSE IS RIGHT!
+        return psf[::xdirection,::ydirection]/np.sum(psf)
 
         # return a PSF that has the right shape, but is still centered at (0.0, 0.0)
-        return rotated_psf
+        #return psf
 
-    def binHighResolutionPSF(self, position, temperature=5000, dx=0.0, dy=0.0, plot=True, chatty=False):
+    #@profile
+    def binHighResolutionPSF(self, position, stellartemp=5000, dx=0.0, dy=0.0, focus=0.0, plot=True, chatty=False, figure=None):
         '''Pixelize a high resolution PSF at a given coordinate (cannot be used to put stars directly on images).'''
 
         # center the CCD subarray at the *rounded* pixel of the quoted position
         if chatty:
             self.speak('pixelizing a PSF at {0}'.format(position))
+
+        # make sure the pixel arrays are already set up
+        self.setupPixelArrays()
+
         self.ccd.center = np.array(np.round(position.focalxy.tuple))
         if chatty:
             self.speak('moved PSF subarray to {0}'.format(self.cartographer.ccd.center))
 
         # create the high-resolution PSF appropriate for this position
-        zeroCenteredSubgridPSF = self.highResolutionPSF(position, temperature)
+        zeroCenteredSubgridPSF = self.highResolutionPSF(position, stellartemp=stellartemp, focus=focus, chatty=chatty)
 
         # calculate the x and y subpixel grids, for both the unshifted and shifted pixels
-        unshiftedx, unshiftedy = self.dx_subpixelsforintegrating, self.dy_subpixelsforintegrating
+        unshiftedx, unshiftedy = self.dx_subpixels, self.dy_subpixels
         shiftedx, shiftedy = unshiftedx + dx, unshiftedy + dy
-
 
         # MAKE SURE THERE'S NOT AN ACCIDENTAL TRANSPOSE IN HERE!
         prnu = self.intrapixel.prnu
@@ -445,16 +525,20 @@ class PSF(Talker):
             np.histogram2d(unshiftedy.flatten(), unshiftedx.flatten(), \
                             bins=[self.dy_pixels_edges, self.dx_pixels_edges], \
                             weights=zeroCenteredSubgridPSF.flatten()*prnu(unshiftedy.flatten(), unshiftedx.flatten()))
+
         recenteredBinnedPSF, xedges, yedges = \
             np.histogram2d(shiftedy.flatten(), shiftedx.flatten(), \
                             bins=[self.dy_pixels_edges, self.dx_pixels_edges], \
                             weights=zeroCenteredSubgridPSF.flatten()*prnu(shiftedy.flatten(), shiftedx.flatten()))
 
         if plot:
-
-            plt.figure('Pixelizing the PSF', figsize=(7.5,7.5), dpi=100)
+            plt.ioff()
+            try:
+                self.pixelizingfigure
+            except AttributeError:
+                self.pixelizingfigure = plt.figure('Pixelizing the PSF', figsize=(7.5,7.5), dpi=100)
             plt.clf()
-            gs = plt.matplotlib.gridspec.GridSpec(2,2,wspace=0.05,hspace=0.05, top=0.83)
+            gs = plt.matplotlib.gridspec.GridSpec(2,2,wspace=0.05,hspace=0.05, top=0.80)
             self.axHighResolution = plt.subplot(gs[0,0])
             self.axHighResolutionNudged = plt.subplot(gs[0,1], sharex=self.axHighResolution, sharey=self.axHighResolution)
             self.axPixelized = plt.subplot(gs[1,0], sharex=self.axHighResolution, sharey=self.axHighResolution)
@@ -464,12 +548,13 @@ class PSF(Talker):
 
 
             for a in axes:
-                a.imshow(prnu(unshiftedx, unshiftedy), extent=extent(unshiftedx, unshiftedy), cmap='Oranges_r', alpha=0.25, interpolation='nearest')
+                a.imshow(prnu(unshiftedx, unshiftedy), extent=extent(unshiftedx, unshiftedy), origin='lower', cmap='Oranges_r', alpha=0.25, interpolation='nearest')
 
-            kw = dict( interpolation='nearest', cmap='gray_r', alpha=0.75)
-            vmax=np.maximum(np.max(zeroCenteredBinnedPSF), np.max(recenteredBinnedPSF))
-            self.axHighResolution.imshow(zeroCenteredSubgridPSF, extent=extent(unshiftedx, unshiftedy), **kw)
-            self.axHighResolutionNudged.imshow(zeroCenteredSubgridPSF,  extent=extent(shiftedx, shiftedy),  **kw)
+            kw = dict( interpolation='nearest', cmap='gray_r', alpha=0.75, origin='lower')
+            #vmax=np.maximum(np.max(zeroCenteredBinnedPSF), np.max(recenteredBinnedPSF))
+            vmin, vmax = np.percentile(zeroCenteredSubgridPSF, [1, 99.9])
+            self.axHighResolution.imshow((zeroCenteredSubgridPSF), extent=extent(unshiftedx, unshiftedy), vmin=vmin, vmax=vmax, **kw)
+            self.axHighResolutionNudged.imshow((zeroCenteredSubgridPSF),  extent=extent(shiftedx, shiftedy), vmin=vmin,  vmax=vmax, **kw)
             vmax=np.maximum(np.max(zeroCenteredBinnedPSF), np.max(recenteredBinnedPSF))
             self.axPixelized.imshow(zeroCenteredBinnedPSF, extent=extent(self.dx_pixels_edges, self.dy_pixels_edges), vmax=vmax, **kw)
             self.axPixelizedNudged.imshow(recenteredBinnedPSF, extent=extent(self.dx_pixels_edges, self.dy_pixels_edges), vmax=vmax,**kw)
@@ -495,78 +580,114 @@ class PSF(Talker):
             plt.setp(self.axHighResolutionNudged.get_xticklabels(), visible=False)
             plt.setp(self.axHighResolutionNudged.get_yticklabels(), visible=False)
             plt.setp(self.axPixelizedNudged.get_yticklabels(), visible=False)
-            plt.suptitle("Pixelizing the TESS Point Spread Function\n{temperature:.0f}K star, jittered for {jitter:.0f}s, intrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, temperature=temperature, jitter=self.jitteredlibrarytime, intrapixel=self.intrapixel.name))
+            plt.suptitle("Pixelizing the TESS Point Spread Function\n{stellartemp:.0f}K star, {focus:.2f}um focus,\njittered by {jitter},\nintrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focus=focus, focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, stellartemp=stellartemp, jitter=self.jitteredby, intrapixel=self.intrapixel.name))
             plt.draw()
 
+            self.display.one(zeroCenteredSubgridPSF, frame=0)
         centralx, centraly = position.ccdxy.integerpixels
 
-        # return the pixelized,
+        # return the pixelized, binned, PSF
         return recenteredBinnedPSF, centralx + self.dx_pixels, centraly + self.dy_pixels
 
-
     # populate a library of binned PRFS, using the jittered high-resolution library
-    def populateBinned(self, plot=False):
+    #@profile
+    def populateBinned(self, plot=False, chatty=True):
         '''Populate a library of binned PRFs, using the jittered, wavelength-integrated, high-resolution library.'''
-        binned_filename = self.versiondirectory + 'pixelizedlibrary_{cadence:04.0f}s_{nradii:.0f}radii_{noffset:.0f}offsets_{drotation:.0f}degrees_{dtemperature:.0f}K_{intrapixel}.npy'.format(nradii=self.nradii, noffset=self.noffset, drotation=self.drotation, dtemperature=self.dtemperature, cadence=self.camera.cadence, intrapixel=self.intrapixel.name)
+        self.setupPixelArrays()
+        npositions = 13
+        noffsets = 11
+        binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:2.0f}positions_{noffsets:02.0f}offsets.npy'.format(
+                        jitter=self.camera.jitter.basename, intrapixel=self.intrapixel.name,
+                        npositions=npositions, noffsets=noffsets
+                        )
         try:
-            (self.binned, self.focalr, self.temperatures, self.focaltheta, self.xoffsets, self.yoffsets) = np.load(binned_filename)
-            self.speak('loaded binned PSFs from {0}'.format(binned_filename))
+            self.speak('trying to load PSFs from {0}'.format(binned_filename))
+            self.binned, self.binned_axes = np.load(binned_filename)
+            self.speak('...success!')
         except IOError:
             self.speak('creating a new library of binned PSFs')
-            self.populateHighResolutionJitteredLibrary()
+            self.populateJitteredPSFLibrary()
 
             # set up the grid of values over which the
-            self.focaltheta = np.arange(0, 360, self.drotation)
-            self.xoffsets = np.linspace(-0.5,0.5,self.noffset)
-            self.yoffsets = np.linspace(-0.5,0.5,self.noffset)
-            self.focalr = np.linspace(0, np.max(self.focalplaneradii),self.nradii)
+            self.binned_axes = {}
+            self.binned_axes['focus'] = self.unbinned_axes['focus']
+            self.binned_axes['stellartemp'] = self.unbinned_axes['stellartemp']
+            self.binned_axes['fieldx_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldx_mm']),np.max(self.unbinned_axes['fieldx_mm']),npositions)/self.pixelstomm).astype(np.int)
+            self.binned_axes['fieldy_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldy_mm']),np.max(self.unbinned_axes['fieldy_mm']),npositions)/self.pixelstomm).astype(np.int)
+            self.binned_axes['xoffset'] = np.linspace(-0.5, 0.5, noffsets)# 11)
+            self.binned_axes['yoffset'] = np.linspace(-0.5, 0.5, noffsets)# 11)
+
+            self.numberofbinnedentries = 1
+            for k,v in self.binned_axes.items():
+                l = len(v)
+                self.speak('including {} entries for {}'.format(l, k))
+                self.numberofbinnedentries *= l
+            self.countthroughbinnedentries = 0
             try:
                 self.binned
             except AttributeError:
                 self.binned = {}
-                for radius in self.focalr:
-                    self.speak('adding focal plane radius of {0:.1f} pixels'.format(radius), 1)
+                for focus in self.binned_axes['focus']:
+                    self.speak('adding focus {0:.1f}um'.format(focus), 1)
                     try:
-                        self.binned[radius]
+                        self.binned[focus]
                     except KeyError:
-                        self.binned[radius] = {}
+                        self.binned[focus] = {}
 
-                        for temperature in self.temperatures:
-                            self.speak('adding temperature of {0:.0f}K'.format(temperature), 2)
+                        for stellartemp in self.binned_axes['stellartemp']:
+                            self.speak('adding stellartemp of {0:.0f}K'.format(stellartemp), 2)
 
                             try:
-                                self.binned[radius][temperature]
+                                self.binned[focus][stellartemp]
                             except KeyError:
-                                self.binned[radius][temperature] = {}
+                                self.binned[focus][stellartemp] = {}
 
-                                for theta in self.focaltheta:
-                                    self.speak('adding focal plane theta of {0:.0f} degrees'.format(theta), 3)
+                                for fieldx in self.binned_axes['fieldx_px']:
+                                    self.speak('adding focal plane x of {0:.0f} pixels'.format(fieldx), 3)
                                     try:
-                                        self.binned[radius][temperature][theta]
+                                        self.binned[focus][stellartemp][fieldx]
                                     except KeyError:
-                                        self.binned[radius][temperature][theta] = {}
-                                        position = self.cartographer.point(radius, theta/180.0*np.pi, 'focalrtheta')
-                                        for xoffset in self.xoffsets:
-                                            self.speak('adding xoffset of {0:.2f} pixels'.format(xoffset), 4)
-                                            try:
-                                                self.binned[radius][temperature][theta][xoffset]
-                                            except KeyError:
-                                                self.binned[radius][temperature][theta][xoffset] = {}
+                                        self.binned[focus][stellartemp][fieldx] = {}
 
-                                                for yoffset in self.yoffsets:
-                                                    self.speak('adding yoffset of {0:.2f} pixels'.format(yoffset), 5)
-                                                    self.binned[radius][temperature][theta][xoffset][yoffset] = self.binHighResolutionPSF(position, temperature=temperature, dx=xoffset, dy=yoffset, plot=plot)[0]
-                                                    self.speak('(r={radius:.0f}, T={temperature:.0f}K, theta={theta:.0f} degrees , dx={xoffset:.2f} pixels, dy={yoffset:.2f} pixels)'.format(radius=radius, temperature=temperature, theta=theta, xoffset=xoffset, yoffset=yoffset), 6)
-                np.save(binned_filename, (self.binned, self.focalr, self.temperatures, self.focaltheta, self.xoffsets, self.yoffsets))
+                                        for fieldy in self.binned_axes['fieldy_px']:
+                                            self.speak('adding focal plane y of {0:.0f} pixels'.format(fieldy), 4)
+                                            try:
+                                                self.binned[focus][stellartemp][fieldx][fieldy]
+                                            except KeyError:
+                                                self.binned[focus][stellartemp][fieldx][fieldy] = {}
+
+                                            position = self.cartographer.point(fieldx, fieldy, 'focalxy')
+
+                                            for xoffset in self.binned_axes['xoffset']:
+                                                self.speak('adding xoffset of {0:.2f} pixels'.format(xoffset), 6)
+                                                try:
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset]
+                                                except KeyError:
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset] = {}
+
+                                                for yoffset in self.binned_axes['yoffset']:
+                                                    self.speak('adding yoffset of {0:.2f} pixels'.format(yoffset), 6)
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset][yoffset] = self.binHighResolutionPSF(position, stellartemp=stellartemp, dx=xoffset, dy=yoffset, focus=focus, plot=plot, chatty=chatty)[0]
+                                                    if plot:
+                                                        plotdir = binned_filename.replace('pixelizedlibrary_', 'plotsfor_') + '/'
+                                                        zachopy.utils.mkdir(plotdir)
+                                                        plotfile = plotdir + 'f{focus:.0f}t{stellartemp:.0f}xf{fieldx:.0f}yf{fieldy:.0f}xo{xoffset:.2f}yo{yoffset:.2f}.pdf'.format(**locals())
+                                                        plt.savefig(plotfile)
+                                                        self.speak('saved plot to {}'.format(plotfile))
+                                                    self.speak('(focus={focus:.2f}um, T={stellartemp:.0f}K, pos={position}, dx={xoffset:.2f} pixels, dy={yoffset:.2f} pixels)'.format(**locals()), 6)
+                                                    self.countthroughbinnedentries += 1
+                                                    self.speak('{}/{} PSFs binned'.format(self.countthroughbinnedentries, self.numberofbinnedentries))
+                                                    #self.input('thoughts?')
+                np.save(binned_filename, (self.binned, self.binned_axes))
                 self.speak('saved binned PSF library to {0}'.format(binned_filename))
 
 
 
-    def comparePSFs(self, position, temperature=4000, verbose=False, plot=True, justnew=False, center=None):
+    def comparePSFs(self, position, stellartemp=4000, verbose=False, plot=True, justnew=False, center=None):
         '''Compare the PSF pulled out of the library to a newly pixelized one.'''
 
-        newpsf, newx, newy = self.newlyPixelizedPSF(position, temperature)
-        librarypsf, libraryx, libraryy = self.pixelizedPSF(position, temperature)
+        newpsf, newx, newy = self.newlyPixelizedPSF(position, stellartemp)
+        librarypsf, libraryx, libraryy = self.pixelizedPSF(position, stellartemp)
 
         if plot:
             # set up the plotting figure
@@ -582,7 +703,7 @@ class PSF(Talker):
             #    center = position
 
             # plot the intrapixel sensitivity
-            unshiftedx, unshiftedy = self.dx_subpixelsforintegrating, self.dy_subpixelsforintegrating
+            unshiftedx, unshiftedy = self.dx_subpixels, self.dy_subpixels
             integerx, integery = center.ccdxy.integerpixels
             for a in axes:
                 a.imshow(self.intrapixel.prnu(unshiftedx, unshiftedy), extent=extent(unshiftedx+integerx, unshiftedy+integery), cmap='Oranges_r', alpha=0.25, interpolation='nearest')
@@ -611,18 +732,19 @@ class PSF(Talker):
                 plt.setp(a.get_xticklabels(), visible=False)
                 plt.setp(a.get_yticklabels(), visible=False)
             dx, dy = position.ccdxy.fractionalpixels
-            plt.suptitle("Comparing Recently Recalculated PSF to the Library\n{temperature:.0f}K star, jittered for {jitter:.0f}s, intrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, temperature=temperature, jitter=self.jitteredlibrarytime, intrapixel=self.intrapixel.name))
+            plt.suptitle("Comparing Recently Recalculated PSF to the Library\n{stellartemp:.0f}K star, jittered for {jitter:.0f}s, intrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, stellartemp=stellartemp, jitter=self.jitteredlibrarytime, intrapixel=self.intrapixel.name))
             #plt.draw()
         return np.sum(librarypsf), np.sum(newpsf)
 
-    def newlyPixelizedPSF(self, position, temperature=4000, verbose=False):
+    def newlyPixelizedPSF(self, position, stellartemp=4000, verbose=False):
         '''Wrapper for binHighResolutionPSF, to directly compare with pixelizedPSF.'''
         self.speak('re-pixelizing a PSF at {0}'.format(position))
         dx, dy = position.ccdxy.fractionalpixels
         self.speak('at subpixel offsets of {0}; CCD center at {1} with size of {2}'.format((dx,dy), self.ccd.center, self.ccd.npix))
-        return self.binHighResolutionPSF(position, temperature, dx=dx, dy=dy, plot=False)
+        return self.binHighResolutionPSF(position, stellartemp, dx=dx, dy=dy, plot=False)
 
-    def pixelizedPSF(self, position, temperature=4000, verbose=False):
+    #@profile
+    def pixelizedPSF(self, position, focus=0.0, stellartemp=4000, verbose=False):
         '''Drop a pixelized PSF, drawn from the library, at a particular position.'''
 
         # make sure the binned PSF library is already loaded
@@ -631,32 +753,94 @@ class PSF(Talker):
         except AttributeError:
             self.populateBinned()
 
-        # need to determine [radius][temperature][theta][xoffset][yoffset] to pull out of library
-        focalr, focaltheta = position.focalrtheta.tuple
-        key_radius = zachopy.utils.find_nearest(self.focalr, focalr, verbose=verbose)
-        key_theta = zachopy.utils.find_nearest(self.focaltheta, focaltheta*180/np.pi, verbose=verbose)
-        key_temperature = zachopy.utils.find_nearest(self.temperatures, temperature, verbose=verbose)
+
+        # need to determine [radius][stellartemp][theta][xoffset][yoffset] to pull out of library
+        fieldx, fieldy = position.focalxy.tuple
+        key_stellartemp = zachopy.utils.find_nearest(self.binned_axes['stellartemp'], stellartemp, verbose=verbose)
+        key_fieldx = zachopy.utils.find_nearest(self.binned_axes['fieldx_px'], fieldx, verbose=verbose)
+        key_fieldy = zachopy.utils.find_nearest(self.binned_axes['fieldx_px'], fieldy, verbose=verbose)
 
         ccdx, ccdy = position.ccdxy.tuple
         xoffset, yoffset = position.ccdxy.fractionalpixels
         centralx, centraly = position.ccdxy.integerpixels
 
-
-        xoffsetbounds = zachopy.utils.find_two_nearest(self.xoffsets, xoffset, verbose=verbose)
+        # interpolate
+        xoffsetbounds = zachopy.utils.find_two_nearest(self.binned_axes['xoffset'], xoffset, verbose=verbose)
         xbelow, xabove = xoffsetbounds
         xbelow_weight, xabove_weight = zachopy.utils.interpolation_weights(xoffsetbounds, xoffset)
-        yoffsetbounds = zachopy.utils.find_two_nearest(self.yoffsets, yoffset, verbose=verbose)
+        yoffsetbounds = zachopy.utils.find_two_nearest(self.binned_axes['yoffset'], yoffset, verbose=verbose)
         ybelow, yabove = yoffsetbounds
         ybelow_weight, yabove_weight = zachopy.utils.interpolation_weights(yoffsetbounds, yoffset)
 
-        interpolatedPSF = \
-            xbelow_weight*ybelow_weight*self.binned[key_radius][key_temperature][key_theta][xbelow][ybelow] + \
-            xabove_weight*ybelow_weight*self.binned[key_radius][key_temperature][key_theta][xabove][ybelow] + \
-            xabove_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xabove][yabove] + \
-            xbelow_weight*yabove_weight*self.binned[key_radius][key_temperature][key_theta][xbelow][yabove]
+        try:
+            atfocus = self.binned[focus]
+            needtofocusinterpolate = False
+        except KeyError:
+            self.speak('could not find focus entry exactly at {}'.format(focus))
+            needtofocusinterpolate = True
 
-        assert( interpolatedPSF is not None)
-        return interpolatedPSF, centralx + self.dx_pixels, centraly + self.dy_pixels
+        if needtofocusinterpolate:
+            #self.speak('interpolating in focus')
+            focusbounds = zachopy.utils.find_two_nearest(self.binned_axes['focus'], focus, verbose=verbose)
+            focusbelow, focusabove = focusbounds
+            focusbelow_weight, focusabove_weight = zachopy.utils.interpolation_weights(focusbounds, focus)
+            prfbelow = self.binned[focusbelow][key_stellartemp][key_fieldx][key_fieldy]
+            prfabove = self.binned[focusabove][key_stellartemp][key_fieldx][key_fieldy]
+
+            ibelow =        xbelow_weight*ybelow_weight*prfbelow[xbelow][ybelow] + \
+                            xabove_weight*ybelow_weight*prfbelow[xabove][ybelow] + \
+                            xabove_weight*yabove_weight*prfbelow[xabove][yabove] + \
+                            xbelow_weight*yabove_weight*prfbelow[xbelow][yabove]
+
+            iabove =        xbelow_weight*ybelow_weight*prfabove[xbelow][ybelow] + \
+                            xabove_weight*ybelow_weight*prfabove[xabove][ybelow] + \
+                            xabove_weight*yabove_weight*prfabove[xabove][yabove] + \
+                            xbelow_weight*yabove_weight*prfabove[xbelow][yabove]
+
+            interpolated = ibelow*focusbelow_weight + iabove*focusabove_weight
+        else:
+            #self.speak('evaluating at focus gridpoint')
+            prf = atfocus[key_stellartemp][key_fieldx][key_fieldy]
+            interpolated =  xbelow_weight*ybelow_weight*prf[xbelow][ybelow] + \
+                            xabove_weight*ybelow_weight*prf[xabove][ybelow] + \
+                            xabove_weight*yabove_weight*prf[xabove][yabove] + \
+                            xbelow_weight*yabove_weight*prf[xbelow][yabove]
+
+        assert(interpolated is not None)
+
+        return interpolated, centralx + self.dx_pixels, centraly + self.dy_pixels
+
+
+    def plotPSF(self, psf, title=None, output=None):
+        '''Plot a PSF.'''
+        try:
+            for a in self.ax_psf_zoom:
+                a.cla()
+        except:
+            fig = plt.figure(figsize=(10,10))
+            plt.subplots_adjust(hspace=0, wspace=0)
+            ax_map = fig.add_subplot(2,2,3)
+            ax_vert = fig.add_subplot(2,2,4, sharey=ax_map)
+            ax_hori = fig.add_subplot(2,2,1, sharex=ax_map)
+            self.ax_psf_zoom = (ax_map, ax_vert, ax_hori)
+
+        (ax_map, ax_vert, ax_hori) = self.ax_psf_zoom
+        ax_hori.plot(self.dx_subpixels_axis, np.sum(psf, 0)/np.sum(psf,0).max(), color='black', linewidth=3)
+        ax_vert.plot(np.sum(psf, 1)/np.sum(psf,1).max(),self.dy_subpixels_axis, color='black', linewidth=3)
+        ax_vert.semilogx()
+        ax_hori.semilogy()
+        ax_hori.set_ylim(1e-6,1e0)
+        ax_vert.set_xlim(1e-6,1e0)
+
+        ax_vert.tick_params(labelleft=False)
+        ax_hori.tick_params(labelbottom=False)
+        if title is not None:
+            ax_hori.set_title(title)
+        ax_map.imshow(np.sqrt(psf), cmap='gray_r', extent=[self.dx_subpixels_axis.min(), self.dx_subpixels_axis.max(), self.dy_subpixels_axis.min(), self.dy_subpixels_axis.max()],vmin=0.0,interpolation='nearest')
+        plt.draw()
+        if output is not None:
+            ax_map.figure.savefig(output)
+            self.speak("   saved PSF plot to {0}".format(output))
 
 def extent(x,y):
     return [x.min(), x.max(), y.min(), y.max()]

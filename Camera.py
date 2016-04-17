@@ -4,6 +4,7 @@ from PSF import PSF
 from Cartographer import Cartographer
 from CCD import CCD
 from Jitter import Jitter
+from Focus import Focus
 
 # define a camera class
 class Camera(Talker):
@@ -19,12 +20,18 @@ class Camera(Talker):
                         counterstep=1, # jump by multiple exposures each time?
                         aberrate=True, # apply velocity aberration?
                         positionangle=None, # position angle of the field
-                        stamps=None # how many postage stamps?
+                        stamps=None, # how many postage stamps?
+                        variablefocus=False,
+                        psfkw={},
+                        jitterkw={},
+                        focuskw={}
                 ):
         '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
 
         # decide whether or not this Camera is chatty
         Talker.__init__(self)
+
+        self.psfkw, self.jitterkw, self.focuskw = psfkw, jitterkw, focuskw
 
         # KLUDGE (or is it?)
         self.stamps = stamps
@@ -70,7 +77,6 @@ class Camera(Talker):
         # assign the cadence for this camera
         self.singleread = 2.0											# seconds
         self.readouttime = 0.05										# seconds
-        self.setCadence(cadence)                                        # seconds
 
         # define scales for the Camera
         self.pixelscale = 21.1                  						# arcsec!! (from Peter's paper)
@@ -108,14 +114,13 @@ class Camera(Talker):
         self.nudge = {'x':0.0, 'y':0.0, 'z':0.0}						# nudge relative to nominal spacecraft pointing (arcsec)
 
 
+        self.setCadence(cadence)                                        # seconds
+
+
         # point the Camera
         self.point(self.ra, self.dec)
 
-        # load the PSF for this Camera
-        self.psf = PSF(camera=self)
 
-        # load the jitterball for this camera
-        self.jitter = Jitter(camera=self)
 
 
     @property
@@ -176,6 +181,21 @@ class Camera(Talker):
         # set the cadence
         self.cadence = cadence
         self.speak("setting cadence to {0} seconds = {1:.0f} reads.".format(self.cadence, self.cadence/self.singleread))
+
+        #
+        self.focus = Focus(camera=self, **self.focuskw)
+
+        # load the jitterball for this camera
+        self.jitter = Jitter(camera=self, nsubpixelsperpixel=self.psfkw['nsubpixelsperpixel'], **self.jitterkw)
+
+        # load the PSF for this Camera
+        self.psf = PSF(camera=self, **self.psfkw)
+
+    def counterToBJD(self, counter):
+        self.bjd0 = 2457827.0
+        return self.bjd0 + counter*self.cadence/24.0/60.0/60.0
+
+
 
     def point(self, ra=None, dec=None):
         '''Point this Camera at the sky, by using the field-specified (ra,dec) and (if active) the jitter nudge for this exposure.'''

@@ -55,7 +55,7 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
-def random(options=['trapezoid', 'sin'], extreme=False, **kw):
+def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, **kw):
     '''
     random() returns random Lightcurve.
 
@@ -64,19 +64,19 @@ def random(options=['trapezoid', 'sin'], extreme=False, **kw):
         extreme=False (should we allow extreme variability [good for movies] or no?)
     '''
 
-    if extreme:
-        return cartoonrandom(options=options, extreme=extreme)
+    if np.random.uniform(0,1) < fractionwithextremelc:
+        return cartoonrandom(options=options, extreme=True)
+    else:
+        fractionrotators = 34030.0/133030.0
+        fractiontransiting = 20152/112001.0
 
-    fractionrotators = 34030.0/133030.0
-    fractiontransiting = 20152/112001.0
+        if 'trapezoid' in options:
+            if np.random.uniform(0,1) < fractiontransiting:
+                return drawTransit()
 
-    if 'trapezoid' in options:
-        if np.random.uniform(0,1) < fractiontransiting:
-            return drawTransit()
-
-    if 'sin' in options:
-        if np.random.uniform(0,1) < fractionrotators:
-            return drawRotation()
+        if 'sin' in options:
+            if np.random.uniform(0,1) < fractionrotators:
+                return drawRotation()
 
     return constant()
 
@@ -86,7 +86,7 @@ def cartoonrandom(options=['trapezoid', 'sin'], extreme=False):
     name = np.random.choice(options)
     if name == 'sin':
         if extreme:
-            p = [0.001, 0.1]
+            p = [0.1, 30.0]
             a = [0.1, 1]
         else:
             p = [0.1, 30.0]
@@ -99,7 +99,7 @@ def cartoonrandom(options=['trapezoid', 'sin'], extreme=False):
 
     if name == 'trapezoid':
         if extreme:
-            p = [0.001, 0.3]
+            p = [0.1, 30.0]
             d = [0.1, 1]
         else:
             p = [0.1, 30.0]
@@ -160,9 +160,7 @@ class Cartoon(Talker):
 
     def integrated(self, t, exptime=30.0/60.0/24.0, resolution=100):
 
-        # don't waste time on this if the light curve is a constant
-        if self.__class__.__name__ == 'constant':
-            return self.model(t)
+
 
         # deal with the edge case of only a single time point being passed
         try:
@@ -170,6 +168,10 @@ class Cartoon(Talker):
         except AttributeError:
             t = np.array([t])
 
+        # don't waste time on this if the light curve is a constant
+        if self.__class__.__name__ == 'constant':
+            return self.model(np.array(t))
+            
         # create a high-resolution subsampled timeseries
         nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
         subsampled = t.reshape(1, t.shape[0]) + nudges.reshape(nudges.shape[0], 1)

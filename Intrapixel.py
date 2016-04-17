@@ -36,9 +36,9 @@ class Intrapixel(Talker):
 
 class Perfect(Intrapixel):
     '''Perfect pixel has uniform sensitivity everywhere.'''
-    def __init__(self, nsubpixels=240, supersample=8):
+    def __init__(self):
         self.name = 'perfectpixels'
-        Intrapixel.__init__(self, nsubpixels=nsubpixels, supersample=supersample)
+        Intrapixel.__init__(self, nsubpixels=None, supersample=None)
 
     def prnu(self, x, y):
         '''Calculate the pixel response non-uniformity for a pixel.'''

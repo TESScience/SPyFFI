@@ -3,7 +3,8 @@ from imports import *
 import settings
 
 class Jitter(Talker):
-  def __init__(self, camera=None, jitterrms=None, rawjitterbasename="AttErrTimeArcsec_80k.dat"):
+  def __init__(self, camera=None, jitterrms=None, rawjitterbasename="AttErrTimeArcsec_80k.dat", nsubpixelsperpixel=None,
+      amplifyinterexposurejitter=1.0):
       # decide whether or not this CCD is chatty
       Talker.__init__(self, mute=False, pithy=False)
 
@@ -19,6 +20,12 @@ class Jitter(Talker):
 
       # what do you want the RMS to be rescaled to?
       self.jitterrms = jitterrms
+
+      # how much should the exposure to exposure jitter be amplified
+      self.amplifyinterexposurejitter = amplifyinterexposurejitter
+
+      # (for creating map that will be used to convolve with the psf)
+      self.nsubpixelsperpixel = nsubpixelsperpixel
 
       # update the jitterball to one that has been binned to this cadence
       self.load()
@@ -48,7 +55,7 @@ class Jitter(Talker):
     cadencestatement = '.cadence{:.0f}s'.format(self.camera.cadence)
 
     if self.jitterrms is not None:
-      jitterstatement = '.rescaledto{:.2}arcsec'
+      jitterstatement = '.rescaledto{:0.2f}arcsec'.format(self.jitterrms)
     else:
       jitterstatement = '.unscaled'
 
@@ -180,10 +187,11 @@ class Jitter(Talker):
     narcsec = np.maximum(np.max(np.abs(xoff)), np.max(np.abs(yoff)))#3
 
     # calculate the number of bins (in units of subpixels)
-    bins = np.ceil(narcsec/self.camera.pixelscale/self.camera.psf.subpixelsforintegrating_size).astype(np.int)*2 +1
+    bins = np.ceil(narcsec/self.camera.pixelscale*self.nsubpixelsperpixel).astype(np.int)*2 +1
 
     # calculate the range of the map (in units of pixels)
-    range = [[-(bins-1)/2*self.camera.psf.subpixelsforintegrating_size,(bins-1)/2*self.camera.psf.subpixelsforintegrating_size],[-(bins-1)/2*self.camera.psf.subpixelsforintegrating_size,(bins-1)/2*self.camera.psf.subpixelsforintegrating_size]]
+    range = [   [-(bins-1)/2/self.nsubpixelsperpixel,(bins-1)/2/self.nsubpixelsperpixel],
+                [-(bins-1)/2/self.nsubpixelsperpixel,(bins-1)/2/self.nsubpixelsperpixel]]
 
     # define the jittermap as a 2D histrogram for convolution within exps
     self.jittermap = np.histogram2d(xoff, yoff,
@@ -224,21 +232,50 @@ class Jitter(Talker):
 
   @property
   def x(self):
-    return self.jitterball[0]
+    return self.amplifyinterexposurejitter*self.jitterball[0]
 
   @property
   def y(self):
-    return self.jitterball[1]
+    return self.amplifyinterexposurejitter*self.jitterball[1]
 
   @property
   def z(self):
-    return self.jitterball[2]
+    return self.amplifyinterexposurejitter*self.jitterball[2]
+
+  def writeNudges(self, outfile='jitter.txt'):
+
+    counters = np.arange(len(self.x))
+    bjds = self.camera.counterToBJD(counters)
+    time = bjds - np.min(bjds)
+    plt.figure('jitter timeseries')
+    gs = plt.matplotlib.gridspec.GridSpec(2,1,hspace=0.1)
+    kw = dict(linewidth=2)
+    ax = None
+
+    for i, what in enumerate((self.x, self.y)):
+        ax = plt.subplot(gs[i], sharex=ax, sharey=ax)
+        ax.plot(time, what, **kw)
+        ax.set_ylabel(['dRA (arcsec)', 'dDec (arcsec)'][i])
+        if i == 0:
+            ax.set_title('Jitter Timeseries from\n{}'.format(self.basename))
+
+    plt.xlabel('Time from Observation Start (days)')
+    plt.xlim(np.min(time), np.max(time))
+    plt.draw()
+    plt.savefig(outfile.replace('.txt', '.pdf'))
+
+
+    data= [counters, bjds, self.x, self.y]
+    names=['imagenumber', 'bjd', 'arcsecnudge_ra', 'arcsecnudge_dec']
+
+    t = astropy.table.Table(data=data, names=names)
+    t.write(outfile.replace('.txt', '_amplifiedby{}.txt'.format(self.amplifyinterexposurejitter)), format='ascii.fixed_width', delimiter=' ')
+    self.speak("save jitter nudge timeseries to {0}".format(outfile))
 
   def applyNudge(self,
                     counter=None, # which row to use from jitterball?
                     dx=None, dy=None, dz=None, # custom nudges, in arcsec
                     header=None, # the FITS header in which to record nudges
-                    scale=1.0 # by how much do we magnify the jitter?
                     ):
 
     '''jitter the camera by a little bit,
@@ -258,9 +295,9 @@ class Jitter(Talker):
     else:
       # if we're over the counter, loop back
       i = counter % n
-      self.camera.nudge['x'] = scale*self.x[i]
-      self.camera.nudge['y'] = scale*self.y[i]
-      self.camera.nudge['z'] = scale*self.z[i]
+      self.camera.nudge['x'] = self.x[i]
+      self.camera.nudge['y'] = self.y[i]
+      self.camera.nudge['z'] = self.z[i]
 
     # if possible, write the details to the supplied FITS header
     try:
@@ -273,7 +310,7 @@ class Jitter(Talker):
                   '["] jitter-induced nudge')
       header['JITPFILE'] = (self.basename,
                   'processed jitter filename')
-      header['JITSCALE'] = (scale, 'jitter magnified by ? relative to file')
+      header['JITSCALE'] = (self.amplifyinterexposurejitter, 'jitter magnified by ? relative to file')
       header['JITCOUNT'] = (i, 'which row of jitter file was applied?')
 
       self.speak('updated header keywords')

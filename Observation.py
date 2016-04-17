@@ -100,8 +100,9 @@ class Observation(Talker):
         kw = self.inputs['catalog']['skykw']
 
         self.speak('creating catalog from "real" stars')
-        self.camera.catalog = Catalogs.makeCatalog(name='UCAC4',
+        self.camera.catalog = Catalogs.UCAC4(
                                 ra=ra, dec=dec, radius=radius,
+                                lckw=self.inputs['catalog']['lckw'],
                                 **kw)
 
     def createCatalogWithTestPattern(self):
@@ -112,9 +113,9 @@ class Observation(Talker):
         self.speak('creating catalog representing a test pattern of stars')
         kw = self.inputs['catalog']['testpatternkw']
         self.camera.catalog = Catalogs.TestPattern(
-            name='testpattern',
-            ra=ra, dec=dec, size=size,
-            **kw)
+                                ra=ra, dec=dec, size=size,
+                                lckw=self.inputs['catalog']['lckw'],
+                                **kw)
 
     def createCatalog(self):
         try:

@@ -9,9 +9,38 @@ jitterkw = dict(
 
     # the code looks for a jitter timeseries (at any cadence faster than 2s)
     #   located in '$SPYFFIDATA/inputs/{rawjitterbasename}'
-    rawjitterbasename="AttErrTimeArcsec_80k.dat"
+    rawjitterbasename="AttErrTimeArcsec_80k.dat",
 
+    # by what factor should we rescale the jitter between exposures (without affecting intraexposure jitter)
+    amplifyinterexposurejitter=1.0,
 )
+
+
+# the inputs go into creating the PSF library
+psfkw = dict(
+
+    # version name for this basic PSF
+    version='RRUasbuilt',
+
+    # what prefix was used for
+    debprefix = 'woods_prf_feb2016/RAYS_ptSrc_wSi_Oct27model_AP40.6_75C_F3p314adj',
+
+    nsubpixelsperpixel = 101,
+    npixels = 21,
+
+    # in the unbinned PSFs
+    focus_toinclude = [0,10],
+    stellartemp_toinclude = [4350],
+
+    # in the binned PSFs
+    #[6030,4350]# #[7200, 6030, 4350, 3240]
+    #7200.,  6440.,  6030.,  5770.,  5250.,  4350.,  3850.,  3240.
+    # take every N-
+)
+
+# the inputs that go into creating the focus
+focuskw = dict(     # what's the range of allowed focus?
+                    span=[0.0, 10.0])
 
 # the inputs go into creating the camera
 camerakw = dict(
@@ -39,13 +68,26 @@ camerakw = dict(
     # should this be a camera that magnifies aberration?
     warpspaceandtime=False,
 
+    # should this camera change focus over time?
+    variablefocus = True,
+    # NOT YET IMPLEMENTED!
+
     # by how many steps should the counter advance each exposure
     #  (set to integer > 1 to speed up time)
     counterstep=1,
 
     # how many fake postage stamps per CCD should be made?
-    stamps = None
+    stamps = None,
     # (ultimately, this should be fleshed out into Stamper object, with options)
+
+    # include the PSF keywords here, so they can be passed to PSF
+    psfkw = psfkw,
+
+    # include the jitter keywords here, so they can be passed to jitter
+    jitterkw = jitterkw,
+
+    # include the focus keywords here
+    focuskw = focuskw
 )
 
 # these inputs create the catalog of target stars
@@ -55,15 +97,18 @@ catalogkw = dict(
     #   options are ['sky', testpattern']
     name = 'sky',
 
+    # should we populate stars with light curves?
+    starsarevariable = True,
+
     # the default settings for a real star catalog
-    skykw = dict(fast=True),
+    skykw = dict(fast=False, faintlimit=None),
 
     # the default settings for a testpattern catalog
     testpatternkw = dict(
                     # how far apart are stars from each other (")
                     spacing=500.0,
                      # list of min, max magnitudes
-                    magnitudes=[6,16],
+                    magnitudes=[10,10],
                     # how far to nudge stars (")
                     randomizenudgesby = 21.1,
                     # random prop. mot. (mas/yr)
@@ -72,31 +117,26 @@ catalogkw = dict(
                     randomizemagnitudes=False,
                     ),
 
+    # the default settings for the light curves for the catalog
+    lckw = dict(    # what kinds of variabilty should be allowed?
+                    options=['trapezoid', 'sin'],
+                    # what magnitude is the faintest star that gets an lc
+                    fainteststarwithlc=None,
+                    # what fraction of the bright-enough stars get light curves?
+                    fractionofstarswithlc=1.0,
+                    # what fraction of light curves are extreme?
+                    fractionwithextremelc=0.01,
+                    # a seed for the randomizer, for repeatability
+                    seed=0)
 
 )
 
 # these keywords will be passed to CCD.expose
 exposekw = dict(
-    # should the exposures be jittered?
-    jitter=True,
+
 
     # should the exposures write out to file(s)?
     writesimulated=True,
-
-    # should readout smear be included?
-    smear=True,
-
-    # what kind of cosmics should be included? (need to be option?)
-    cosmicsversion='fancy',
-
-    # should diffusion of cosmics be done?
-    diffusion=True,
-
-    # should we skip cosmic injection?
-    skipcosmics=False,
-
-    # should we pretend cosmics don't exist?
-    correctcosmics=False,
 
     # should we write an image of the cosmic rays?
     writecosmics=True,
@@ -104,8 +144,30 @@ exposekw = dict(
     # should we write an image with no noise?
     writenoiseless=True,
 
-    jitterscale=1.0, # should we rescale the jitter?
+    # down to what magnitudes should we include? (for fast testing)
+    magnitudethreshold=999,
 
+    # should the exposures be jittered?
+    jitter=True,
+
+
+
+    # should readout smear be included?
+    smear=False,
+
+    # should we skip cosmic injection?
+    skipcosmics=False,
+
+    # what kind of cosmics should be included? (need to be option?)
+    cosmicsversion='fancy',
+
+    # should diffusion of cosmics be done?
+    cosmicsdiffusion=True,
+
+    # should we pretend cosmics don't exist?
+    correctcosmics=False,
+
+    # should we display images in ds9, as they're created?
     display=True,
 )
 observationkw = dict(
@@ -120,6 +182,7 @@ observationkw = dict(
     collate = True,
     # type
 )
+
 
 inputs = dict(
                 observation=observationkw,

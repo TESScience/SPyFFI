@@ -50,18 +50,18 @@ class Catalog(Talker):
     self.directory = 'catalogs/'
     zachopy.utils.mkdir(settings.intermediates + self.directory)
 
-  def addLCs(self, magmax=None, fmax=1.0, seed=None, **kw):
+  def addLCs(self, fainteststarwithlc=None, fractionofstarswithlc=1.0, seed=None, **kw):
     '''
     addLCs() populates a catalog with light curves.
 
     addLCs() makes use of these keywords:
-      magmax=None (what's the faintest magnitude star that should be populated with a lightcurve?)
-      fmax=1.0 (what fraction of eligible stars should be populated with lightcurves, from 0 to 1)
+      fainteststarwithlc=None (what's the faintest magnitude star that should be populated with a lightcurve?)
+      fractionofstarswithlc=1.0 (what fraction of eligible stars should be populated with lightcurves, from 0 to 1)
       seed=None (if you want the exact light curves on multiple calls, set a value for the seed)
     addLCs() passes additional keywords to SPyFFI.Lightcurve.random(**kw):
         random() makes use of these keyword arguments:
             options=['trapezoid', 'sin'] (a list of the kinds of a variability to choose from)
-            extreme=False (should we allow extreme variability [good for movies] or no?)
+            fractionwithextremelc=False (should we allow fractionwithextremelc variability [good for movies] or no?)
 
     '''
     np.random.seed(seed)
@@ -73,16 +73,16 @@ class Catalog(Talker):
     self.lightcurves = np.array([constant]*ntotal)
 
     # make sure that the maximum magnitude for variable stars is defined
-    if magmax is None:
-      magmax = np.max(self.tmag) + 1
+    if fainteststarwithlc is None:
+      fainteststarwithlc = np.max(self.tmag) + 1
 
     # pull only the stars that pass the brightness cut
-    brightenough = (self.tmag <= magmax).nonzero()[0]
+    brightenough = (self.tmag <= fainteststarwithlc).nonzero()[0]
     nbrightenough = len(brightenough)
-    self.speak('{0} stars are brighter than {1}; populating {2:.1f}% of them with light curves'.format(nbrightenough, magmax, fmax*100))
+    self.speak('{0} stars are brighter than {1}; populating {2:.1f}% of them with light curves'.format(nbrightenough, fainteststarwithlc, fractionofstarswithlc*100))
 
     # use the input seed, to ensure it wor
-    for i in np.random.choice(brightenough, len(brightenough)*fmax, replace=False):
+    for i in np.random.choice(brightenough, len(brightenough)*fractionofstarswithlc, replace=False):
       self.lightcurves[i] = Lightcurve.random(**kw)
 
   @property
@@ -107,11 +107,9 @@ class Catalog(Talker):
     ra, dec = self.atEpoch(epoch)
 
     # determine brightness of star
-    try:
-      moment = np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves]).flatten()
-    except AttributeError:
-      moment = np.array([0.0])
+    moment = np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves]).flatten()
     tmag = self.tmag + moment
+    print "{:.0f}".format(np.max(tmag))
 
     # determine color of star
     temperature = self.temperature
@@ -175,7 +173,7 @@ class Catalog(Talker):
 
   def writeProjected(self, ccd=None, outfile='catalog.txt'):
     # take a snapshot projection of the catalog
-    ras, decs, tmag, temperatures = self.snapshot(ccd.bjd,
+    ras, decs, tmag, temperatures = self.snapshot(ccd.camera.bjd,
                     exptime=ccd.camera.cadence/60.0/60.0/24.0)
 
     # calculate the CCD coordinates of these stars
@@ -184,19 +182,32 @@ class Catalog(Talker):
 
     basemag = self.tmag
     lc = self.lightcurvecodes
-    t = astropy.table.Table(data= [ras, decs, x, y, basemag, lc],
-                names=['ra', 'dec', 'x', 'y', 'tmag', 'lc'])
+
+    # does the temperature matter at all? (does the PSF have multiple temperatures available?)
+    if len(ccd.camera.psf.binned_axes['stellartemp']) > 1:
+        data= [ras, decs, x, y, basemag, temperatures, lc]
+        names=['ra', 'dec', 'x', 'y', 'tmag', 'stellaratemperature', 'lc']
+    else:
+        data= [ras, decs, x, y, basemag, lc]
+        names=['ra', 'dec', 'x', 'y', 'tmag', 'lc']
+
+    t = astropy.table.Table(data=data, names=names)
     t.write(outfile, format='ascii.fixed_width', delimiter=' ')
     self.speak("save projected star catalog {0}".format(outfile))
 
 class TestPattern(Catalog):
   '''a test pattern catalog, creating a grid of stars to fill an image'''
-  def __init__(self, **kwargs):
+  def __init__(self, lckw=None, starsarevariable=True, **kwargs):
     '''create a size x size square (in arcsecs) test pattern of stars,
     with spacing (in arcsecs) between each element and
     magnitudes spanning the range of magnitudes'''
     Catalog.__init__(self)
     self.load(**kwargs)
+
+    if starsarevariable:
+        self.addLCs(**lckw)
+    else:
+        self.addLCs(fractionofstarswithlc=0.0)
 
   def load(self,
                     size=3000.0, # the overall size of the grid
@@ -234,7 +245,7 @@ class TestPattern(Catalog):
     # draw the magnitudes of the stars totally randomly
     if randomizemagnitudes:
       self.tmag = np.random.uniform(np.min(magnitudes), np.max(magnitudes), n)
-    assert(randomizemagnitudes)
+
     # make up some imaginary proper motions
     if randomizepropermotionsby > 0:
       self.pmra = np.random.normal(0,randomizepropermotionsby,n)
@@ -244,25 +255,28 @@ class TestPattern(Catalog):
     self.epoch = 2018.0
     self.temperature = 5800.0 + np.zeros_like(self.ra)
 
-    # KLUDGE!
-    self.addLCs(fmax=0.0)
-
-
 
 class UCAC4(Catalog):
   def __init__(self,   ra=0.0, dec=90.0,
             radius=0.2,
             write=True,
-            faint=10,
-            fast=False, **kwargs):
+            fast=False,
+            lckw=None, starsarevariable=True, faintlimit=None, **kwargs):
 
     # initialize this catalog
     Catalog.__init__(self)
     if fast:
         radius *= 0.1
-    self.load(ra=ra, dec=dec, radius=radius, write=write)
+    self.load(ra=ra, dec=dec, radius=radius, write=write, faintlimit=faintlimit)
 
-  def load(self, ra=0.0, dec=90.0, radius=0.2, write=True):
+    if starsarevariable:
+        self.addLCs(**lckw)
+    else:
+        self.addLCs(fractionofstarswithlc=0.0)
+
+
+
+  def load(self, ra=0.0, dec=90.0, radius=0.2, write=True, faintlimit=None):
 
     # select the columns that should be downloaded from UCAC
     catalog = 'UCAC4'
@@ -342,6 +356,9 @@ class UCAC4(Catalog):
     pmdec[np.isfinite(pmdec) == False] = 0.0
 
     ok = np.isfinite(imag)
+    if faintlimit is not None:
+        ok *= imag <= faintlimit
+
     self.speak("found {0} stars with {1} < V < {2}".format(np.sum(ok), np.min(rmag[ok]), np.max(rmag[ok])))
     self.ra = ras[ok]
     self.dec = decs[ok]
@@ -351,9 +368,6 @@ class UCAC4(Catalog):
     self.temperature = temperatures[ok]
     self.epoch = 2000.0
 
-    # populate with constant LCs (KLUDGE!)
-    self.addLCs(fmax=0.0)
-    #return ras[ok], decs[ok], rmag[ok], jmag[ok], imag[ok], temperatures[ok]
 
 class Trimmed(Catalog):
   '''a trimed catalog, created by removing elements from another catalog'''

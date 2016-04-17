@@ -168,18 +168,19 @@ class CCD(Talker):
       self.header['INPUTS'] = ''
       self.header['INPUNOTE'] = ('', 'Ingredients for simulated images.')
 
+
   def setTime(self):
     '''Based on the camera counter, apply a timestamp to this image.'''
 
     # add time to the image (in a very simplistic way -- no accounting for the spacecraft orbit)
     self.header['COUNTER'] = self.camera.counter, '# of exposures since start, for this field'
-    self.bjd0 = 2457827.0
-    self.bjd = self.bjd0 + self.camera.counter*self.camera.cadence/24.0/60.0/60.0
-    self.bjdantisun = self.bjd0 + 13.7
-    self.header['BJD0'] = self.bjd0, '[day] base time subtracted from all BJD'
-    self.header['BJD'] = self.bjd - self.bjd0, '[day] mid-exposure time - BJD0'
-    self.header['ANTISUN'] = self.bjdantisun - self.bjd0, '[day] time of antisun - BJD0'
-    self.epoch = (self.bjd - 2451544.5)/365.25 + 2000.0
+    self.camera.bjd = self.camera.counterToBJD(self.camera.counter)
+
+    self.camera.bjdantisun = self.camera.bjd0 + 13.7
+    self.header['BJD0'] = self.camera.bjd0, '[day] base time subtracted from all BJD'
+    self.header['BJD'] = self.camera.bjd - self.camera.bjd0, '[day] mid-exposure time - BJD0'
+    self.header['ANTISUN'] = self.camera.bjdantisun - self.camera.bjd0, '[day] time of antisun - BJD0'
+    self.epoch = (self.camera.bjd - 2451544.5)/365.25 + 2000.0
     self.header['EPOCH'] = self.epoch, '[years] epoch of mid-exposure time'
 
   def pixels(self):
@@ -299,7 +300,7 @@ class CCD(Talker):
     # optionally, write some other outputs too!
     if lean == False:
       self.note = 'withoutbackground_{0:06.0f}'.format(self.camera.counter)
-      self.writeToFITS(self.image - self.image_background, self.directory + self.note + '.fits')
+      self.writeToFITS(self.image - self.backgroundimage, self.directory + self.note + '.fits')
 
   def createStamps(self, x, y, radius=5):
 
@@ -347,8 +348,8 @@ class CCD(Talker):
     # first figure out which ones are on the CCD
 
     # pull out positions, magnitudes, and temperatures at the time of the first exposure
-    self.speak('taking an intial snapshot at {0} = {1}'.format(self.bjd, self.epoch))
-    ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.bjd,
+    self.speak('taking an intial snapshot at {0} = {1}'.format(self.camera.bjd, self.epoch))
+    ras, decs, tmag, temperatures = self.camera.catalog.snapshot(self.camera.bjd,
                 exptime=self.camera.cadence/60.0/60.0/24.0)
     assert(ras.shape == tmag.shape)
 
@@ -421,9 +422,17 @@ class CCD(Talker):
     # create the CCD catalog
     self.catalog = Catalogs.Trimmed(self.camera.catalog, ok)
 
+  def writeIngredients(self):
+
     # write the catalog out to a text file
     outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
-    self.catalog.writeProjected(ccd=self, outfile=outfile)
+    self.camera.catalog.writeProjected(ccd=self, outfile=outfile)
+
+    jitteroutfile = self.directory + 'jitternudges_{cadence:.0f}s_{name}.txt'.format(cadence=self.camera.cadence, name=self.name)
+    self.camera.jitter.writeNudges(jitteroutfile)
+
+    focusoutfile = self.directory + 'focustimeseries_{name}.txt'.format(name=self.name)
+    self.camera.focus.writeModel(focusoutfile)
 
   def projectCatalog(self, write=True):
     '''Create using the camera's star catalog, and project stars using this CCD.'''
@@ -438,8 +447,8 @@ class CCD(Talker):
 
 
     # pull out positions, magnitudes, and temperatures
-    self.speak('taking a snapshot at {0} = {1}'.format(self.bjd, self.epoch))
-    ras, decs, tmag, temperatures = self.catalog.snapshot(self.bjd, exptime=self.camera.cadence/60.0/60.0/24.0)
+    self.speak('taking a snapshot at {0} = {1}'.format(self.camera.bjd, self.epoch))
+    ras, decs, tmag, temperatures = self.catalog.snapshot(self.camera.bjd, exptime=self.camera.cadence/60.0/60.0/24.0)
     self.speak('  done!')
     assert(ras.shape == tmag.shape)
     self.camera.cartographer.ccd = self
@@ -449,7 +458,7 @@ class CCD(Talker):
     x,y = stars.ccdxy.tuple
 
     # apply differential velocity aberration, based on the time offset from antisun
-    dt = self.bjd - self.bjdantisun
+    dt = self.camera.bjd - self.camera.bjdantisun
     dx,dy = self.aberrations(stars, dt)
     fieldcenter = self.camera.cartographer.point(0,0,'focalxy')
     centerx,centery = self.aberrations(fieldcenter,dt)
@@ -545,7 +554,7 @@ class CCD(Talker):
 
     focalx, focaly = ccdxy.focalxy.tuple
 
-    normalized, xindex, yindex = self.camera.psf.pixelizedPSF(ccdxy,temp)
+    normalized, xindex, yindex = self.camera.psf.pixelizedPSF(ccdxy,stellartemp=temp,focus=0.0)
     binned = normalized*self.camera.cadence*self.photons(mag)
     #binned = unnormed*self.camera.cadence*self.photons(mag)/np.sum(unnormed)
 
@@ -571,9 +580,9 @@ class CCD(Talker):
 
     ok = (xindex >= self.xmin) * (xindex < self.xsize) * (yindex >= self.ymin) * (yindex < self.ysize)
     self.starimage[yindex[ok], xindex[ok]] += binned[ok]
+    #a = self.input('just added {}'.format(ccdxy))
 
-
-  def addStars(self, remake=False, jitter=False):
+  def addStars(self, remake=False, jitter=False, magnitudethreshold=None):
     #self.speak("adding stars")
     self.starcounter = 0
     self.nstars =0
@@ -602,12 +611,12 @@ class CCD(Talker):
       self.projectCatalog()
 
 
-      #for threshold in magnitude_thresholds:
       if True:
-        threshold = np.max(magnitude_thresholds)
+        if magnitudethreshold is None:
+            magnitudethreshold = np.max(magnitude_thresholds)
 
         # define a filename for this magnitude range
-        self.note = 'starsbrighterthan{0:02d}'.format(threshold)
+        self.note = 'starsbrighterthan{0:02d}'.format(magnitudethreshold)
         starsfilename = self.directory + self.note + '.fits'
 
         # load the existing stellar image, if possible
@@ -625,7 +634,7 @@ class CCD(Talker):
               (self.starx + self.camera.psf.dx_pixels_axis[0] <= self.xmax) * \
               (self.stary + self.camera.psf.dy_pixels_axis[-1] >= self.ymin) * \
               (self.stary + self.camera.psf.dy_pixels_axis[0] <= self.ymax) * \
-              (self.starmag < threshold)*(self.starmag >= minimum)
+              (self.starmag < magnitudethreshold)*(self.starmag >= minimum)
           x = self.starx[ok]
           y = self.stary[ok]
           mag = self.starmag[ok]
@@ -801,12 +810,13 @@ class CCD(Talker):
     # if the background image already exists, just load it
     try:
       self.backgroundimage
-    except:
+      assert(self.camera.counter != 0)
+    except (AttributeError, AssertionError):
 
       try:
         self.backgroundimage = self.loadFromFITS(backgroundsfilename)
-      # otherwise compute the backgrounds from scratch, and save them for next time
-      except:
+        # otherwise compute the backgrounds from scratch, and save them for next time
+      except IOError:
         # define a blank background image
         self.backgroundimage = self.zeros()
         # define coordinates (equatorial, Galactic, celestial) at every pixel in the image
@@ -907,7 +917,8 @@ class CCD(Talker):
                     writecosmics=False, # should the cosmics image write to file?
                     writenoiseless=False, # should we write an image with no noise?
                     jitterscale=1.0, # should we rescale the jitter?
-                    display=False, # should we display this image in ds9?
+                    display=False, # should we display this image in ds9?,
+                    magnitudethreshold=999,
                     **kwargs):
 
     '''Expose an image on this CCD.'''
@@ -920,12 +931,16 @@ class CCD(Talker):
     # populate the basics of the header
     self.populateHeader()
 
+    # write out the ingredients, if this is the first exposure
+    if self.camera.counter == 0:
+        self.writeIngredients()
+
     # jitter the camera, or at least update the
     if jitter:
-      self.camera.jitter.applyNudge(self.camera.counter, header=self.header, scale=jitterscale)
+      self.camera.jitter.applyNudge(self.camera.counter, header=self.header)
 
     # add stars to the image
-    self.addStars(jitter=jitter, remake=remake)
+    self.addStars(jitter=jitter, remake=remake, magnitudethreshold=magnitudethreshold)
 
     # add galaxies to the image
     self.addGalaxies()
