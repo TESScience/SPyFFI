@@ -171,7 +171,7 @@ exposekw = dict(
     correctcosmics=False,
 
     # should we display images in ds9, as they're created?
-    display=True,
+    display=False,
 )
 observationkw = dict(
 
