@@ -33,6 +33,10 @@ inputs['camera']['warpspaceandtime'] = 0.1
 
 inputs['camera']['variablefocus'] = False
 
+
+inputs['camera']['psfkw']['npositions_toinclude'] = 13
+inputs['camera']['psfkw']['noffsets_toinclude'] = 11
+
 '''
 ------------_--------------_--------------_--------------_--------------_-------
 "catalog" inputs affect what stars will be used to populate the images.
