@@ -14,7 +14,8 @@ class PSF(Talker):
                         version=None,
                         debprefix='woods_prf_feb2016/RAYS_ptSrc_wSi_Oct27model_AP40.6_75C_F3p314adj',
                         focus_toinclude=[0,10], stellartemp_toinclude=[4350],
-                        nsubpixelsperpixel=101, npixels=21):
+                        nsubpixelsperpixel=101, npixels=21,
+                        npositions_toinclude = 21, noffsets_toinclude = 11):
 
         # decide whether or not this PSF is chatty
         Talker.__init__(self, mute=False, pithy=False)
@@ -30,6 +31,8 @@ class PSF(Talker):
         # the basic geometry of the unbinned pixels
         self.nsubpixelsperpixel = nsubpixelsperpixel
         self.npixels = npixels
+        self.noffsets = noffsets_toinclude
+        self.npositions = npositions_toinclude
 
         # limit the library, to keep things manageable memory-wise
         self.focus_toinclude = focus_toinclude
@@ -38,7 +41,7 @@ class PSF(Talker):
         # fill in an intrapixel sensitivity
         self.intrapixel = Intrapixel.Perfect()
 
-        self.display = ds9('PSF')
+        #self.display = ds9('PSF')
         #self.populateJitteredPSFLibrary()
         self.populateBinned()
         #self.populateHeader()
@@ -583,7 +586,7 @@ class PSF(Talker):
             plt.suptitle("Pixelizing the TESS Point Spread Function\n{stellartemp:.0f}K star, {focus:.2f}um focus,\njittered by {jitter},\nintrapixel of {intrapixel}\n({focalx:.0f},{focaly:.0f}) pixels from focal plane center\n({dx:.2f},{dy:.2f}) from pixel center".format(focus=focus, focalx=self.ccd.center[0], focaly=self.ccd.center[1], dx=dx, dy=dy, stellartemp=stellartemp, jitter=self.jitteredby, intrapixel=self.intrapixel.name))
             plt.draw()
 
-            self.display.one(zeroCenteredSubgridPSF, frame=0)
+            #self.display.one(zeroCenteredSubgridPSF, frame=0)
         centralx, centraly = position.ccdxy.integerpixels
 
         # return the pixelized, binned, PSF
@@ -594,11 +597,10 @@ class PSF(Talker):
     def populateBinned(self, plot=False, chatty=True):
         '''Populate a library of binned PRFs, using the jittered, wavelength-integrated, high-resolution library.'''
         self.setupPixelArrays()
-        npositions = 13
-        noffsets = 11
+
         binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:2.0f}positions_{noffsets:02.0f}offsets.npy'.format(
                         jitter=self.camera.jitter.basename, intrapixel=self.intrapixel.name,
-                        npositions=npositions, noffsets=noffsets
+                        npositions=self.npositions, noffsets=self.noffsets
                         )
         try:
             self.speak('trying to load PSFs from {0}'.format(binned_filename))
@@ -612,10 +614,10 @@ class PSF(Talker):
             self.binned_axes = {}
             self.binned_axes['focus'] = self.unbinned_axes['focus']
             self.binned_axes['stellartemp'] = self.unbinned_axes['stellartemp']
-            self.binned_axes['fieldx_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldx_mm']),np.max(self.unbinned_axes['fieldx_mm']),npositions)/self.pixelstomm).astype(np.int)
-            self.binned_axes['fieldy_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldy_mm']),np.max(self.unbinned_axes['fieldy_mm']),npositions)/self.pixelstomm).astype(np.int)
-            self.binned_axes['xoffset'] = np.linspace(-0.5, 0.5, noffsets)# 11)
-            self.binned_axes['yoffset'] = np.linspace(-0.5, 0.5, noffsets)# 11)
+            self.binned_axes['fieldx_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldx_mm']),np.max(self.unbinned_axes['fieldx_mm']),self.npositions)/self.pixelstomm).astype(np.int)
+            self.binned_axes['fieldy_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldy_mm']),np.max(self.unbinned_axes['fieldy_mm']),self.npositions)/self.pixelstomm).astype(np.int)
+            self.binned_axes['xoffset'] = np.linspace(-0.5, 0.5, self.noffsets)# 11)
+            self.binned_axes['yoffset'] = np.linspace(-0.5, 0.5, self.noffsets)# 11)
 
             self.numberofbinnedentries = 1
             for k,v in self.binned_axes.items():
@@ -776,7 +778,7 @@ class PSF(Talker):
             atfocus = self.binned[focus]
             needtofocusinterpolate = False
         except KeyError:
-            self.speak('could not find focus entry exactly at {}'.format(focus))
+            #self.speak('could not find focus entry exactly at {}'.format(focus))
             needtofocusinterpolate = True
 
         if needtofocusinterpolate:

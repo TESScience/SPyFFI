@@ -8,18 +8,27 @@ class Focus(Talker):
 
       # store the input camera
       self.camera = camera
+      if self.camera.variablefocus:
+          self.model = self.variablemodel
+      else:
+          self.model = self.constantmodel
 
       # what do you want the absolute focus range to be?
       self.span = span
-
-
       self.orbit = 13.7
       self.sigma = 0.1
       self.jump = 0.5
       self.best, self.worst = self.span
       self.scale = self.worst - self.best
 
-  def model(self, counter):
+  def constantmodel(self, counter):
+      try:
+          counter.shape
+          return np.zeros_like(counter)
+      except AttributeError:
+          return 0.0
+
+  def variablemodel(self, counter):
       bjd = self.camera.counterToBJD(counter)
       phase = (((bjd - self.camera.bjd0)/self.orbit + 0.5) % 1) - 0.5
       best, worst = self.span
@@ -40,9 +49,11 @@ class Focus(Talker):
       plt.savefig(outfile.replace('.txt', '.pdf'))
 
       with open(outfile, 'w') as f:
-          f.write('x = (((bjd - {})/{} + 0.5) % 1) - 0.5\n'.format(self.camera.bjd0, self.orbit))
-          f.write('focus = {best} + {scale}*exp(-0.5*(x/{sigma})**2)'.format(**self.__dict__))
-
+          if self.camera.variablefocus:
+              f.write('x = (((bjd - {})/{} + 0.5) % 1) - 0.5\n'.format(self.camera.bjd0, self.orbit))
+              f.write('focus = {best} + {scale}*exp(-0.5*(x/{sigma})**2)'.format(**self.__dict__))
+          else:
+              f.write('fixed to 0.0 microns')
 
   def applyNudge(self,
                     counter=None, # which row to use from jitterball?

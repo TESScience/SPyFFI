@@ -63,6 +63,7 @@ class Observation(Talker):
         for k in self.cadencestodo.keys():
             # set the cadence to this one
             self.camera.setCadence(k)
+            np.save(self.camera.directory + 'observationdictionary.npy', self.inputs)
             # reset the counter
             self.camera.counter = 0
 
@@ -72,6 +73,7 @@ class Observation(Talker):
                 for i in range(self.cadencestodo[k]):
                     for c in self.camera.ccds:
                         c.expose(**self.inputs['expose'])
+
             else:
                 # if not collating, loop through CCDs, exposing all for each
                 for c in self.camera.ccds:
@@ -79,7 +81,7 @@ class Observation(Talker):
                     self.counter = 0
                     for i in range(self.cadencestodo[k]):
                         # expose this CCD
-                        c.expose(**self.inputs['expose'])
+                        c.expose(advancecounter=False, **self.inputs['expose'])
                         # advance the counter by hand
                         c.camera.advanceCounter()
 

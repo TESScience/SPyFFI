@@ -173,6 +173,7 @@ class Catalog(Talker):
 
   def writeProjected(self, ccd=None, outfile='catalog.txt'):
     # take a snapshot projection of the catalog
+    ccd.camera.cartographer.ccd = ccd
     ras, decs, tmag, temperatures = self.snapshot(ccd.camera.bjd,
                     exptime=ccd.camera.cadence/60.0/60.0/24.0)
 
@@ -185,11 +186,11 @@ class Catalog(Talker):
 
     # does the temperature matter at all? (does the PSF have multiple temperatures available?)
     if len(ccd.camera.psf.binned_axes['stellartemp']) > 1:
-        data= [ras, decs, x, y, basemag, temperatures, lc]
-        names=['ra', 'dec', 'x', 'y', 'tmag', 'stellaratemperature', 'lc']
+        data= [ras, decs, self.pmra, self.pmdec, x, y, basemag, temperatures, lc]
+        names=['ra', 'dec', 'pmracosdec_mas', 'pmdec_mas', 'x', 'y', 'tmag', 'stellaratemperature', 'lc']
     else:
-        data= [ras, decs, x, y, basemag, lc]
-        names=['ra', 'dec', 'x', 'y', 'tmag', 'lc']
+        data= [ras, decs, self.pmra, self.pmdec, x, y, basemag, lc]
+        names=['ra', 'dec', 'pmracosdec_mas', 'pmdec_mas', 'x', 'y', 'tmag', 'lc']
 
     t = astropy.table.Table(data=data, names=names)
     t.write(outfile, format='ascii.fixed_width', delimiter=' ')
@@ -304,9 +305,10 @@ class UCAC4(Catalog):
 
     try:
       # try to load a raw catalog file
-      t = np.load(starsfilename)
       self.speak("loading a catalog of stars from {0}".format(starsfilename))
+      t = np.load(starsfilename)
     except IOError:
+      self.speak('could not load stars')
       # otherwise, make a new query
       self.speak("querying {catalog} "
                 "for ra = {ra}, dec = {dec}, radius = {radius}".format(

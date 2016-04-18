@@ -30,7 +30,10 @@ psfkw = dict(
 
     # in the unbinned PSFs
     focus_toinclude = [0,10],
-    stellartemp_toinclude = [4350],
+    stellartemp_toinclude = [6440, 3850],#[4350],
+
+    npositions_toinclude = 21,
+    noffsets_toinclude = 11
 
     # in the binned PSFs
     #[6030,4350]# #[7200, 6030, 4350, 3240]
@@ -66,7 +69,7 @@ camerakw = dict(
     subarray = None,
 
     # should this be a camera that magnifies aberration?
-    warpspaceandtime=False,
+    warpspaceandtime = False,
 
     # should this camera change focus over time?
     variablefocus = True,

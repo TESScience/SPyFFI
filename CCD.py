@@ -276,7 +276,7 @@ class CCD(Talker):
       return image
     except IOError:
       self.speak("       ...failed")
-      raise RuntimeError('failed tring to load {}'.format(path))
+      raise IOError('failed tring to load {}'.format(path))
 
   @property
   def fileidentifier(self):
@@ -399,7 +399,7 @@ class CCD(Talker):
 
       # pull out the target stars, and write them to disk
       self.targetstarcatalog = Catalogs.Trimmed(self.camera.catalog, itargets)
-      targetsoutfile = self.directory + 'postagestamptargets_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
+      targetsoutfile = self.directory + 'postagestamptargets_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string, name=self.name, epoch=self.epoch)
       self.targetstarcatalog.writeProjected(ccd=self, outfile=targetsoutfile)
 
       #for t in range(len(self.targetstarcatalog.ra)):
@@ -425,7 +425,7 @@ class CCD(Talker):
   def writeIngredients(self):
 
     # write the catalog out to a text file
-    outfile = self.directory + 'catalog_{pos}_{name}.txt'.format(pos=self.pos_string, name=self.name)
+    outfile = self.directory + 'catalog_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string, name=self.name, epoch=self.epoch)
     self.camera.catalog.writeProjected(ccd=self, outfile=outfile)
 
     jitteroutfile = self.directory + 'jitternudges_{cadence:.0f}s_{name}.txt'.format(cadence=self.camera.cadence, name=self.name)
@@ -433,6 +433,7 @@ class CCD(Talker):
 
     focusoutfile = self.directory + 'focustimeseries_{name}.txt'.format(name=self.name)
     self.camera.focus.writeModel(focusoutfile)
+
 
   def projectCatalog(self, write=True):
     '''Create using the camera's star catalog, and project stars using this CCD.'''
@@ -458,12 +459,16 @@ class CCD(Talker):
     x,y = stars.ccdxy.tuple
 
     # apply differential velocity aberration, based on the time offset from antisun
-    dt = self.camera.bjd - self.camera.bjdantisun
-    dx,dy = self.aberrations(stars, dt)
-    fieldcenter = self.camera.cartographer.point(0,0,'focalxy')
-    centerx,centery = self.aberrations(fieldcenter,dt)
-    x+=dx-np.mean(dx)
-    y+=dy-np.mean(dy)
+    if self.camera.aberrate:
+        self.speak('applying differental velocity aberration (relative to this camera only)')
+        dt = self.camera.bjd - self.camera.bjdantisun
+        dx,dy = self.aberrations(stars, dt)
+        fieldcenter = self.camera.cartographer.point(0,0,'focalxy')
+        centerx,centery = self.aberrations(fieldcenter,dt)
+        x+=dx-np.mean(dx)
+        y+=dy-np.mean(dy)
+    else:
+        self.speak('skipping differental velocity aberration')
 
     # trim everything down to only those stars that could be relevant for this camera
     buffer = 10
@@ -486,6 +491,9 @@ class CCD(Talker):
       assert(self.aberrator.ccd == self)
     except AttributeError:
       self.aberrator = Aberrator(self.camera.cartographer)
+      if self.camera.counter == 0:
+          self.aberrator.plotPossibilities()
+
       self.header['ABERRATE'] = ''
       self.header['AB_NOTE'] = '', 'Velocity aberration ingredients.'
       self.header['AB_DEF'] = 'd?=BETA*cos(L-FCLON+DLON)*AB?FUNC(x,y)-FCD?', "[L=stars' ec. lon.]"
@@ -554,7 +562,7 @@ class CCD(Talker):
 
     focalx, focaly = ccdxy.focalxy.tuple
 
-    normalized, xindex, yindex = self.camera.psf.pixelizedPSF(ccdxy,stellartemp=temp,focus=0.0)
+    normalized, xindex, yindex = self.camera.psf.pixelizedPSF(ccdxy,stellartemp=temp,focus=self.currentfocus)
     binned = normalized*self.camera.cadence*self.photons(mag)
     #binned = unnormed*self.camera.cadence*self.photons(mag)/np.sum(unnormed)
 
@@ -643,15 +651,17 @@ class CCD(Talker):
           self.speak('adding {0} stars between {1:.1f} and {2:.1f} magnitudes'.format(
             len(x), np.min(mag), np.max(mag)))
 
-
+          self.currentfocus = self.camera.focus.model(self.camera.counter)
+          self.speak("the camera's focus is set to {}".format(self.currentfocus))
+          self.header['FOCUS'] = (self.currentfocus, 'distance from optimal focus (microns)')
           if np.sum(ok) > 0:
             self.nstars += np.sum(ok)
             for i in range(len(x)):
               self.addStar(x[i], y[i], mag[i], temp[i])
               self.starcounter += 1
 
-            if jitter == False:
-              self.writeToFITS(self.starimage, starsfilename)
+            #if jitter == False:
+            #  self.writeToFITS(self.starimage, starsfilename)
 
     self.image += self.starimage
 
@@ -670,6 +680,13 @@ class CCD(Talker):
       self.header['IVELABER'] = ('True'), 'differential velocity aberration applied'
     else:
       self.header['IVELABER'] = ('False'), 'no differential velocity aberration'
+
+    if self.camera.variablefocus:
+      self.header['IVARFOCU'] = ('True'), 'camera focus allowed to vary'
+    else:
+      self.header['IVARFOCU'] = ('False'), 'camera focus allowed to vary'
+
+
     return self.starimage
 
   def addGalaxies(self):
@@ -919,6 +936,7 @@ class CCD(Talker):
                     jitterscale=1.0, # should we rescale the jitter?
                     display=False, # should we display this image in ds9?,
                     magnitudethreshold=999,
+                    advancecounter=True,
                     **kwargs):
 
     '''Expose an image on this CCD.'''
@@ -993,7 +1011,7 @@ class CCD(Talker):
     self.report("created image #{counter:07d} of {pos_string} with {cadence:.0f}s cadence".format(counter=self.camera.counter, pos_string=self.pos_string, cadence=self.camera.cadence))
 
     # advance the camera's counter (and therefore timestep) if this is the last of the CCDs
-    if self == self.camera.ccds[-1]:
+    if self == self.camera.ccds[-1] and advancecounter:
       self.camera.advanceCounter()
 
     self.show()
@@ -1086,7 +1104,7 @@ class Aberrator(Talker):
 
     dx,dy,delon = [],[], []
     fcdx, fcdy = [], []
-    bjds = np.linspace(0,365,1000)+self.ccd.bjd0
+    bjds = np.linspace(0,365,1000)+self.ccd.camera.bjd0
     for bjd in bjds:
       nudges = self.ccd.aberrations(stars,bjd)
       dx.append(nudges[0])
@@ -1126,7 +1144,7 @@ class Aberrator(Talker):
     plt.xlim(-1 + min(bjds), max(bjds)+1)
     plt.xlabel('Time (days)')
     plt.savefig(self.ccd.directory+'aberrationoveroneyear.pdf')
-
+    self.speak('saved a plot of the aberration over one year to {}'.format(self.ccd.directory))
 def gauss(x, y, xcenter, ycenter):
   rsquared = (x - xcenter)**2 + (y - ycenter)**2
   sigma = 1.0

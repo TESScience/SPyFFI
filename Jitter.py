@@ -248,7 +248,7 @@ class Jitter(Talker):
     bjds = self.camera.counterToBJD(counters)
     time = bjds - np.min(bjds)
     plt.figure('jitter timeseries')
-    gs = plt.matplotlib.gridspec.GridSpec(2,1,hspace=0.1)
+    gs = plt.matplotlib.gridspec.GridSpec(2,1,hspace=0.15)
     kw = dict(linewidth=2)
     ax = None
 

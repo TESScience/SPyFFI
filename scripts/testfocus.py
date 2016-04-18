@@ -13,7 +13,7 @@ inputs = default
 
 
 # provide a label, that sets the directory in which outputs will be stored
-inputs['camera']['label'] = 'oriontest'
+inputs['camera']['label'] = 'focustest'
 
 # what is the commanded central ra and dec of the field?
 inputs['camera']['ra'] = 82.0
@@ -25,6 +25,7 @@ inputs['camera']['dec'] = 1.0
 #   simply creating four separate CCDs, with their default sizes
 inputs['camera']['subarray'] = None
 
+inputs['camera']['counterstep'] = 1
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -33,11 +34,10 @@ inputs['camera']['subarray'] = None
 '''
 # if the catalog name is set to 'sky', draw stars from the real sky (UCAC4)
 inputs['catalog']['name'] = 'sky'
-
 inputs['catalog']['skykw']['faintlimit'] = 10.0
 
 # if the catalog name is set to 'testpattern', create a uniformly space grid
-# inputs['catalog']['name'] = 'testpattern'
+#inputs['catalog']['name'] = 'testpattern'
 
 
 '''
@@ -109,7 +109,8 @@ inputs['expose']['display'] = True
 
 # cadencestodo should be a dictionary of cadences to expose, for example:
 # "{2:3, 120:3, 1800:3}" generates (3 each of 2s, 120s, 1800s exposures)
-inputs['observation']['cadencestodo'] = {1800:10, 2:1, 120:1}
+inputs['observation']['cadencestodo'] = {1800:3, 2:1, 120:1}#int(24*2*13.7)
+inputs['observation']['collate'] = False
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------

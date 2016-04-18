@@ -22,6 +22,7 @@ class Camera(Talker):
                         positionangle=None, # position angle of the field
                         stamps=None, # how many postage stamps?
                         variablefocus=False,
+                        dirprefix='',
                         psfkw={},
                         jitterkw={},
                         focuskw={}
@@ -32,6 +33,10 @@ class Camera(Talker):
         Talker.__init__(self)
 
         self.psfkw, self.jitterkw, self.focuskw = psfkw, jitterkw, focuskw
+
+        # in case you want everything stored in its own directory
+        self.dirprefix = dirprefix
+        zachopy.utils.mkdir(settings.prefix + 'outputs/{}'.format(self.dirprefix))
 
         # KLUDGE (or is it?)
         self.stamps = stamps
@@ -58,7 +63,10 @@ class Camera(Talker):
                 'the speed of light to {}c'.format(self.warpspaceandtime))
 
         # should positions be aberrated?
-        self.aberrate=True
+        self.aberrate = aberrate
+
+        # should the focus be allowed to vary?
+        self.variablefocus = variablefocus
 
         # speeding up time
         self.counterstep=counterstep
@@ -127,9 +135,9 @@ class Camera(Talker):
     def fielddirectory(self):
         '''define the field directory for this camera'''
         if self.label == '':
-            d = settings.prefix + 'outputs/{pos}/'.format(pos=self.pos_string())
+            d = settings.prefix + 'outputs/{dirprefix}{pos}/'.format(pos=self.pos_string(), dirprefix=self.dirprefix)
         else:
-            d = settings.prefix + 'outputs/{pos}_{label}/'.format(pos=self.pos_string(), label=self.label)
+            d = settings.prefix + 'outputs/{dirprefix}{pos}_{label}/'.format(pos=self.pos_string(), label=self.label,  dirprefix=self.dirprefix)
         zachopy.utils.mkdir(d)
         return d
 
@@ -161,6 +169,7 @@ class Camera(Talker):
         self.header['PIXDEPTH'] = (self.physicalpixeldepth, '[cm] physical pixel depth')
         self.header['PHYSIGAP'] = (self.physicalgap, '[cm] gap between CCDs')
         self.header['PIXELGAP'] = (self.gapinpixels, '[pix] gap size in pixels (rough)')
+        self.header['FOCUS'] = (None, 'distance from optimal focus (microns)')
         if self.subarray is not None:
             self.header['SUBARRAY'] = (self.subarray, 'THIS IMAGE IS JUST {0}x{1} POSTAGE STAMP!'.format(self.subarray, self.subarray))
 
@@ -190,6 +199,13 @@ class Camera(Talker):
 
         # load the PSF for this Camera
         self.psf = PSF(camera=self, **self.psfkw)
+
+        # make sure the background image gets reset
+        for c in self.ccds:
+            try:
+                del c.backgroundimage
+            except AttributeError:
+                pass
 
     def counterToBJD(self, counter):
         self.bjd0 = 2457827.0
