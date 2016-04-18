@@ -7,91 +7,127 @@ of either the sky or a test pattern.'''
 
 import Camera, Catalogs
 from imports import *
+from defaults import inputs as default
 
 class Observation(Talker):
-	def __init__(self, nexposures=1,  **kwargs):
+    '''an observation object handles a simulated group of observations,
+        using the same general pointing, the same stars, the same lightcurves'''
 
-		Talker.__init__(self)
-		self.nexposures = nexposures
-		self.createCamera(**kwargs)
-		self.createCatalog(**kwargs)
+    def __init__(self, inputs=default):
+        '''initialize a basic observation object'''
 
-	def expose(self, remake=False, write=True, display=False, jitter=True, **kwargs):
-		self.ccd = self.camera.ccds[0]
-		self.ccd.display = display
-		for i in range(self.nexposures):
-			self.ccd.expose(write=write, remake=remake, jitter=jitter, **kwargs)
-			plt.close('all')
+        # store the dictionary of dictionaries of inputs
+        self.inputs = inputs
 
-	def createCamera(self, cadence=2, ra=0.0, dec=0.0, subarray=100, warpspaceandtime=False, counterstep=1, **kwargs):
-		self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray, warpspaceandtime=warpspaceandtime, counterstep=counterstep)
-		try:
-			self.camera.label = kwargs['label']
-		except KeyError:
-			pass
+        # initialize the talker
+        Talker.__init__(self)
 
-	def create(self, stamps=None, **kwargs):
-		try:
-			todo = kwargs['todo']
-		except KeyError:
-			todo = {2:3, 120:3, 1800:int(27.4*48)}
+        # print the inputs for this observation
+        self.speak("  creating a new observation, with the following inputs:")
+        for k in inputs.keys():
+            self.speak('   {:>20s}'.format('inputs[{}] = '.format(k)))
+            for l in inputs[k].keys():
+                self.speak('     {:>30s}:{}'.format(l, inputs[k][l]))
 
+        # setup the basics of the observation
+        self.setupObservation()
 
-		for k in todo.keys():
-			self.camera.setCadence(k)
-			self.camera.counter = 0
-			self.camera.stamps = stamps
-			self.nexposures = todo[k]
-			self.expose(**kwargs)
+        # create the camera
+        self.createCamera()
 
-class Sky(Observation):
-	def __init__(self, subarray=None, **kwargs):
-		Observation.__init__(self, subarray=subarray, **kwargs)
-		self.camera.testpattern=False
+        # create the catalog
+        self.createCatalog()
 
-	def createCatalog(self, radius=0.2, **kwargs):
-		# determine the size of the catalog from the camera's subarray size (in pixels)
-		ra, dec = self.camera.ra, self.camera.dec
-		radius = self.camera.subarray*self.camera.pixelscale/60.0/60.0
-		self.camera.catalog = Catalogs.makeCatalog(name='UCAC4', ra=ra, dec=dec, radius=radius)
+    def setupObservation(self):
+        '''set up the basics of this observation set'''
+        kw = self.inputs['observation']
+        self.cadencestodo = kw['cadencestodo']
+        self.collate = kw['collate']
 
-class SkySubarray(Sky):
-	def __init__(self, subarray=200, **kwargs):
-		kwargs['subarray'] = subarray
-		Sky.__init__(self, **kwargs)
+        name = self.inputs['catalog']['name'].lower()
+        self.testpattern = name == 'testpattern'
 
+    def expose(self):
+        '''execute one exposure of this observation, looping through all CCDs'''
 
-class SkyFFI(Sky):
-	def __init__(self, **kwargs):
-		kwargs['subarray'] = None
-		Sky.__init__(self, **kwargs)
+        # create one exposure, by looping over the CCDs
+        #   (the last CCD will update the counter)
+        for i, c in self.camera.ccds:
+            c.expose(**self.inputs['expose'])
 
-	#def createCamera(self, subarray=None, cadence=2, ra=0.0, dec=0.0, **kwargs):
-	#	self.camera = Camera.Camera(cadence=cadence, ra=ra, dec=dec, subarray=subarray)
+    def create(self, **kwargs):
+        '''make *all* the exposures for this observation,
+           looping through all CCD's, either collating or not'''
 
-	def createCatalog(self, fast=False, **kwargs):
-		# determine the size of the catalog from the camera's subarray size (in pixels)
-		ra, dec = self.camera.ra, self.camera.dec
-		radius = self.camera.fov/np.sqrt(2)*1.01
-		if fast:
-			radius *= 0.1
-		self.camera.catalog = Catalogs.makeCatalog(name='UCAC4', ra=ra, dec=dec, radius=radius)
-
-	def expose(self, remake=False, write=True, display=False, jitter=True, **kwargs):
-		self.ccd = self.camera.ccds[0]
-		self.ccd.display = display
-		for i in range(self.nexposures):
-			self.camera.expose(write=write, remake=remake, jitter=jitter, **kwargs)
+        # loop over the cadences that need to be done
+        for k in self.cadencestodo.keys():
+            # set the cadence to this one
+            self.camera.setCadence(k)
+            np.save(self.camera.directory + 'observationdictionary.npy', self.inputs)
+            # reset the counter
+            self.camera.counter = 0
 
 
-class TestPattern(Observation):
-	def __init__(self, **kwargs):
-		Observation.__init__(self, **kwargs)
-		self.camera.testpattern=True
+            if self.collate:
+                # if collating, loop through exposure numbers, exposing all CCDs
+                for i in range(self.cadencestodo[k]):
+                    for c in self.camera.ccds:
+                        c.expose(**self.inputs['expose'])
 
-	def createCatalog(self, spacing=200.0, magnitudes=[10], ra=0.0, dec=0.0, random=True, nudge=21.1, pm=0.0, **kwargs):
+            else:
+                # if not collating, loop through CCDs, exposing all for each
+                for c in self.camera.ccds:
+                    # reset the counter to 0
+                    self.counter = 0
+                    for i in range(self.cadencestodo[k]):
+                        # expose this CCD
+                        c.expose(advancecounter=False, **self.inputs['expose'])
+                        # advance the counter by hand
+                        c.camera.advanceCounter()
 
-		# determine the size of the catalog from the camera's subarray size (in pixels)
-		assert(self.camera.subarray is not None)
-		size = self.camera.pixelscale*self.camera.subarray # in arcsec
-		self.camera.catalog = Catalogs.makeCatalog(name='testpattern', size=size, spacing=spacing, magnitudes=magnitudes, random=random, nudge=nudge, pm=pm)
+    def createCamera(self):
+
+        self.speak('setting up the camera for this Observation.')
+        kw = self.inputs['camera']
+        self.camera = Camera.Camera(testpattern=self.testpattern, **kw)
+        #try:
+        #    self.camera.label = kw['label']
+        #except KeyError:
+        #    pass
+
+    def createCatalogFromStars(self):
+        # determine the catalog purview from the camera object
+        ra, dec = self.camera.ra, self.camera.dec
+        radius = self.camera.effective_fov*1.01
+        kw = self.inputs['catalog']['skykw']
+
+        self.speak('creating catalog from "real" stars')
+        self.camera.catalog = Catalogs.UCAC4(
+                                ra=ra, dec=dec, radius=radius,
+                                lckw=self.inputs['catalog']['lckw'],
+                                **kw)
+
+    def createCatalogWithTestPattern(self):
+        # determine the catalog purview from the camera object
+        ra, dec = self.camera.ra, self.camera.dec
+        size = 2*self.camera.effective_fov*1.01*3600.0
+
+        self.speak('creating catalog representing a test pattern of stars')
+        kw = self.inputs['catalog']['testpatternkw']
+        self.camera.catalog = Catalogs.TestPattern(
+                                ra=ra, dec=dec, size=size,
+                                lckw=self.inputs['catalog']['lckw'],
+                                **kw)
+
+    def createCatalog(self):
+        try:
+            self.speak('setting up catalog based on '
+                'camera centered at {x.ra:.2f}, {x.dec:.2f}'.format(x=self.camera))
+        except AttributeError:
+            raise RuntimeError('createCamera must be run before createCatalog')
+
+
+        if self.testpattern:
+            self.createCatalogWithTestPattern()
+        else:
+            self.createCatalogFromStars()

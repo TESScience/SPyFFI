@@ -9,7 +9,7 @@ ccds = o.camera.ccds*1
 o.camera.catalog.addLCs(fmax=0.0, magmax=None, seed=0)
 for i, c in enumerate(ccds):
     o.camera.ccds = [c]
-    o.create(todo={1800:1}, stamps=100, skipcosmics=True)
+    o.create(cadencestodo={1800:1}, stamps=100, skipcosmics=True)
     c.aberrator.plotPossibilities()
 
 '''

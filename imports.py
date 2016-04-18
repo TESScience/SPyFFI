@@ -17,3 +17,8 @@ import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.di
 from zachopy.Talker import Talker
 
 #from memory_profiler import profile
+
+# what is the path to the main code directory?
+codedir = os.path.abspath(os.path.dirname(__file__))
+
+# what is the base data output directory?

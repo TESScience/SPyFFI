@@ -13,22 +13,15 @@ Make sure you have recent versions of the following astronomy-related libraries 
     pip install numpy --upgrade  
     pip install astropy --upgrade  
     pip install astroquery --upgrade
-
-
-### pyds9 dependency
-This allows Python to interface directly with ds9 to display images. (This, of course, assumes you have ds9 install too.) Run this from any directory (and then you can delete the downloaded code if you like):
-
-    wget http://ds9.si.edu/download/pyds9/pyds9-1.7.tar.gz
-    tar -xvf pyds9-1.7.tar.gz
-    cd pyds9-1.7
-    python setup.py install
+    pip install git+https://github.com/ericmandel/pyds9.git#egg=pyds9 --upgrade
+    (the last of these allows you to connect to ds9 directly from Python. If you don't have ds9, get it!)
 
 ### SpyFFI Python scripts
 Change to the directory into which you want to install SPyFFI (e.g. ~/code/). From, here clone this git repository with
 
-`git clone https://github.com/zkbt/SPyFFI/`
+`git clone https://username@github.com/zkbt/SPyFFI/`
 
-to create and populate the directory (~/code/SPyFFI). You must be listed as a collaborator on the SPyFFI repository to have access -- contact Zach (zkbt@mit.edu) to be added.
+to create and populate the directory (~/code/SPyFFI), where you replace `username` with your github account name. You must be listed as a collaborator on the SPyFFI repository to have access -- contact Zach (zkbt@mit.edu) to be added.
 
 For an introduction on how to use this github repository more generally, please see [`git_tutorial.md`](https://github.com/zkbt/SPyFFI/blob/master/git_tutorial.md).
 

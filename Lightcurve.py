@@ -5,13 +5,17 @@ import zachopy.units as u
 
 # kludge to figure out path to data resources
 import os
-datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
-print datadir
+datadir = os.path.abspath(os.path.join(codedir, 'data'))
+
+rotationtable = None
+transittable = None
 
 # read the McQuillan table (once)
-print "[lightcurve.py] reading McQuillan rotation table"
-rotationtable = astropy.io.ascii.read(datadir+'/rotation_McQuillan.txt')
 def drawRotation():
+    global rotationtable
+    if rotationtable is None:
+        print "[lightcurve.py] reading McQuillan rotation table"
+        rotationtable = astropy.io.ascii.read(datadir+'/rotation_McQuillan.txt')
     row = rotationtable[np.random.randint(0, len(rotationtable))]
     P=row['PRot']
     E=np.random.uniform(0,P)
@@ -20,11 +24,13 @@ def drawRotation():
 
 
 # read the Kepler TCE table (once)
-print "[lightcurve.py] reading Kepler TCE table"
-transittable = astropy.io.ascii.read(datadir+'/keplerTCE_DR24.txt')
-transittable = transittable[transittable['tce_depth']>1.0]
 def drawTransit():
     #from Seader et al. "The search includes a total of $198,646$ targets, of which $112,001$ were observed in every quarter and $86,645$ were observed in a subset of the 17 quarters.""
+    global transittable
+    if transittable is None:
+        print "[lightcurve.py] reading Kepler TCE table"
+        transittable = astropy.io.ascii.read(datadir+'/keplerTCE_DR24.txt')
+        transittable = transittable[transittable['tce_depth']>1.0]
 
     row = transittable[np.random.randint(0, len(transittable))]
     P=row['tce_period']
@@ -49,19 +55,28 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
-def random(options=['trapezoid', 'sin'], extreme=False):
+def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, **kw):
+    '''
+    random() returns random Lightcurve.
 
+    random() makes use of these keyword arguments:
+        options=['trapezoid', 'sin'] (a list of the kinds of a variability to choose from)
+        extreme=False (should we allow extreme variability [good for movies] or no?)
+    '''
 
-    fractionrotators = len(rotationtable)/133030.0
-    fractiontransiting = len(transittable)/112001.0
+    if np.random.uniform(0,1) < fractionwithextremelc:
+        return cartoonrandom(options=options, extreme=True)
+    else:
+        fractionrotators = 34030.0/133030.0
+        fractiontransiting = 20152/112001.0
 
-    if 'trapezoid' in options:
-        if np.random.uniform(0,1) < fractiontransiting:
-            return drawTransit()
+        if 'trapezoid' in options:
+            if np.random.uniform(0,1) < fractiontransiting:
+                return drawTransit()
 
-    if 'sin' in options:
-        if np.random.uniform(0,1) < fractionrotators:
-            return drawRotation()
+        if 'sin' in options:
+            if np.random.uniform(0,1) < fractionrotators:
+                return drawRotation()
 
     return constant()
 
@@ -71,7 +86,7 @@ def cartoonrandom(options=['trapezoid', 'sin'], extreme=False):
     name = np.random.choice(options)
     if name == 'sin':
         if extreme:
-            p = [0.001, 0.1]
+            p = [0.1, 30.0]
             a = [0.1, 1]
         else:
             p = [0.1, 30.0]
@@ -84,7 +99,7 @@ def cartoonrandom(options=['trapezoid', 'sin'], extreme=False):
 
     if name == 'trapezoid':
         if extreme:
-            p = [0.001, 0.3]
+            p = [0.1, 30.0]
             d = [0.1, 1]
         else:
             p = [0.1, 30.0]
@@ -145,9 +160,7 @@ class Cartoon(Talker):
 
     def integrated(self, t, exptime=30.0/60.0/24.0, resolution=100):
 
-        # don't waste time on this if the light curve is a constant
-        if self.__class__.__name__ == 'constant':
-            return self.model(t)
+
 
         # deal with the edge case of only a single time point being passed
         try:
@@ -155,6 +168,10 @@ class Cartoon(Talker):
         except AttributeError:
             t = np.array([t])
 
+        # don't waste time on this if the light curve is a constant
+        if self.__class__.__name__ == 'constant':
+            return self.model(np.array(t))
+            
         # create a high-resolution subsampled timeseries
         nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
         subsampled = t.reshape(1, t.shape[0]) + nudges.reshape(nudges.shape[0], 1)
