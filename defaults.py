@@ -32,7 +32,7 @@ psfkw = dict(
     focus_toinclude = [0,10],
     stellartemp_toinclude = [4350],#[6440, 3850],#[4350],
 
-    npositions_toinclude = 21,
+    npositions_toinclude = 13,#,21,
     noffsets_toinclude = 11
 
     # in the binned PSFs
