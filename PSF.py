@@ -812,6 +812,30 @@ class PSF(Talker):
 
         return interpolated, centralx + self.dx_pixels, centraly + self.dy_pixels
 
+    def magnifiedPSF(self, position, focus=0.0, stellartemp=4000, verbose=False, binby=2):
+        '''create a magnified PSF to plop into an image, for Kalo's reference PSFs
+            right now, only puts PSFs centered at the centers of pixels (no subpixel offsets)'''
+
+        # pull out the (zero-centered) high resolution PSF for this position
+        zeroCenteredSubgridPSF = self.highResolutionPSF(position, stellartemp=stellartemp, focus=focus, chatty=False)
+
+        originalsize = self.nsubpixelsperpixel*self.npixels
+        newsize = np.round(originalsize/binby).astype(np.int)
+        start = ((originalsize - newsize) % binby)/2
+        trimmed = zeroCenteredSubgridPSF[start:start + newsize*binby, start:start + newsize*binby]
+        newshape = (newsize, binby, newsize, binby)
+        zeroCenteredBinnedPSF = trimmed.reshape(newshape).sum(3).sum(1)
+
+        print zeroCenteredBinnedPSF.shape
+        print newshape
+        print 'effective magnification is {}'.format(np.float(self.nsubpixelsperpixel)/binby)
+        dx, dy = np.meshgrid(np.arange(newsize), np.arange(newsize))
+        dx -= dx.mean().astype(np.int)
+        dy -= dy.mean().astype(np.int)
+
+        ccdx, ccdy = position.ccdxy.integerpixels
+
+        return zeroCenteredBinnedPSF, dx + ccdx, dy + ccdy
 
     def plotPSF(self, psf, title=None, output=None):
         '''Plot a PSF.'''

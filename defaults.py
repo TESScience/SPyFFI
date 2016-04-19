@@ -5,7 +5,7 @@ jitterkw = dict(
     #   the code will rescale so that sqrt(dx**2 + dy**2) = jitterrms
     # if jitterrms is set to None,
     #   the code will use the input jitter timeseries as is
-    jitterrms = None,
+    jitterrms = 2.0/3.0,
 
     # the code looks for a jitter timeseries (at any cadence faster than 2s)
     #   located in '$SPYFFIDATA/inputs/{rawjitterbasename}'
