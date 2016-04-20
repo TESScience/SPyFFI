@@ -5,11 +5,11 @@ jitterkw = dict(
     #   the code will rescale so that sqrt(dx**2 + dy**2) = jitterrms
     # if jitterrms is set to None,
     #   the code will use the input jitter timeseries as is
-    jitterrms = 2.0/3.0,
+    jitterrms = None,
 
     # the code looks for a jitter timeseries (at any cadence faster than 2s)
     #   located in '$SPYFFIDATA/inputs/{rawjitterbasename}'
-    rawjitterbasename="AttErrTimeArcsec_80k.dat",
+    rawjitterbasename="cartoon.jitter",
 
     # by what factor should we rescale the jitter between exposures (without affecting intraexposure jitter)
     amplifyinterexposurejitter=1.0,

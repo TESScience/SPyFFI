@@ -2,6 +2,33 @@
 from imports import *
 import settings
 
+def makeCartoon(seed=1):
+    '''create a cartoon jitter timeseries'''
+
+    np.random.seed(seed)
+    rmsat2s=2.0/3.0
+    rmsat120s=0.21
+
+    # share across two dimensions
+    rmsat120s1d = rmsat120s/np.sqrt(2)
+    rmsat2s1d = rmsat2s/np.sqrt(2)
+
+    cadence = 2.0
+    smoothscale = 10.0
+    nsmooth = int(smoothscale/cadence)
+    t = np.arange(0, 30*24*60*60, 2)
+    n = len(t)
+    d = {}
+    d['t'] = t
+    for k in ['x', 'y']:
+        v = np.random.normal(0,1,n)
+        for i in range(2):
+            v = np.convolve(v, np.ones(nsmooth), mode='same')
+        d[k] = v/np.std(v)*rmsat2s1d
+
+    table = astropy.table.Table(d, names=['t', 'x', 'y'])
+    table.write(settings.inputs + 'cartoon.jitter', format='ascii.fixed_width', bookend=False)
+
 class Jitter(Talker):
   def __init__(self, camera=None, jitterrms=None, rawjitterbasename="AttErrTimeArcsec_80k.dat", nsubpixelsperpixel=None,
       amplifyinterexposurejitter=1.0):
@@ -105,13 +132,15 @@ class Jitter(Talker):
     self.speak('loading raw jitter from {}'.format(self.rawfile))
 
     # load the raw file
-    self.rawdata = astropy.io.ascii.read(self.rawfile,
-                    names=['t','x', 'y', 'z'])
+    if 'AttErrTimeArcsec' in self.rawfile:
+        self.rawdata = astropy.io.ascii.read(self.rawfile,
+                        names=['t','x', 'y', 'z'])
+    else:
+        self.rawdata = astropy.io.ascii.read(self.rawfile, names=['t', 'x', 'y'])
 
     # subtract means
     self.rawdata['x'] -= np.mean(self.rawdata['x'])
     self.rawdata['y'] -= np.mean(self.rawdata['y'])
-    self.rawdata['z'] -= np.mean(self.rawdata['z'])
 
     # scale jitterball to requirements (should be inflation by ~1.5)
     if self.jitterrms is not None:
@@ -120,7 +149,6 @@ class Jitter(Talker):
                       self.rawdata['y']**2))
       self.rawdata['x'] *= self.jitterrms/original_rms
       self.rawdata['y'] *= self.jitterrms/original_rms
-      self.rawdata['z'] *= self.jitterrms/original_rms
 
     # smooth them to the required cadence
     self.speak("smoothing the jitter to {0}s cadence".format(
@@ -142,13 +170,11 @@ class Jitter(Talker):
     smoothed_t = np.convolve(self.rawdata['t'], filter, mode='valid')
     smoothed_x = np.convolve(self.rawdata['x'], filter, mode='valid')
     smoothed_y = np.convolve(self.rawdata['y'], filter, mode='valid')
-    smoothed_z = np.convolve(self.rawdata['z'], filter, mode='valid')
 
     # sample smoothed timeseries at the camera's cadence
     t = smoothed_t[::n]
     x = smoothed_x[::n]
     y = smoothed_y[::n]
-    z = smoothed_z[::n]
 
     # plot each dimension separately
     self.speak('saving binned jitter timeseries plot')
@@ -159,19 +185,16 @@ class Jitter(Talker):
     zachopy.utils.mkdir(plotdirectory)
     bkw = dict(alpha=0.5, color='black')
     rkw = dict(linewidth=2, alpha=0.5, marker='o', color='red')
-    fi, ax = plt.subplots(3,1, sharey=True, sharex=True)
+    fi, ax = plt.subplots(2,1, sharey=True, sharex=True)
     ax[0].plot(self.rawdata['t'], self.rawdata['x'], **bkw)
     ax[0].plot(t, x, **rkw)
     ax[1].plot(self.rawdata['t'], self.rawdata['y'], **bkw)
     ax[1].plot(t, y, **rkw)
-    ax[2].plot(self.rawdata['t'], self.rawdata['z'], **bkw)
-    ax[2].plot(t, z, **rkw)
     ax[0].set_xlim(0,self.camera.cadence*10)
     ax[0].set_title('TESS Pointing Jitter for \n{}\nfor {}s Cadence'.format(self.basename, self.camera.cadence), fontsize=6)
     ax[0].set_ylabel('x (")')
     ax[1].set_ylabel('y (")')
-    ax[2].set_ylabel('z (")')
-    ax[2].set_xlabel('Time (seconds)')
+    ax[1].set_xlabel('Time (seconds)')
     fi.savefig(plotdirectory + self.basename + '_timeseries.pdf')
 
     # make interpolators to keep track of the running smooth means
@@ -179,52 +202,35 @@ class Jitter(Talker):
     xip = scipy.interpolate.interp1d(smoothed_t,smoothed_x,**ikw)
     yip = scipy.interpolate.interp1d(smoothed_t,smoothed_y,**ikw)
 
-    # assign the jittermap here, to be used for convolution in the PSF code
-    xoff = (self.rawdata['x']-xip(self.rawdata['t']))/self.camera.pixelscale
-    yoff = (self.rawdata['y']-yip(self.rawdata['t']))/self.camera.pixelscale
+    # assign the jittermap here, in units of subpixels, to be used for convolution in the PSF code
+    arcsectosubpixels = 1.0/self.camera.pixelscale*self.nsubpixelsperpixel
+    xoff = (self.rawdata['x']-xip(self.rawdata['t']))*arcsectosubpixels
+    yoff = (self.rawdata['y']-yip(self.rawdata['t']))*arcsectosubpixels
 
-    # create a 2D jittermap (MAKE SURE THIS IS OKAY!)
-    narcsec = np.maximum(np.max(np.abs(xoff)), np.max(np.abs(yoff)))#3
-
-    # calculate the number of bins (in units of subpixels)
-    bins = np.ceil(narcsec/self.camera.pixelscale*self.nsubpixelsperpixel).astype(np.int)*2 +1
-
-    # calculate the range of the map (in units of pixels)
-    range = [   [-(bins-1)/2/self.nsubpixelsperpixel,(bins-1)/2/self.nsubpixelsperpixel],
-                [-(bins-1)/2/self.nsubpixelsperpixel,(bins-1)/2/self.nsubpixelsperpixel]]
+    npixelsfromcenter = 1
+    nbins = np.max(np.abs(np.sqrt(xoff**2 + yoff**2)))+1#npixelsfromcenter*self.nsubpixelsperpixel
+    limits = [[-nbins, nbins],[-nbins, nbins]]
 
     # define the jittermap as a 2D histrogram for convolution within exps
     self.jittermap = np.histogram2d(xoff, yoff,
-                      bins=bins,
-                      range=range,
+                      bins=nbins,
+                      range=limits,
                       normed=True)
 
     # define the binned jitterball, for nudges between exps
-    self.jitterball = (x,y,z)
+    self.jitterball = (x,y)
 
     # keep track of the jitter cadence associated with this
     self.jittercadence = self.camera.cadence
 
     self.speak('saving jittermap plots')
-    # make an easier-to-view histogram of the jitterball for plotting
-    jittermap_to_plot = np.histogram2d(xoff, yoff,
-                      bins=50,
-                      range=range,
-                      normed=True)
-
-    # plot this 2D histogram
-    plothist2d(jittermap_to_plot,
-            title='TESS Pointing Jitter over {0}s'.format(
-              self.camera.cadence),
-            xtitle='Pixels', ytitle='Pixels',
-          filename=plotdirectory+self.basename+'_jittermaphires.pdf')
 
     # plot the adopted jitterball, as more useful binning
-    plothist2d(self.jittermap,
+    plothist2d(self.jittermap, scale=1.0/self.nsubpixelsperpixel,
             title='TESS Pointing Jitter over {0}s'.format(
               self.camera.cadence),
             xtitle='Pixels', ytitle='Pixels',
-          filename=plotdirectory+self.basename+'_jittermapadopt.pdf')
+          filename=plotdirectory+self.basename+'_jittermap.pdf')
 
     # save the necessary jitter files
     self.speak('saving the jitter files to {0}'.format(self.processedfile))
@@ -238,9 +244,6 @@ class Jitter(Talker):
   def y(self):
     return self.amplifyinterexposurejitter*self.jitterball[1]
 
-  @property
-  def z(self):
-    return self.amplifyinterexposurejitter*self.jitterball[2]
 
   def writeNudges(self, outfile='jitter.txt'):
 
@@ -274,7 +277,7 @@ class Jitter(Talker):
 
   def applyNudge(self,
                     counter=None, # which row to use from jitterball?
-                    dx=None, dy=None, dz=None, # custom nudges, in arcsec
+                    dx=None, dy=None, # custom nudges, in arcsec
                     header=None, # the FITS header in which to record nudges
                     ):
 
@@ -291,13 +294,11 @@ class Jitter(Talker):
     if usecustom:
       self.camera.nudge['x'] = dx
       self.camera.nudge['y'] = dy
-      self.camera.nudge['z'] = dz
     else:
       # if we're over the counter, loop back
       i = counter % n
       self.camera.nudge['x'] = self.x[i]
       self.camera.nudge['y'] = self.y[i]
-      self.camera.nudge['z'] = self.z[i]
 
     # if possible, write the details to the supplied FITS header
     try:
@@ -322,13 +323,13 @@ class Jitter(Talker):
           " away from nominal pointing.".format(**self.camera.nudge))
 
 
-def plothist2d(hist,  title=None, log=False,
+def plothist2d(hist,  title=None, log=False, scale=1.0,
             xtitle=None, ytitle=None, filename=None):
 
   '''Plot a 2D histogram.'''
   map = hist[0]
-  x = hist[1][1:] + (hist[1][0] - hist[1][1])/2.0
-  y = hist[2][1:]+ (hist[2][0] - hist[2][1])/2.0
+  x = (hist[1][1:] + (hist[1][0] - hist[1][1])/2.0)*scale
+  y = (hist[2][1:]+ (hist[2][0] - hist[2][1])/2.0)*scale
   fig = plt.figure(figsize=(10,10))
   plt.clf()
   plt.subplots_adjust(hspace=0, wspace=0)
