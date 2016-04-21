@@ -208,7 +208,7 @@ class Jitter(Talker):
     yoff = (self.rawdata['y']-yip(self.rawdata['t']))*arcsectosubpixels
 
     npixelsfromcenter = 1
-    nbins = np.max(np.abs(np.sqrt(xoff**2 + yoff**2)))+1#npixelsfromcenter*self.nsubpixelsperpixel
+    nbins = np.maximum(np.max(np.abs(np.sqrt(xoff**2 + yoff**2))), 1)#npixelsfromcenter*self.nsubpixelsperpixel
     limits = [[-nbins, nbins],[-nbins, nbins]]
 
     # define the jittermap as a 2D histrogram for convolution within exps
@@ -359,7 +359,11 @@ def plothist2d(hist,  title=None, log=False, scale=1.0,
   if ytitle is not None:
     ax_map.set_ylabel(ytitle)
 
-  xhalf, yhalf = (x[1]-x[0])/2.0, (y[1] - y[0])/2.0
+  try:
+      xhalf, yhalf = (x[1]-x[0])/2.0, (y[1] - y[0])/2.0
+  except IndexError:
+      xhalf, yhalf = 0.5, 0.5
+
   kw =  dict(cmap='gray_r',
              extent=[x.min() - xhalf, x.max() + xhalf,
                      y.min() - yhalf, y.max() + yhalf],

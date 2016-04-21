@@ -237,7 +237,7 @@ class CCD(Talker):
     return 10**(-0.4*I_surface_brightness)*1.7e6*self.camera.effective_area*self.camera.pixel_solid_area
 
 
-  def writeToFITS(self, image, path, split=False, savetype=np.float32, zip=False):
+  def writeToFITS(self, image, path, split=False, savetype=np.float32, cancompress=True):
     '''General FITS writer for this CCD.'''
 
     # print status
@@ -258,7 +258,10 @@ class CCD(Talker):
 
     # write the file to FITS
     #astropy.io.fits.PrimaryHDU(np.transpose(savetype(image)), header=self.header).writeto(filename, clobber=True)
+
     astropy.io.fits.PrimaryHDU(savetype(image), header=self.header).writeto(path, clobber=True)
+    if self.compress[self.camera.cadence] and cancompress:
+        os.system('gzip -vf {}'.format(path))
 
 
   def loadFromFITS(self, path):
@@ -329,7 +332,8 @@ class CCD(Talker):
     self.writeToFITS(self.stampimage,stampfilename)
 
   def stampify(self):
-    self.image *= self.stampimage != 0
+    if self.stamps is not None:
+        self.image *= self.stampimage != 0
 
   def setupCatalog(self, write=True):
     '''setup the CCD's catalog, by creating it from the camera and then trimming'''
@@ -343,6 +347,7 @@ class CCD(Talker):
     except AttributeError:
       self.speak("populating a new catalog for the camera")
       self.camera.populateCatalog()
+
 
     # we want to make a trimmed catalog for this CCD.
     # first figure out which ones are on the CCD
@@ -365,19 +370,11 @@ class CCD(Talker):
     ok = (x > -buffer) & (x < self.xsize + buffer) & (y > -buffer) & (y < self.ysize + buffer)
 
     # trim to postage stamps, if desired
-    if self.camera.stamps is not None:
+    if self.camera.stamps[self.camera.cadence] is not None:
 
       # select (randomly?) some target stars
       np.random.seed(self.number)
 
-
-      # currently a kludge -- eventually replace with actual target selection
-      '''# this is how the weights were estimated, from a small field
-      hy, edges = np.histogram(tmag)
-      hx = 0.5*(edges[1:] + edges[:-1])
-      plt.figure()
-      plt.plot(hy, hx)
-      np.polyfit(hx, np.log(hy), 1)'''
 
 
       # weight stars inversely to their abundance, to give roughly uniform distribution of magnitudes
@@ -392,7 +389,7 @@ class CCD(Talker):
       weights = (1.0/dndmag( self.camera.catalog.tmag)*( self.camera.catalog.tmag >= 6)*( self.camera.catalog.tmag <= 16))[onccd]
       weights /= np.sum(weights)
       itargets = np.random.choice(onccd.nonzero()[0],
-                    size=np.minimum(self.camera.stamps, np.sum(weights != 0)),
+                    size=np.minimum(self.camera.stamps[self.camera.cadence], np.sum(weights != 0)),
                     replace=False,
                     p=weights)
 
@@ -417,7 +414,7 @@ class CCD(Talker):
       ok[onccd] *= self.stampimage[iy,ix].astype(np.bool)
 
     # keep track of whether this is a stamp catalog or not
-    self.stamps = self.camera.stamps
+    self.stamps = self.camera.stamps[self.camera.cadence]
 
     # create the CCD catalog
     self.catalog = Catalogs.Trimmed(self.camera.catalog, ok)
@@ -442,7 +439,7 @@ class CCD(Talker):
     # make sure the camera has a catalog defined
     try:
       self.catalog
-      assert(self.stamps == self.camera.stamps)
+      assert(self.stamps == self.camera.stamps[self.camera.cadence])
     except (AttributeError,AssertionError):
       self.setupCatalog()
 
@@ -854,7 +851,7 @@ class CCD(Talker):
         self.header['IUNRESOL'] = ('True', 'unresolved stars, treated as smooth background')
 
         # write the image, so it can just be loaded easily next time
-        self.writeToFITS(self.backgroundimage, backgroundsfilename)
+        self.writeToFITS(self.backgroundimage, backgroundsfilename, cancompress=False)
 
     # add the background image to the total image
     self.image += self.backgroundimage
@@ -925,6 +922,7 @@ class CCD(Talker):
                     plot=False, # should we make plots with this exposure?
                     jitter=False, # should this exposure be jittered?
                     writesimulated=False, # should this exposure write to file?
+                    compress={2:True, 120:True, 1800:False},
                     remake=False, # should we remake stars (might try not to)?
                     smear=True, # should readout smear be included?
                     cosmicsversion='fancy', # what kind of cosmics should be included?
@@ -942,6 +940,7 @@ class CCD(Talker):
     '''Expose an image on this CCD.'''
     self.plot = plot
     self.display=display
+    self.compress = compress
 
     # create a blank image
     self.image = self.zeros()

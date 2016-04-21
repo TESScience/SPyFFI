@@ -109,7 +109,6 @@ class Catalog(Talker):
     # determine brightness of star
     moment = np.array([lc.integrated(bjd, exptime) for lc in self.lightcurves]).flatten()
     tmag = self.tmag + moment
-    print "{:.0f}".format(np.max(tmag))
 
     # determine color of star
     temperature = self.temperature

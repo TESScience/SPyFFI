@@ -20,7 +20,7 @@ class Camera(Talker):
                         counterstep=1, # jump by multiple exposures each time?
                         aberrate=True, # apply velocity aberration?
                         positionangle=None, # position angle of the field
-                        stamps=None, # how many postage stamps?
+                        stamps={2:None, 120:None, 1800:None}, # how many postage stamps?
                         variablefocus=False,
                         dirprefix='',
                         psfkw={},

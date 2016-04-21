@@ -55,7 +55,7 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
-def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, **kw):
+def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, fractionwithrotation=None, fractionwithtrapezoid=None, **kw):
     '''
     random() returns random Lightcurve.
 
@@ -67,15 +67,17 @@ def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, **kw):
     if np.random.uniform(0,1) < fractionwithextremelc:
         return cartoonrandom(options=options, extreme=True)
     else:
-        fractionrotators = 34030.0/133030.0
-        fractiontransiting = 20152/112001.0
+        if fractionwithrotation is None:
+            fractionwithrotation = 34030.0/133030.0
+        if fractionwithtrapezoid is None:
+            fractionwithtrapezoid = 20152/112001.0
 
         if 'trapezoid' in options:
-            if np.random.uniform(0,1) < fractiontransiting:
+            if np.random.uniform(0,1) < fractionwithtrapezoid:
                 return drawTransit()
 
         if 'sin' in options:
-            if np.random.uniform(0,1) < fractionrotators:
+            if np.random.uniform(0,1) < fractionwithrotation:
                 return drawRotation()
 
     return constant()
@@ -171,7 +173,7 @@ class Cartoon(Talker):
         # don't waste time on this if the light curve is a constant
         if self.__class__.__name__ == 'constant':
             return self.model(np.array(t))
-            
+
         # create a high-resolution subsampled timeseries
         nudges = np.linspace(-exptime/2.0, exptime/2.0, resolution)
         subsampled = t.reshape(1, t.shape[0]) + nudges.reshape(nudges.shape[0], 1)

@@ -79,8 +79,9 @@ camerakw = dict(
     #  (set to integer > 1 to speed up time)
     counterstep=1,
 
-    # how many fake postage stamps per CCD should be made?
-    stamps = None,
+    # how many fake postage stamps per CCD should be made, for each cadence?
+    stamps = {2:10, 120:4000, 1800:None},
+
     # (ultimately, this should be fleshed out into Stamper object, with options)
 
     # include the PSF keywords here, so they can be passed to PSF
@@ -128,7 +129,14 @@ catalogkw = dict(
                     # what fraction of the bright-enough stars get light curves?
                     fractionofstarswithlc=1.0,
                     # what fraction of light curves are extreme?
-                    fractionwithextremelc=0.01,
+                    fractionwithextremelc=0.002,
+
+                    # what fraction of light curves get trapezoids (or None, for default)
+                    fractionwithtrapezoid=0.3,
+
+                    # what fraction of light curves get sin curves (or None, for default)
+                    fractionwithrotation=0.2,
+
                     # a seed for the randomizer, for repeatability
                     seed=0)
 
@@ -147,6 +155,9 @@ exposekw = dict(
     # should we write an image with no noise?
     writenoiseless=True,
 
+    # should we compress the images when writing images?
+    compress={2:True, 120:True, 1800:False},
+
     # down to what magnitudes should we include? (for fast testing)
     magnitudethreshold=999,
 
@@ -159,7 +170,7 @@ exposekw = dict(
     smear=False,
 
     # should we skip cosmic injection?
-    skipcosmics=False,
+    skipcosmics=True,
 
     # what kind of cosmics should be included? (need to be option?)
     cosmicsversion='fancy',

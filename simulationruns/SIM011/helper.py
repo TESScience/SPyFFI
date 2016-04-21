@@ -49,10 +49,10 @@ if __name__ == '__main__':
 
     ndays = 27.6
     if args.stamps:
-        inputs['camera']['stamps'] = 4000
+        inputs['camera']['stamps'][120] = 4000
         inputs['observation']['cadencestodo'] = {120:int(ndays*48*15)}
     else:
-        inputs['camera']['stamps'] = None
+        inputs['camera']['stamps'][1800] = None
         inputs['observation']['cadencestodo'] = {1800:int(ndays*48)}
 
     print inputs['camera']

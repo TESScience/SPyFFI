@@ -12,10 +12,10 @@ inputs = default
 '''
 
 
-inputs['camera']['dirprefix'] = 'SIM011_quicktest/'
+inputs['camera']['dirprefix'] = 'SIM011_actual/'
 
 # provide a label, that sets the directory in which outputs will be stored
-inputs['camera']['label'] = 'SIM011_quicktest'
+inputs['camera']['label'] = 'SIM011_actual'
 
 # what is the commanded central ra and dec of the field?
 inputs['camera']['ra'] = 82.0
