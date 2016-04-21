@@ -55,7 +55,7 @@ of the PSF library.
 #   the code will rescale so that sqrt(dx**2 + dy**2) = jitterrms (in arcsec)
 # if jitterrms is set to None,
 #   the code will use the input jitter timeseries as is
-inputs['jitter']['jitterrms'] = 2.0/3.0
+inputs['jitter']['jitterrms'] = None#2.0/3.0
 
 inputs['jitter']['amplifyinterexposurejitter'] = 10.0
 
