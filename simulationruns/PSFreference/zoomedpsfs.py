@@ -18,6 +18,9 @@ for binby in [2,4,8]:
             inputs['catalog']['name'] = 'testpattern'
             inputs['catalog']['testpatternkw']['spacing'] = 1000.0
 
+
+            inputs['jitter']['jitterrms'] = 2.0/3.0
+
             inputs['expose']['skipcosmics'] = True
             inputs['expose']['jitter'] = False
             inputs['camera']['aberrate'] = False
