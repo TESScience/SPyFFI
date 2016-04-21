@@ -704,8 +704,8 @@ class PSF(Talker):
         '''Populate a library of binned PRFs, using the jittered, wavelength-integrated, high-resolution library.'''
 
         # KLUDGE! for testing!
-        self.parallelPopulateBinned()
-        return
+        # self.parallelPopulateBinned()
+        # return
 
         self.setupPixelArrays()
 
