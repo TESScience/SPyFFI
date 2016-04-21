@@ -124,12 +124,15 @@ catalogkw = dict(
     # the default settings for the light curves for the catalog
     lckw = dict(    # what kinds of variabilty should be allowed?
                     options=['trapezoid', 'sin'],
+
                     # what magnitude is the faintest star that gets an lc
                     fainteststarwithlc=None,
+
                     # what fraction of the bright-enough stars get light curves?
-                    fractionofstarswithlc=1.0,
+                    fractionofstarswithlc=0.5,
+
                     # what fraction of light curves are extreme?
-                    fractionwithextremelc=0.002,
+                    fractionwithextremelc=0.005,
 
                     # what fraction of light curves get trapezoids (or None, for default)
                     fractionwithtrapezoid=0.3,

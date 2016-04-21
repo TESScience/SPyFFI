@@ -17,10 +17,6 @@ inputs['camera']['dirprefix'] = 'SIM011_actual/'
 # provide a label, that sets the directory in which outputs will be stored
 inputs['camera']['label'] = 'SIM011_actual'
 
-# what is the commanded central ra and dec of the field?
-inputs['camera']['ra'] = 82.0
-inputs['camera']['dec'] = 1.0
-
 # if subarray = an integer number
 #   create a square subarray, with that many pixels on a side
 # if subarray = None,
@@ -44,7 +40,7 @@ inputs['camera']['psfkw']['noffsets_toinclude'] = 11
 '''
 # if the catalog name is set to 'sky', draw stars from the real sky (UCAC4)
 inputs['catalog']['name'] = 'sky'
-inputs['catalog']['skykw']['faintlimit'] = 10
+inputs['catalog']['skykw']['faintlimit'] = None
 
 # if the catalog name is set to 'testpattern', create a uniformly space grid
 #inputs['catalog']['name'] = 'testpattern'
