@@ -29,7 +29,7 @@ for focus in inputs['camera']['psfkw']['focus_toinclude']:
     inputs['camera']['aberrate'] = False
     inputs['camera']['variablefocus'] = True
 
-    inputs['expose']['display'] = True
+    inputs['expose']['display'] = False
     inputs['expose']['writenoiseless'] = False
     inputs['expose']['writecosmics'] = False
 
@@ -77,7 +77,7 @@ for focus in inputs['camera']['psfkw']['focus_toinclude']:
             zpsf, zx, zy = psf.magnifiedPSF(pos, stellartemp=stellartemp, focus=focus, binby=binby)
             ok = (zx >= c.xmin)*(zx < c.xmax)*(zy >= c.ymin)*(zy < c.ymax)
             zoomedimage[zy[ok], zx[ok]] += zpsf[ok]*c.camera.cadence*c.photons(o.camera.catalog.tmag[i])
-            c.ds9.one(zoomedimage, frame=2)
+            #c.ds9.one(zoomedimage, frame=2)
 
         c.header['MAGNIFY'] = ''
         c.header['MAGNOTE'] = ('', 'this image may be a magnitude PSF reference')
