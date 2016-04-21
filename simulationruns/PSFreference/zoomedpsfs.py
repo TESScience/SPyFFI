@@ -19,7 +19,7 @@ for binby in [2,4,8]:
             inputs['catalog']['testpatternkw']['spacing'] = 1000.0
 
 
-            inputs['jitter']['jitterrms'] = 2.0/3.0
+            inputs['jitter']['jitterrms'] = None
 
             inputs['expose']['skipcosmics'] = True
             inputs['expose']['jitter'] = False
@@ -35,10 +35,11 @@ for binby in [2,4,8]:
 
 
             # made a grid in focalxy positions, that land at the centers of CCD pixels
-            x, y = np.meshgrid(np.arange(0, 2049, 256), np.arange(0, 2049, 256))
+            spacing = 512*2/binby
+            x, y = np.meshgrid(np.arange(0, 2049, spacing), np.arange(0, 2049, spacing))
 
-            x = x.flatten().astype(np.float) + (o.camera.ccds[0].center[0] % 1) - 0.5
-            y = y.flatten().astype(np.float) + (o.camera.ccds[0].center[1] % 1) - 0.5
+            x = x.flatten().astype(np.float)# + (o.camera.ccds[0].center[0] % 1) - 0.5
+            y = y.flatten().astype(np.float)# + (o.camera.ccds[0].center[1] % 1) - 0.5
 
             psf = o.camera.psf
             for c in o.camera.ccds:

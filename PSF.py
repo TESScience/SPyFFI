@@ -709,7 +709,7 @@ class PSF(Talker):
 
         self.setupPixelArrays()
 
-        binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:2.0f}positions_{noffsets:02.0f}offsets.npy'.format(
+        binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:02.0f}positions_{noffsets:02.0f}offsets.npy'.format(
                         jitter=self.camera.jitter.basename, intrapixel=self.intrapixel.name,
                         npositions=self.npositions, noffsets=self.noffsets
                         )
