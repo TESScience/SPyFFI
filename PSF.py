@@ -594,6 +594,97 @@ class PSF(Talker):
 
     # populate a library of binned PRFS, using the jittered high-resolution library
     #@profile
+    def parallelPopulateBinned(self, plot=False, chatty=True):
+        '''Populate a library of binned PRFs, using the jittered, wavelength-integrated, high-resolution library.'''
+        self.setupPixelArrays()
+
+        binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:02.0f}positions_{noffsets:02.0f}offsets.npy'.format(
+                        jitter=self.camera.jitter.basename, intrapixel=self.intrapixel.name,
+                        npositions=self.npositions, noffsets=self.noffsets
+                        )
+        try:
+            self.speak('trying to load PSFs from {0}'.format(binned_filename))
+            self.binned, self.binned_axes = np.load(binned_filename)
+            self.speak('...success!')
+        except IOError:
+            self.speak('creating a new library of binned PSFs')
+            self.populateJitteredPSFLibrary()
+
+            # set up the grid of values over which the
+            self.binned_axes = {}
+            self.binned_axes['focus'] = self.unbinned_axes['focus']
+            self.binned_axes['stellartemp'] = self.unbinned_axes['stellartemp']
+            self.binned_axes['fieldx_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldx_mm']),np.max(self.unbinned_axes['fieldx_mm']),self.npositions)/self.pixelstomm).astype(np.int)
+            self.binned_axes['fieldy_px'] = np.round(np.linspace(-np.max(self.unbinned_axes['fieldy_mm']),np.max(self.unbinned_axes['fieldy_mm']),self.npositions)/self.pixelstomm).astype(np.int)
+            self.binned_axes['xoffset'] = np.linspace(-0.5, 0.5, self.noffsets)# 11)
+            self.binned_axes['yoffset'] = np.linspace(-0.5, 0.5, self.noffsets)# 11)
+
+            self.numberofbinnedentries = 1
+            for k,v in self.binned_axes.items():
+                l = len(v)
+                self.speak('including {} entries for {}'.format(l, k))
+                self.numberofbinnedentries *= l
+            self.countthroughbinnedentries = 0
+            try:
+                self.binned
+            except AttributeError:
+                self.binned = {}
+                for focus in self.binned_axes['focus']:
+                    self.speak('adding focus {0:.1f}um'.format(focus), 1)
+                    try:
+                        self.binned[focus]
+                    except KeyError:
+                        self.binned[focus] = {}
+
+                        for stellartemp in self.binned_axes['stellartemp']:
+                            self.speak('adding stellartemp of {0:.0f}K'.format(stellartemp), 2)
+
+                            try:
+                                self.binned[focus][stellartemp]
+                            except KeyError:
+                                self.binned[focus][stellartemp] = {}
+
+                                for fieldx in self.binned_axes['fieldx_px']:
+                                    self.speak('adding focal plane x of {0:.0f} pixels'.format(fieldx), 3)
+                                    try:
+                                        self.binned[focus][stellartemp][fieldx]
+                                    except KeyError:
+                                        self.binned[focus][stellartemp][fieldx] = {}
+
+                                        for fieldy in self.binned_axes['fieldy_px']:
+                                            self.speak('adding focal plane y of {0:.0f} pixels'.format(fieldy), 4)
+                                            try:
+                                                self.binned[focus][stellartemp][fieldx][fieldy]
+                                            except KeyError:
+                                                manager = multiprocessing.Manager()
+                                                self.binned[focus][stellartemp][fieldx][fieldy] = manager.dict()
+
+                                            position = self.cartographer.point(fieldx, fieldy, 'focalxy')
+                                            jobs = [multiprocessing.Process(target=self.addPixelized, args=(self.binned[focus][stellartemp][fieldx][fieldy], xoffset, yoffset))]
+                                            for xoffset in self.binned_axes['xoffset']:
+                                                self.speak('adding xoffset of {0:.2f} pixels'.format(xoffset), 6)
+                                                try:
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset]
+                                                except KeyError:
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset] = {}
+
+                                                for yoffset in self.binned_axes['yoffset']:
+                                                    self.speak('adding yoffset of {0:.2f} pixels'.format(yoffset), 6)
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset][yoffset] = self.binHighResolutionPSF(position, stellartemp=stellartemp, dx=xoffset, dy=yoffset, focus=focus, plot=plot, chatty=chatty)[0]
+                                                    if plot:
+                                                        plotdir = binned_filename.replace('pixelizedlibrary_', 'plotsfor_') + '/'
+                                                        zachopy.utils.mkdir(plotdir)
+                                                        plotfile = plotdir + 'f{focus:.0f}t{stellartemp:.0f}xf{fieldx:.0f}yf{fieldy:.0f}xo{xoffset:.2f}yo{yoffset:.2f}.pdf'.format(**locals())
+                                                        plt.savefig(plotfile)
+                                                        self.speak('saved plot to {}'.format(plotfile))
+                                                    self.speak('(focus={focus:.2f}um, T={stellartemp:.0f}K, pos={position}, dx={xoffset:.2f} pixels, dy={yoffset:.2f} pixels)'.format(**locals()), 6)
+                                                    self.countthroughbinnedentries += 1
+                                                    self.speak('{}/{} PSFs binned'.format(self.countthroughbinnedentries, self.numberofbinnedentries))
+                                                    #self.input('thoughts?')
+                np.save(binned_filename, (self.binned, self.binned_axes))
+                self.speak('saved binned PSF library to {0}'.format(binned_filename))
+
+
     def populateBinned(self, plot=False, chatty=True):
         '''Populate a library of binned PRFs, using the jittered, wavelength-integrated, high-resolution library.'''
         self.setupPixelArrays()
