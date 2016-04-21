@@ -12,8 +12,8 @@ stellartemp = 4350
 magnification = 101.0/binby
 for focus in inputs['camera']['psfkw']['focus_toinclude']:
     inputs['camera']['psfkw']['stellartemp_toinclude'] = [stellartemp]
-    inputs['camera']['psfkw']['npositions_toinclude'] = 4
-    inputs['camera']['psfkw']['noffsets_toinclude'] = 3
+    inputs['camera']['psfkw']['npositions_toinclude'] = 3
+    inputs['camera']['psfkw']['noffsets_toinclude'] = 11
 
     inputs['camera']['dirprefix'] = 'PSFtest/'
 

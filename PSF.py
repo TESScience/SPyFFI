@@ -5,6 +5,7 @@ from CCD import CCD
 from Cartographer import Cartographer
 from scipy.io import loadmat
 from zachopy.displays.ds9 import ds9
+import multiprocessing
 
 # define everything related to PSFs
 class PSF(Talker):
@@ -619,6 +620,7 @@ class PSF(Talker):
             self.binned_axes['xoffset'] = np.linspace(-0.5, 0.5, self.noffsets)# 11)
             self.binned_axes['yoffset'] = np.linspace(-0.5, 0.5, self.noffsets)# 11)
 
+            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
             self.numberofbinnedentries = 1
             for k,v in self.binned_axes.items():
                 l = len(v)
@@ -656,37 +658,55 @@ class PSF(Talker):
                                             try:
                                                 self.binned[focus][stellartemp][fieldx][fieldy]
                                             except KeyError:
-                                                manager = multiprocessing.Manager()
-                                                self.binned[focus][stellartemp][fieldx][fieldy] = manager.dict()
+                                                self.binned[focus][stellartemp][fieldx][fieldy] = {}
 
                                             position = self.cartographer.point(fieldx, fieldy, 'focalxy')
-                                            jobs = [multiprocessing.Process(target=self.addPixelized, args=(self.binned[focus][stellartemp][fieldx][fieldy], xoffset, yoffset))]
+
                                             for xoffset in self.binned_axes['xoffset']:
                                                 self.speak('adding xoffset of {0:.2f} pixels'.format(xoffset), 6)
                                                 try:
                                                     self.binned[focus][stellartemp][fieldx][fieldy][xoffset]
                                                 except KeyError:
-                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset] = {}
+                                                    manager = multiprocessing.Manager()
+                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset]  = manager.dict()
 
-                                                for yoffset in self.binned_axes['yoffset']:
-                                                    self.speak('adding yoffset of {0:.2f} pixels'.format(yoffset), 6)
-                                                    self.binned[focus][stellartemp][fieldx][fieldy][xoffset][yoffset] = self.binHighResolutionPSF(position, stellartemp=stellartemp, dx=xoffset, dy=yoffset, focus=focus, plot=plot, chatty=chatty)[0]
-                                                    if plot:
-                                                        plotdir = binned_filename.replace('pixelizedlibrary_', 'plotsfor_') + '/'
-                                                        zachopy.utils.mkdir(plotdir)
-                                                        plotfile = plotdir + 'f{focus:.0f}t{stellartemp:.0f}xf{fieldx:.0f}yf{fieldy:.0f}xo{xoffset:.2f}yo{yoffset:.2f}.pdf'.format(**locals())
-                                                        plt.savefig(plotfile)
-                                                        self.speak('saved plot to {}'.format(plotfile))
-                                                    self.speak('(focus={focus:.2f}um, T={stellartemp:.0f}K, pos={position}, dx={xoffset:.2f} pixels, dy={yoffset:.2f} pixels)'.format(**locals()), 6)
-                                                    self.countthroughbinnedentries += 1
-                                                    self.speak('{}/{} PSFs binned'.format(self.countthroughbinnedentries, self.numberofbinnedentries))
-                                                    #self.input('thoughts?')
+
+                                                jobs = [multiprocessing.Process(target=self.addPixelized, args=(self.binned[focus][stellartemp][fieldx][fieldy][xoffset], position, focus, stellartemp, xoffset, yoffset)) for yoffset in self.binned_axes['yoffset']]
+                                                #for yoffset in self.binned_axes['yoffset']:
+                                                #    pool.apply_async(self.addPixelized, (self.binned[focus][stellartemp][fieldx][fieldy][xoffset], position, focus, stellartemp, xoffset, yoffset))
+                                                for j in jobs:
+                                                    j.start()
+                                                for j in jobs:
+                                                    j.join()
+
+                                                self.countthroughbinnedentries += len(self.binned_axes['yoffset'])
+                                                self.speak('')
+                                                self.speak('{}/{} PSFs binned'.format(self.countthroughbinnedentries, self.numberofbinnedentries))
+                                                self.speak('')
+
                 np.save(binned_filename, (self.binned, self.binned_axes))
                 self.speak('saved binned PSF library to {0}'.format(binned_filename))
 
+    def addPixelized(self, d, position, focus, stellartemp, xoffset, yoffset, plot=False, chatty=True):
+        self.speak('adding yoffset of {0:.2f} pixels'.format(yoffset), 6)
+        d[yoffset] = self.binHighResolutionPSF(position, stellartemp=stellartemp, dx=xoffset, dy=yoffset, focus=focus, plot=plot, chatty=chatty)[0]
+        if plot:
+            plotdir = binned_filename.replace('pixelizedlibrary_', 'plotsfor_') + '/'
+            zachopy.utils.mkdir(plotdir)
+            plotfile = plotdir + 'f{focus:.0f}t{stellartemp:.0f}xf{fieldx:.0f}yf{fieldy:.0f}xo{xoffset:.2f}yo{yoffset:.2f}.pdf'.format(**locals())
+            plt.savefig(plotfile)
+            self.speak('saved plot to {}'.format(plotfile))
+        self.speak('(focus={focus:.2f}um, T={stellartemp:.0f}K, pos={position}, dx={xoffset:.2f} pixels, dy={yoffset:.2f} pixels)'.format(**locals()), 6)
+        return None
+        #self.input('thoughts?')
 
     def populateBinned(self, plot=False, chatty=True):
         '''Populate a library of binned PRFs, using the jittered, wavelength-integrated, high-resolution library.'''
+
+        # KLUDGE! for testing!
+        self.parallelPopulateBinned()
+        return
+
         self.setupPixelArrays()
 
         binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:2.0f}positions_{noffsets:02.0f}offsets.npy'.format(
