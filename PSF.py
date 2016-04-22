@@ -495,7 +495,7 @@ class PSF(Talker):
             self.speak(' {yweightbelow}*{yweightabove}*library[{ybelow}][{yabove}]'.format(**locals()))
 
         # MAKE SURE THE TRANSPOSE IS RIGHT!
-        return psf[::xdirection,::ydirection]/np.sum(psf)
+        return psf[::ydirection,::xdirection]/np.sum(psf)
 
         # return a PSF that has the right shape, but is still centered at (0.0, 0.0)
         #return psf

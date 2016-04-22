@@ -13,6 +13,9 @@ magnification = 101.0/binby
 for focus in inputs['camera']['psfkw']['focus_toinclude']:
     for stellartemp in inputs['camera']['psfkw']['stellartemp_toinclude']:
 
+        inputs['camera']['psfkw']['npositions_toinclude'] = 1
+        inputs['camera']['psfkw']['noffsets_toinclude'] = 1
+
         inputs['camera']['dirprefix'] = 'PSFtest/'
 
         inputs['camera']['label'] = 'focus{:.0f}_stellartemp{:.0f}_magnifyby{:.2f}'.format(focus, stellartemp, magnification).replace('.','p')
@@ -68,23 +71,23 @@ for focus in inputs['camera']['psfkw']['focus_toinclude']:
             c.writeToFITS(c.starimage, unmagnifiedfilename, savetype=np.int32)
 
 
-        #for i in range(len(x)):
-        zoomedimage = np.zeros_like(c.image)
-        for i in range(len(x)):
-            pos = o.camera.cartographer.point(x[i], y[i], 'ccdxy')
-            zpsf, zx, zy = psf.magnifiedPSF(pos, stellartemp=stellartemp, focus=focus, binby=binby)
-            ok = (zx >= c.xmin)*(zx < c.xmax)*(zy >= c.ymin)*(zy < c.ymax)
-            zoomedimage[zy[ok], zx[ok]] += zpsf[ok]*c.camera.cadence*c.photons(o.camera.catalog.tmag[i])
-            #c.ds9.one(zoomedimage, frame=2)
+            #for i in range(len(x)):
+            zoomedimage = np.zeros_like(c.image)
+            for i in range(len(x)):
+                pos = o.camera.cartographer.point(x[i], y[i], 'ccdxy')
+                zpsf, zx, zy = psf.magnifiedPSF(pos, stellartemp=stellartemp, focus=focus, binby=binby)
+                ok = (zx >= c.xmin)*(zx < c.xmax)*(zy >= c.ymin)*(zy < c.ymax)
+                zoomedimage[zy[ok], zx[ok]] += zpsf[ok]*c.camera.cadence*c.photons(o.camera.catalog.tmag[i])
+                #c.ds9.one(zoomedimage, frame=2)
 
-        c.header['MAGNIFY'] = ''
-        c.header['MAGNOTE'] = ('', 'this image may be a magnitude PSF reference')
-        c.header['MAGFACTO'] = (np.float(psf.nsubpixelsperpixel)/binby, 'PSFs are magnified by this factor')
-        c.header['MAGFOCUS'] = (focus, 'all at this focus')
-        c.header['MAGTEMP'] = (stellartemp, 'all at this stellartemp')
-        c.header['IMAGNIFY'] = (True, 'are the PSFs magnified in this image?')
+            c.header['MAGNIFY'] = ''
+            c.header['MAGNOTE'] = ('', 'this image may be a magnitude PSF reference')
+            c.header['MAGFACTO'] = (np.float(psf.nsubpixelsperpixel)/binby, 'PSFs are magnified by this factor')
+            c.header['MAGFOCUS'] = (focus, 'all at this focus')
+            c.header['MAGTEMP'] = (stellartemp, 'all at this stellartemp')
+            c.header['IMAGNIFY'] = (True, 'are the PSFs magnified in this image?')
 
 
-        c.note = 'magnified_focus{:.0f}_stellartemp{:.0f}_'.format(focus, stellartemp)  +c.fileidentifier
-        magnifiedfilename = c.directory + c.note + '.fits'
-        c.writeToFITS(zoomedimage, magnifiedfilename, savetype=np.int32)
+            c.note = 'magnified_focus{:.0f}_stellartemp{:.0f}_'.format(focus, stellartemp)  +c.fileidentifier
+            magnifiedfilename = c.directory + c.note + '.fits'
+            c.writeToFITS(zoomedimage, magnifiedfilename, savetype=np.int32)
