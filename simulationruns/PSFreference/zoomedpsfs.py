@@ -7,11 +7,14 @@ import numpy as np
 inputs = default
 
 binby = 2
-for binby in [2,4,8]:
+for binby in [2,3,4,5,6,7,8,9,10]:
     magnification = 101.0/binby
+    spacing = 2048/binby#np.int(21.0*magnification)
     for focus in inputs['camera']['psfkw']['focus_toinclude']:
         for stellartemp in inputs['camera']['psfkw']['stellartemp_toinclude']:
 
+            inputs['camera']['psfkw']['npositions_toinclude'] = 1
+            inputs['camera']['psfkw']['noffsets_toinclude'] = 1
             inputs['camera']['dirprefix'] = 'PSFreference/'
 
             inputs['camera']['label'] = 'focus{:.0f}_stellartemp{:.0f}_magnifyby{:.2f}'.format(focus, stellartemp, magnification).replace('.','p')
@@ -35,8 +38,8 @@ for binby in [2,4,8]:
 
 
             # made a grid in focalxy positions, that land at the centers of CCD pixels
-            spacing = 512*2/binby
-            x, y = np.meshgrid(np.arange(0, 2049, spacing), np.arange(0, 2049, spacing))
+            #spacing = 512*2/binby
+            x, y = np.meshgrid(np.arange(spacing/2, 2048 + spacing/2, spacing), np.arange(spacing/2, 2048 + spacing/2, spacing))
 
             x = x.flatten().astype(np.float)# + (o.camera.ccds[0].center[0] % 1) - 0.5
             y = y.flatten().astype(np.float)# + (o.camera.ccds[0].center[1] % 1) - 0.5

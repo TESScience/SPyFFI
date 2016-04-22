@@ -13,7 +13,7 @@ magnification = 101.0/binby
 for focus in inputs['camera']['psfkw']['focus_toinclude']:
     for stellartemp in inputs['camera']['psfkw']['stellartemp_toinclude']:
 
-        inputs['camera']['psfkw']['npositions_toinclude'] = 1
+        inputs['camera']['psfkw']['npositions_toinclude'] = 5
         inputs['camera']['psfkw']['noffsets_toinclude'] = 1
 
         inputs['camera']['dirprefix'] = 'PSFtest/'
