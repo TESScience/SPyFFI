@@ -12,10 +12,10 @@ inputs = default
 '''
 
 
-inputs['camera']['dirprefix'] = 'SIM011_actual/'
+inputs['camera']['dirprefix'] = 'SIM011and12/'
 
 # provide a label, that sets the directory in which outputs will be stored
-inputs['camera']['label'] = 'SIM011_actual'
+inputs['camera']['label'] = 'SIM011and12'
 
 # if subarray = an integer number
 #   create a square subarray, with that many pixels on a side
@@ -30,7 +30,7 @@ inputs['camera']['warpspaceandtime'] = 0.1
 inputs['camera']['variablefocus'] = False
 
 
-inputs['camera']['psfkw']['npositions_toinclude'] = 13
+inputs['camera']['psfkw']['npositions_toinclude'] = 11
 inputs['camera']['psfkw']['noffsets_toinclude'] = 11
 
 '''
