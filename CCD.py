@@ -591,7 +591,7 @@ class CCD(Talker):
     #self.speak("adding stars")
     self.starcounter = 0
     self.nstars =0
-    if jitter or self.camera.aberrate=True or self.camera.variablefocus=True:
+    if jitter or self.camera.aberrate or self.camera.variablefocus:
       remake=True
     self.camera.cartographer._pithy = True
     # define a grid of magnitude thresholds, will save an image containing all stars brighter than each
