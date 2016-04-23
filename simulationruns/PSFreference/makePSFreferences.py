@@ -7,7 +7,7 @@ import numpy as np
 inputs = default
 
 binby = 2
-for binby in [2,3,4,5,6,8,10]:
+for binby in [2,3,4,5,6,8]:
     magnification = 101.0/binby
     spacing = 2048/binby#np.int(21.0*magnification)
     for focus in inputs['camera']['psfkw']['focus_toinclude']:

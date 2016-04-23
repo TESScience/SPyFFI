@@ -587,11 +587,11 @@ class CCD(Talker):
     self.starimage[yindex[ok], xindex[ok]] += binned[ok]
     #a = self.input('just added {}'.format(ccdxy))
 
-  def addStars(self, remake=False, jitter=False, magnitudethreshold=None):
+  def addStars(self, remake=True, jitter=False, magnitudethreshold=None):
     #self.speak("adding stars")
     self.starcounter = 0
     self.nstars =0
-    if jitter:
+    if jitter or self.camera.aberrate=True or self.camera.variablefocus=True:
       remake=True
     self.camera.cartographer._pithy = True
     # define a grid of magnitude thresholds, will save an image containing all stars brighter than each
@@ -923,7 +923,7 @@ class CCD(Talker):
                     jitter=False, # should this exposure be jittered?
                     writesimulated=False, # should this exposure write to file?
                     compress={2:True, 120:True, 1800:False},
-                    remake=False, # should we remake stars (might try not to)?
+                    remake=True, # should we remake stars (might try not to)?
                     smear=True, # should readout smear be included?
                     cosmicsversion='fancy', # what kind of cosmics should be included?
                     cosmicsdiffusion=False, # should diffusion of cosmics be done?
