@@ -5,14 +5,11 @@ The Spiffy Python for Full Frame Images package is a collection of tools for sim
 
 ### basic usage
 
-Once you have it installed, you should be able to start to play, either through the command line in `ipython` or through a script, with something like the following:
+Once you have it installed, you should be able to start to play, either through the command line in `ipython` or through a script, by creating an "Observation" object, and then using that Observation's create() method to generate all its exposures. Observation takes as an input a Python dictionary, which contains the various input parameters (whether you want a test pattern or stars drawn from the real sky, whether images should be jittered, whether stars should be given cartoon light curves, how many exposures of each cadence to make, etc...). An introduction to some of the parameters you may want to change is available in 'scripts/demonstration.py', or you could try the following from an ipython prompt:
 
-    from SPyFFI import Observation
-    o = Observation.TestPattern(magnitudes=[10], subarray=10, nexposures=25, random=True)
-    o.expose(jitter=True)
-
-More instructions will be posted here as the user interface gets a little bit more finalized.
-
+    from SPyFFI.Observation import Observation, default
+    o = Observation(default)
+    o.create()
 
 ### other information
 

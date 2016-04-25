@@ -52,7 +52,7 @@ Make sure you have the following environment variables set, which I do by modify
 Go into the cosmical_realistic directory, and run `python setup.py build_ext --inplace` to compile the C extension required to generate cosmic rays. (It's an intenstive process, and Al's cosmic ray code is a super-fast).
 
 ### download the SPyFFI inputs
-SPyFFI requires a few big files in order to run (primarily the PSF library and a jitterball). Download [SPyFFI_inputs.tar.gz](https://www.dropbox.com/sh/n3mxpi2dol0u9ir/AAAFUi7NlBoW2IjIRZUOxAa5a?dl=0), move it to your $SPYFFIDATA directory, run `tar -xvf SPyFFI_inputs.tar.gz` to unpack it.
+SPyFFI requires a few big files in order to run (primarily the PSF library and a jitterball). Download [SPyFFI_coreinputs.tar.gz](https://www.dropbox.com/s/0e4c2uk34phv4qx/SPyFFI_coreinputs.tar.gz?dl=0), move it to your $SPYFFIDATA directory, run `tar -xvf SPyFFI_inputs.tar.gz` to unpack it.
 
 ### asking for help
 These instructions worked for Zach, starting with a clean install on the MIT antares cluster, as of 3/21/2015. It was was fairly smooth, but it *probably* will not work on the first try for you. Sorry! Please e-mail me (zkbt@mit.edu) with problems and I'll try to help as quickly as I can!
