@@ -11,7 +11,7 @@ import scipy.ndimage, scipy.signal, scipy.interpolate
 import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
 
 # general tools from my library
-import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.display, zachopy.oned, zachopy.star
+import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.oned, zachopy.star
 
 # a parent class that allows text reporting to be muted/unmuted
 from zachopy.Talker import Talker

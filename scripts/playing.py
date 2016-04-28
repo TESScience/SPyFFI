@@ -23,7 +23,7 @@ inputs['camera']['label'] = 'quickstarttest'
 #   create a square subarray, with that many pixels on a side
 # if subarray = None,
 #   simply creating four separate CCDs, with their default sizes
-inputs['camera']['subarray'] = None
+inputs['camera']['subarray'] = 100
 
 
 '''
@@ -32,11 +32,11 @@ inputs['camera']['subarray'] = None
 ------------_--------------_--------------_--------------_--------------_-------
 '''
 # if the catalog name is set to 'sky', draw stars from the real sky (UCAC4)
-#inputs['catalog']['name'] = 'sky'
+inputs['catalog']['name'] = 'sky'
 #inputs['catalog']['skykw']['faintlimit'] = 10.0
 
 # if the catalog name is set to 'testpattern', create a uniformly space grid
-inputs['catalog']['name'] = 'testpattern'
+#inputs['catalog']['name'] = 'testpattern'
 
 
 '''
@@ -80,9 +80,6 @@ inputs['expose']['magnitudethreshold'] = 999
 # should the exposures be jittered?
 inputs['expose']['jitter'] = True
 
-# by what factor should we rescale the jitter?
-inputs['expose']['jitterscale'] = 1.0
-
 # should readout smear be included?
 inputs['expose']['smear'] = False
 
@@ -103,7 +100,7 @@ inputs['expose']['display'] = True
 
 # cadencestodo should be a dictionary of cadences to expose, for example:
 # "{2:3, 120:3, 1800:3}" generates (3 each of 2s, 120s, 1800s exposures)
-inputs['observation']['cadencestodo'] = {1800:10, 2:1, 120:1}
+inputs['observation']['cadencestodo'] = {1800:1, 2:1, 120:1}
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -112,5 +109,6 @@ finally, create an observation object, using all these inputs, and make images!
 '''
 # generate the observation object
 o = Observation(inputs)
+
 # use that object to perform all the exposures
 o.create()
