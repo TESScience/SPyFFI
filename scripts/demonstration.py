@@ -13,7 +13,7 @@ inputs = default
 
 
 # provide a label, that sets the directory in which outputs will be stored
-inputs['camera']['label'] = 'quickstarttest'
+inputs['camera']['label'] = 'demonstration'
 
 # what is the commanded central ra and dec of the field?
 #inputs['camera']['ra'] = 82.0
@@ -57,7 +57,7 @@ of the PSF library.
 inputs['jitter']['jitterrms'] = None
 
 # this will amplify the jitter between exposures (without reblurring the PSFs)
-inputs['jitter']['amplifyinterexposurejitter'] = 10.0
+inputs['jitter']['amplifyinterexposurejitter'] = 100.0
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -80,9 +80,6 @@ inputs['expose']['magnitudethreshold'] = 999
 # should the exposures be jittered?
 inputs['expose']['jitter'] = True
 
-# by what factor should we rescale the jitter?
-inputs['expose']['jitterscale'] = 1.0
-
 # should readout smear be included?
 inputs['expose']['smear'] = False
 
@@ -103,7 +100,7 @@ inputs['expose']['display'] = True
 
 # cadencestodo should be a dictionary of cadences to expose, for example:
 # "{2:3, 120:3, 1800:3}" generates (3 each of 2s, 120s, 1800s exposures)
-inputs['observation']['cadencestodo'] = {1800:10, 2:1, 120:1}
+inputs['observation']['cadencestodo'] = {1800:10, 2:10, 120:10}
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
