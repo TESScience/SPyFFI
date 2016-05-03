@@ -33,7 +33,7 @@ Install the zachopy toolkit in exactly the same way, with
 You should also run this from ~/code/ (or whatever you choose), so the zachopy tools will be in your PATH.
 
 ### set environment variables
-Make sure you have the following environment variables set, which I do by modifying my `/.profile` to read:
+Make sure you have the following environment variables set, which I do by modifying my `~/.profile` to read:
 
     ############################
     # TESS -- the SPyFFI tools #
