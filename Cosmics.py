@@ -43,7 +43,7 @@ def cosmicImage(exptime=1800.0, size=2048, rate=5.0, gradient=False, version='fa
     # return the image
     return goodimage
 
-import zachopy.display
+import zachopy.displays
 def display(**kwargs):
     i = cosmicImage(**kwargs)
     d = zachopy.display.ds9('cosmics')
