@@ -80,8 +80,11 @@ camerakw = dict(
     counterstep=1,
 
     # how many fake postage stamps per CCD should be made, for each cadence?
+    # three options:
+    #   if None, then create a full-frame image, for that cadence
+    #   if an integer, then create a randomize catalog of postage stamps
+    #   if a string, then interpret as a filename containing RA and Dec positions
     stamps = {2:10, 120:4000, 1800:None},
-
     # (ultimately, this should be fleshed out into Stamper object, with options)
 
     # include the PSF keywords here, so they can be passed to PSF
@@ -166,8 +169,6 @@ exposekw = dict(
 
     # should the exposures be jittered?
     jitter=True,
-
-
 
     # should readout smear be included?
     smear=False,

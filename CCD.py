@@ -382,29 +382,35 @@ class CCD(Talker):
 
 
       # start with targets with centers on the chip
-      onccd = (np.round(x) > 0) & \
-          (np.round(x) < self.xsize) & \
-          (np.round(y) > 0) & \
-          (np.round(y) < self.ysize)
-      weights = (1.0/dndmag( self.camera.catalog.tmag)*( self.camera.catalog.tmag >= 6)*( self.camera.catalog.tmag <= 16))[onccd]
-      weights /= np.sum(weights)
-      itargets = np.random.choice(onccd.nonzero()[0],
-                    size=np.minimum(self.camera.stamps[self.camera.cadence], np.sum(weights != 0)),
-                    replace=False,
-                    p=weights)
+      if True:#self.inputs['stamps']['type'] == 'random':
+
+          onccd = (np.round(x) > 0) & \
+              (np.round(x) < self.xsize) & \
+              (np.round(y) > 0) & \
+              (np.round(y) < self.ysize)
+          weights = (1.0/dndmag( self.camera.catalog.tmag)*( self.camera.catalog.tmag >= 6)*( self.camera.catalog.tmag <= 16))[onccd]
+          weights /= np.sum(weights)
+          itargets = np.random.choice(onccd.nonzero()[0],
+                        size=np.minimum(self.camera.stamps[self.camera.cadence], np.sum(weights != 0)),
+                        replace=False,
+                        p=weights)
 
 
-      # pull out the target stars, and write them to disk
-      self.targetstarcatalog = Catalogs.Trimmed(self.camera.catalog, itargets)
-      targetsoutfile = self.directory + 'postagestamptargets_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string, name=self.name, epoch=self.epoch)
-      self.targetstarcatalog.writeProjected(ccd=self, outfile=targetsoutfile)
+          # pull out the target stars, and write them to disk
+          self.targetstarcatalog = Catalogs.Trimmed(self.camera.catalog, itargets)
+          targetsoutfile = self.directory + 'postagestamptargets_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string, name=self.name, epoch=self.epoch)
+          self.targetstarcatalog.writeProjected(ccd=self, outfile=targetsoutfile)
 
-      #for t in range(len(self.targetstarcatalog.ra)):
-      #  i = (self.camera.catalog.ra == self.targetstarcatalog.ra[t])*(self.camera.catalog.dec == self.targetstarcatalog.dec[t])
-      #  assert(np.array(self.camera.catalog.lightcurvecodes)[i] == np.array(self.targetstarcatalog.lightcurvecodes)[t])
+          # make a stamp image centered on target stars
+          self.createStamps(x[itargets], y[itargets])
 
-      # make a stamp image centered on target stars
-      self.createStamps(x[itargets], y[itargets])
+      '''elif self.inputs['stamps']['type'] == 'explicit':
+          READ IN A TABLE OF RA AND DEC
+          CONVERT RA AND DEC TO CCDX and CCDY
+          CREATE CATALOG FROM THESE POSITIONS
+          WRITE IT OUT TO THE OUTPUT DIRECTORY
+         CREATE THE STAMPS, USING THAT CATALOG'''
+
 
       # test which stars fall in the mask
       ix, iy = np.round(x[onccd]).astype(np.int), np.round(y[onccd]).astype(np.int)
@@ -942,6 +948,8 @@ class CCD(Talker):
     self.display=display
     self.compress = compress
 
+    # temp kludge
+    cosmics, stars = None, None
     # create a blank image
     self.image = self.zeros()
 
