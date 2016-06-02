@@ -119,6 +119,11 @@ inputs['observation']['cadencestodo'] = {1800:3, 2:3, 120:3}
 #                   (NOT YET IMPLEMENTED! JUNE 2,2016)
 inputs['camera']['stamps'] = {2:None, 120:None, 1800:None}
 
+# a dictionary, like those above
+# should exposures of a particular cadence be compressed?
+inputs['expose']['compress'] = {2:True, 120:True, 1800:False}
+
+
 
 
 '''
