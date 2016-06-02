@@ -26,6 +26,7 @@ inputs['camera']['label'] = 'demonstration'
 inputs['camera']['subarray'] = None
 
 
+
 '''
 ------------_--------------_--------------_--------------_--------------_-------
 "catalog" inputs affect what stars will be used to populate the images.
@@ -57,7 +58,7 @@ of the PSF library.
 inputs['jitter']['jitterrms'] = None
 
 # this will amplify the jitter between exposures (without reblurring the PSFs)
-inputs['jitter']['amplifyinterexposurejitter'] = 100.0
+inputs['jitter']['amplifyinterexposurejitter'] = 1.0
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -87,6 +88,8 @@ inputs['expose']['smear'] = False
 inputs['expose']['skipcosmics'] = True
 
 # should we pretend cosmics don't exist?
+# (if skipcosmics is false and correctcosmics is true,
+#  a cosmic ray image will be made but not added to the final image)
 inputs['expose']['correctcosmics'] = True
 
 # should we display images in ds9, as they're created?
@@ -100,7 +103,23 @@ inputs['expose']['display'] = True
 
 # cadencestodo should be a dictionary of cadences to expose, for example:
 # "{2:3, 120:3, 1800:3}" generates (3 each of 2s, 120s, 1800s exposures)
-inputs['observation']['cadencestodo'] = {1800:10, 2:10, 120:10}
+inputs['observation']['cadencestodo'] = {1800:3, 2:3, 120:3}
+
+# (this links closely to cadences to do)
+# stamps should be a dictionary, with cadences as keys
+# if a cadence's entry is:
+#   None        -- a full-frame image will be produced
+#   an integer  -- this number of postage stamps will be randomly places
+#   a string    -- this will be interpreted as a filename pointing to a
+#                   three-column ascii text file to define where the stamps
+#                   should be placed. the columns should be:
+#                       [1] RA (in degrees)
+#                       [2] Dec (in degrees)
+#                       [3] radius (in pixels) of postage stamp
+#                   (NOT YET IMPLEMENTED! JUNE 2,2016)
+inputs['camera']['stamps'] = {2:None, 120:None, 1800:None}
+
+
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
