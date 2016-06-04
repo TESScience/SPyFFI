@@ -93,7 +93,7 @@ inputs['expose']['skipcosmics'] = True
 inputs['expose']['correctcosmics'] = True
 
 # should we display images in ds9, as they're created?
-inputs['expose']['display'] = True
+inputs['expose']['display'] = False
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
