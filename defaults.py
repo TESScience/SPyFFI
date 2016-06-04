@@ -83,7 +83,7 @@ camerakw = dict(
     # three options:
     #   if None, then create a full-frame image, for that cadence
     #   if an integer, then create a randomize catalog of postage stamps
-    #   if a string, then interpret as a filename containing RA and Dec positions
+    #   if a string, then interpret as a filename containing RA and Dec positions (absolute path!)
     stamps = {2:None, 120:None, 1800:None},
     # (ultimately, this should be fleshed out into Stamper object, with options)
 
@@ -156,10 +156,10 @@ exposekw = dict(
     writesimulated=True,
 
     # should we write an image of the cosmic rays?
-    writecosmics=True,
+    writecosmics=False,
 
     # should we write an image with no noise?
-    writenoiseless=True,
+    writenoiseless=False,
 
     # should we compress the images when writing images?
     compress={2:True, 120:True, 1800:False},
@@ -183,7 +183,7 @@ exposekw = dict(
     cosmicsdiffusion=True,
 
     # should we pretend cosmics don't exist?
-    correctcosmics=False,
+    correctcosmics=True,
 
     # should we display images in ds9, as they're created?
     display=False,

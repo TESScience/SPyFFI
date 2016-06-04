@@ -369,9 +369,8 @@ class UCAC4(Catalog):
     self.temperature = temperatures[ok]
     self.epoch = 2000.0
 
-
 class Trimmed(Catalog):
-  '''a trimed catalog, created by removing elements from another catalog'''
+  '''a trimmed catalog, created by removing elements from another catalog'''
   def __init__(self, inputcatalog, keep):
     '''inputcatalog = the catalog to start with
     keep = an array indices indicating which elements of inputcatalog to use'''

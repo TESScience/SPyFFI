@@ -2,7 +2,7 @@
 # import necessary packages
 import settings
 from imports import *
-import Cosmics, Catalogs
+import Cosmics, Catalogs, Stamper
 
 # setup basic output options for this Python session
 np.set_printoptions(threshold = 1e6, linewidth = 300)
@@ -13,10 +13,7 @@ zipsuffix = ''
 quadrants = {1:(1,1), 2:(-1,1), 3:(-1,-1), 4:(1,-1), 0:None}
 
 
-def dndmag(m):
-  # a rough fit to a random (small) field
-  f = np.exp(-3.293 + 0.697*m)
-  return f
+
 
 class CCD(Talker):
 
@@ -305,32 +302,6 @@ class CCD(Talker):
       self.note = 'withoutbackground_{0:06.0f}'.format(self.camera.counter)
       self.writeToFITS(self.image - self.backgroundimage, self.directory + self.note + '.fits')
 
-  def createStamps(self, x, y, radius=5):
-
-    # create an empty array
-    mask = self.zeros()
-
-    # create a (currently fixed size and shape) aperture
-    diameter = radius*2 + 1
-    xgrid,ygrid = np.meshgrid(np.arange(-radius,radius+1),np.arange(-radius,radius+1))
-    aperture = np.zeros_like(xgrid)
-
-    #make a circular aperture
-    r = np.sqrt(xgrid**2 + ygrid**2)
-    aperture[r <= radius] = 1
-
-
-    # loop over stars
-    for i in range(len(x)):
-      thisx = np.minimum(np.maximum(np.round(x[i]).astype(np.int) + xgrid, 0), self.xsize-1)
-      thisy = np.minimum(np.maximum(np.round(y[i]).astype(np.int) + ygrid, 0), self.ysize-1)
-      mask[thisy,thisx] += aperture
-
-    self.stampimage = mask
-    self.note = 'stampdefinition'
-    stampfilename = self.directory + self.note + '.fits'
-    self.writeToFITS(self.stampimage,stampfilename)
-
   def stampify(self):
     if self.stamps is not None:
         self.image *= self.stampimage != 0
@@ -366,64 +337,17 @@ class CCD(Talker):
     x,y = stars.ccdxy.tuple
 
     # trim everything down to only those stars that could be relevant for this ccd
-    buffer = 10
-    ok = (x > -buffer) & (x < self.xsize + buffer) & (y > -buffer) & (y < self.ysize + buffer)
+    buffer = 0#10
+    onccd = (x > -buffer) & (x < self.xsize + buffer) & (y > -buffer) & (y < self.ysize + buffer)
 
     # trim to postage stamps, if desired
-    if self.camera.stamps[self.camera.cadence] is not None:
-
-      # select (randomly?) some target stars
-      np.random.seed(self.number)
-
-
-
-      # weight stars inversely to their abundance, to give roughly uniform distribution of magnitudes
-
-
-
-      # start with targets with centers on the chip
-      if True:#self.inputs['stamps']['type'] == 'random':
-
-          onccd = (np.round(x) > 0) & \
-              (np.round(x) < self.xsize) & \
-              (np.round(y) > 0) & \
-              (np.round(y) < self.ysize)
-          weights = (1.0/dndmag( self.camera.catalog.tmag)*( self.camera.catalog.tmag >= 6)*( self.camera.catalog.tmag <= 16))[onccd]
-          weights /= np.sum(weights)
-          itargets = np.random.choice(onccd.nonzero()[0],
-                        size=np.minimum(self.camera.stamps[self.camera.cadence], np.sum(weights != 0)),
-                        replace=False,
-                        p=weights)
-
-
-          # pull out the target stars, and write them to disk
-          self.targetstarcatalog = Catalogs.Trimmed(self.camera.catalog, itargets)
-          targetsoutfile = self.directory + 'postagestamptargets_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string, name=self.name, epoch=self.epoch)
-          self.targetstarcatalog.writeProjected(ccd=self, outfile=targetsoutfile)
-
-          # make a stamp image centered on target stars
-          self.createStamps(x[itargets], y[itargets])
-
-      '''elif self.inputs['stamps']['type'] == 'explicit':
-          READ IN A TABLE OF RA AND DEC
-          CONVERT RA AND DEC TO CCDX and CCDY
-          CREATE CATALOG FROM THESE POSITIONS
-          WRITE IT OUT TO THE OUTPUT DIRECTORY
-         CREATE THE STAMPS, USING THAT CATALOG'''
-
-
-      # test which stars fall in the mask
-      ix, iy = np.round(x[onccd]).astype(np.int), np.round(y[onccd]).astype(np.int)
-
-      # mask out those stars that fall outside stamps (or detector)
-      ok *= onccd
-      ok[onccd] *= self.stampimage[iy,ix].astype(np.bool)
+    self.stamper = Stamper.Stamper(specifier=self.camera.stamps[self.camera.cadence], ccd=self)
 
     # keep track of whether this is a stamp catalog or not
     self.stamps = self.camera.stamps[self.camera.cadence]
 
     # create the CCD catalog
-    self.catalog = Catalogs.Trimmed(self.camera.catalog, ok)
+    self.catalog = self.stamper.trimCatalog(self.camera.catalog)
 
   def writeIngredients(self):
 
@@ -646,6 +570,7 @@ class CCD(Talker):
               (self.stary + self.camera.psf.dy_pixels_axis[-1] >= self.ymin) * \
               (self.stary + self.camera.psf.dy_pixels_axis[0] <= self.ymax) * \
               (self.starmag < magnitudethreshold)*(self.starmag >= minimum)
+
           x = self.starx[ok]
           y = self.stary[ok]
           mag = self.starmag[ok]
