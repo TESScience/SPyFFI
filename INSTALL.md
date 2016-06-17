@@ -9,6 +9,7 @@ If you don't have a relatively modern Python 2.7 distribution, download and inst
 ### easy Python dependencies
 Make sure you have recent versions of the following astronomy-related libraries installed. Using `pip` is an easy way to do this (the `--upgrade` flag will make sure you get the most up-to-date version if you have something already installed):
 
+    pip install distribute --upgrade  
     pip install matplotlib --upgrade  
     pip install numpy --upgrade  
     pip install astropy --upgrade  
