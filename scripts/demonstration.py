@@ -16,8 +16,8 @@ inputs = default
 inputs['camera']['label'] = 'demonstration'
 
 # what is the commanded central ra and dec of the field?
-#inputs['camera']['ra'] = 82.0
-#inputs['camera']['dec'] = 1.0
+inputs['camera']['ra'] = 82.0
+inputs['camera']['dec'] = 1.0
 
 # if subarray = an integer number
 #   create a square subarray, with that many pixels on a side
@@ -116,8 +116,7 @@ inputs['observation']['cadencestodo'] = {1800:3, 2:3, 120:3}
 #                       [1] RA (in degrees)
 #                       [2] Dec (in degrees)
 #                       [3] radius (in pixels) of postage stamp
-#                   (NOT YET IMPLEMENTED! JUNE 2,2016)
-inputs['camera']['stamps'] = {2:None, 120:None, 1800:None}
+inputs['camera']['stamps'] = {2:None, 120:20, 1800:None}
 
 # a dictionary, like those above
 # should exposures of a particular cadence be compressed?
