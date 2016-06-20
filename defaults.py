@@ -80,7 +80,7 @@ camerakw = dict(
     counterstep=1,
 
     # how many fake postage stamps per CCD should be made, for each cadence?
-    stamps = {2:10, 120:4000, 1800:None},
+    stamps = {2:10, 20:None, 120:4000, 1800:None, 20:None},
 
     # (ultimately, this should be fleshed out into Stamper object, with options)
 

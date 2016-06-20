@@ -90,7 +90,10 @@ inputs['expose']['skipcosmics'] = True
 inputs['expose']['correctcosmics'] = True
 
 # should we display images in ds9, as they're created?
-inputs['expose']['display'] = True
+inputs['expose']['display'] = False
+
+# should we compress certain image sizes?
+inputs['expose']['compress']={2:True, 120:False, 1800:False, 20:True}
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
