@@ -57,7 +57,7 @@ def generate(code):
     name, traits = parseCode(code)
     return globals()[name](**traits)
 
-def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, fractionwithrotation=None, fractionwithtrapezoid=None, **kw):
+def random(options=['trapezoid', 'sin', 'custom'], fractionwithextremelc=0.01, fractionwithrotation=None, fractionwithtrapezoid=None, fractionwithcustom=0.0, **kw):
     '''
     random() returns random Lightcurve.
 
@@ -85,6 +85,10 @@ def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, fractionwit
         if fractionwithtrapezoid is None:
             fractionwithtrapezoid = 20152/112001.0
 
+        if 'custom' in options:
+            if np.random.uniform(0,1) < fractionwithcustom:
+                return drawCustom()
+
         # give trapezoids preference over sin curves
         if 'trapezoid' in options:
             if np.random.uniform(0,1) < fractionwithtrapezoid:
@@ -94,6 +98,7 @@ def random(options=['trapezoid', 'sin'], fractionwithextremelc=0.01, fractionwit
         if 'sin' in options:
             if np.random.uniform(0,1) < fractionwithrotation:
                 return drawRotation()
+
 
     # if nothing else, make the light curve a constant
     return constant()
@@ -265,3 +270,28 @@ class trapezoid(LightCurve):
         flux[i] = (finish-dt[i])/(finish-start)*depth
 
         return flux
+
+"""
+class custom(LightCurve):
+    def __init__(self, filepath):
+        ''' load a light curve from a file path'''
+        # if you want faster, load the whole light curve into memory here
+
+        # elements of traits will appear in catalog file
+        self.traits = dict(filepath=filepath)
+
+        #
+        self.discretelightcurve = "load"(filename)
+        self.interpolator = "create an interpolator"
+
+    def model(self, t):
+        ''' interpolate a light curve to an infitesimal timepoint '''
+        # if you want less memory intensive, you'll have to keep reloading here
+
+        return self.interpolator(t)
+        # return MAGNITUDES
+
+def drawCustom():
+    '''this function returns a random "custom" light curve object'''
+    good luck!
+"""

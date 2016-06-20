@@ -134,6 +134,7 @@ catalogkw = dict(
                     # what fraction of the bright-enough stars get light curves?
                     fractionofstarswithlc=0.5,
 
+                    # (the following keywords get fed into "random()")
                     # what fraction of light curves are extreme?
                     fractionwithextremelc=0.005,
 
@@ -142,6 +143,9 @@ catalogkw = dict(
 
                     # what fraction of light curves get sin curves (or None, for default)
                     fractionwithrotation=0.2,
+
+                    # what fraction of light curves get custom light curves (from 0 to 1)
+                    fractionwithcustom=0.1,
 
                     # a seed for the randomizer, for repeatability
                     seed=0)

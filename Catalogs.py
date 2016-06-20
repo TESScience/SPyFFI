@@ -48,7 +48,7 @@ class Catalog(Talker):
     # decide whether or not this Catalog is chatty
     Talker.__init__(self, mute=False, pithy=False)
     self.directory = 'catalogs/'
-    zachopy.utils.mkdir(settings.intermediates + self.directory)
+    zachopy.utils.mkdir(os.path.join(settings.intermediates, self.directory))
 
   def addLCs(self, fainteststarwithlc=None, fractionofstarswithlc=1.0, seed=None, **kw):
     '''
