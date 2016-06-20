@@ -80,8 +80,12 @@ camerakw = dict(
     counterstep=1,
 
     # how many fake postage stamps per CCD should be made, for each cadence?
-    stamps = {2:10, 20:None, 120:4000, 1800:None, 20:None},
-
+    # three options:
+    #   if None, then create a full-frame image, for that cadence
+    #   if an integer, then create a randomize catalog of postage stamps
+    #   if a string, then interpret as a filename containing RA and Dec positions (absolute path!)
+    stamps = {2:None, 20:None, 120:None, 1800:None},
+    
     # (ultimately, this should be fleshed out into Stamper object, with options)
 
     # include the PSF keywords here, so they can be passed to PSF
@@ -131,6 +135,7 @@ catalogkw = dict(
                     # what fraction of the bright-enough stars get light curves?
                     fractionofstarswithlc=0.5,
 
+                    # (the following keywords get fed into "random()")
                     # what fraction of light curves are extreme?
                     fractionwithextremelc=0.005,
 
@@ -139,6 +144,9 @@ catalogkw = dict(
 
                     # what fraction of light curves get sin curves (or None, for default)
                     fractionwithrotation=0.2,
+
+                    # what fraction of light curves get custom light curves (from 0 to 1)
+                    fractionwithcustom=0.1,
 
                     # a seed for the randomizer, for repeatability
                     seed=0)
@@ -153,21 +161,19 @@ exposekw = dict(
     writesimulated=True,
 
     # should we write an image of the cosmic rays?
-    writecosmics=True,
+    writecosmics=False,
 
     # should we write an image with no noise?
-    writenoiseless=True,
+    writenoiseless=False,
 
     # should we compress the images when writing images?
-    compress={2:True, 120:True, 1800:False},
+    compress={2:True, 20:True, 120:True, 1800:False},
 
     # down to what magnitudes should we include? (for fast testing)
     magnitudethreshold=999,
 
     # should the exposures be jittered?
     jitter=True,
-
-
 
     # should readout smear be included?
     smear=False,
@@ -182,7 +188,7 @@ exposekw = dict(
     cosmicsdiffusion=True,
 
     # should we pretend cosmics don't exist?
-    correctcosmics=False,
+    correctcosmics=True,
 
     # should we display images in ds9, as they're created?
     display=False,
@@ -190,7 +196,7 @@ exposekw = dict(
 observationkw = dict(
 
     # dictionary of cadences to expose (3 each of 2s, 120s, 1800s exposures)
-    cadencestodo = {2:3, 120:3, 1800:3},
+    cadencestodo = {2:3, 20:3, 120:3, 1800:3},
 
     # if collate is True,
     #   ccds will expose in order [1,2,3,4,1,2,3,4,....]
