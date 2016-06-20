@@ -9,13 +9,11 @@ If you don't have a relatively modern Python 2.7 distribution, download and inst
 ### easy Python dependencies
 Make sure you have recent versions of the following astronomy-related libraries installed. Using `pip` is an easy way to do this (the `--upgrade` flag will make sure you get the most up-to-date version if you have something already installed):
 
-    pip install distribute --upgrade  
     pip install matplotlib --upgrade  
     pip install numpy --upgrade  
     pip install astropy --upgrade  
     pip install astroquery --upgrade
-    pip install git+https://github.com/ericmandel/pyds9.git#egg=pyds9 --upgrade
-    (the last of these allows you to connect to ds9 directly from Python. If you don't have ds9, get it!)
+
 
 ### SpyFFI Python scripts
 Change to the directory into which you want to install SPyFFI (e.g. ~/code/). From, here clone this git repository with

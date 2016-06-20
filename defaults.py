@@ -84,7 +84,7 @@ camerakw = dict(
     #   if None, then create a full-frame image, for that cadence
     #   if an integer, then create a randomize catalog of postage stamps
     #   if a string, then interpret as a filename containing RA and Dec positions (absolute path!)
-    stamps = {2:None, 120:None, 1800:None},
+    stamps = {2:None, 20:None, 120:None, 1800:None},
     # (ultimately, this should be fleshed out into Stamper object, with options)
 
     # include the PSF keywords here, so they can be passed to PSF
@@ -166,7 +166,7 @@ exposekw = dict(
     writenoiseless=False,
 
     # should we compress the images when writing images?
-    compress={2:True, 120:True, 1800:False},
+    compress={2:True, 20:True, 120:True, 1800:False},
 
     # down to what magnitudes should we include? (for fast testing)
     magnitudethreshold=999,
@@ -195,7 +195,7 @@ exposekw = dict(
 observationkw = dict(
 
     # dictionary of cadences to expose (3 each of 2s, 120s, 1800s exposures)
-    cadencestodo = {2:3, 120:3, 1800:3},
+    cadencestodo = {2:3, 20:3, 120:3, 1800:3},
 
     # if collate is True,
     #   ccds will expose in order [1,2,3,4,1,2,3,4,....]

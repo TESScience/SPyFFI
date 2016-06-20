@@ -60,6 +60,13 @@ inputs['jitter']['jitterrms'] = None
 # this will amplify the jitter between exposures (without reblurring the PSFs)
 inputs['jitter']['amplifyinterexposurejitter'] = 1.0
 
+# differential velocity aberration will be included. if you want to make
+# the smooth positional trends associated with DVA larger, then you can
+# set warpspaceandtime=0.1 to slow down the speed of light by a factor of 10X,
+# thereby making the aberration 10X larger
+# if warpspaceandtime is set to False, the aberration will be as expected
+inputs['camera']['warpspaceandtime'] = False
+
 '''
 ------------_--------------_--------------_--------------_--------------_-------
 "expose" keywords determine how individual exposures are generated.
