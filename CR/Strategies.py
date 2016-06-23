@@ -1,5 +1,5 @@
-from SPyFFI.imports import *
-from SPyFFI.Timeseries import Timeseries
+from ..imports import *
+from ..Timeseries import Timeseries
 
 class Strategy(Talker):
     '''Define structures and methods needed by all cosmic ray rejection strategies.'''

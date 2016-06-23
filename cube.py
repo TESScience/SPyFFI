@@ -2,6 +2,7 @@
 from imports import *
 import Camera, CR.Strategies, Stacker
 
+
 subexposurecadence = 2
 class Cube(Talker):
 	'''Cube to handle simulated postage stamp pixel light curves;

@@ -6,8 +6,8 @@
 #mpl.rcParams['font.size'] = 8#'small'
 
 
-from SPyFFI.imports import *
-from SPyFFI.Timeseries import Timeseries
+from ..imports import *
+from ..Timeseries import Timeseries
 from Strategies import *
 plt.ion()
 #plt.rc('text', usetex=False)

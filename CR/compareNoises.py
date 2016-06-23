@@ -1,12 +1,11 @@
-from SPyFFI.imports import *
-import SPyFFI.settings as settings
-from SPyFFI.Cube import Cube
-from SPyFFI.Photometer import Photometer
-from SPyFFI.Stacker import pick
-from SPyFFI.Noise import noise
-from Strategies import *
 import textwrap
-import os
+
+from ..imports import *
+from ..Cube import Cube
+from ..Photometer import Photometer
+from ..Stacker import pick
+from ..Noise import noise
+
 
 def hogg(bin=1, number=25):
     pkw = dict(alpha=0.15,marker='o',linewidth=0, markeredgewidth=0, markersize=5)

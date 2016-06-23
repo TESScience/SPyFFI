@@ -1,11 +1,7 @@
-from SPyFFI.imports import *
-import SPyFFI.settings as settings
-from SPyFFI.Cube import Cube
-from SPyFFI.Photometer import Photometer
-from SPyFFI.Noise import noise
-from Strategies import *
-import textwrap
-import os
+from ..imports import *
+from .. import settings
+from ..Cube import Cube
+from ..Photometer import Photometer
 
 #cube = Cube(cadence=120, size=32, n=100, stacker='Central 8 out of 10')
 cadence = 120

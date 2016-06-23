@@ -1,6 +1,9 @@
 '''(Maybe), keep track of a TESS survey, with multiple cameras over multiple pointings.'''
 
-class Survey(Talker)
+from zachopy.Talker import Talker
+
+
+class Survey(Talker):
     def __init__(self):
         Talker.__init__(self)
         self.offset_from_ecliptic = 6.0									# degrees

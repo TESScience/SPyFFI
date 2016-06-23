@@ -1,6 +1,5 @@
-import transit
-from SPyFFI.imports import *
-from SPyFFI.Timeseries import Timeseries
+from ..imports import *
+from ..Timeseries import Timeseries
 from Strategies import *
 
 

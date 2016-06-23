@@ -1,13 +1,13 @@
-import SPyFFI.Cosmics as Cosmics
-import SPyFFI.settings as settings
-import zachopy.display
+from .. import Cosmics
+from .. import settings
+import zachopy.displays
 import matplotlib.pyplot as plt
 import numpy as np
 
 def demoimages():
     '''Create example images at three cadences.'''
 
-    d = zachopy.display.ds9('Image')
+    d = zachopy.displays.ds9('Image')
 
     for cadence in [2.0, 120.0, 1800.0]:
         image = Cosmics.cosmicImage(exptime=cadence, size=512, rate=5.0, gradient=False, version='fancy', diffusion=False)

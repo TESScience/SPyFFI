@@ -1,5 +1,5 @@
 from imports import *
-import Camera, Cosmics, Cube, Photometer, settings
+import Camera, Cube, Photometer, settings
 
 class Track(object):
     '''Quick way to make a path for a pixel to follow. Must be created with a Cartographer.'''

@@ -1,6 +1,6 @@
 '''Keep track of camera focus (to make cartoon drifts).'''
 from imports import *
-import settings
+
 
 class Focus(Talker):
   def __init__(self, camera=None, span=[0.0,10.0]):

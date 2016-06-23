@@ -1,11 +1,13 @@
+import multiprocessing
+
+from scipy.io import loadmat
+
 from imports import *
 import settings
 import Intrapixel
 from CCD import CCD
 from Cartographer import Cartographer
-from scipy.io import loadmat
-from zachopy.displays.ds9 import ds9
-import multiprocessing
+
 
 # define everything related to PSFs
 class PSF(Talker):
