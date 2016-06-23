@@ -2,28 +2,36 @@
 
 from imports import *
 
-# define a folder that all data is held
+# okay, so, we need to specify where all the SPyFFI data will be
+# this will...
+#  ...first try to find an environment variable $SPYFFIDATA
+#  ...then default to the current working directory
+# if those directories don't contain the required input data, it will complain!
+
+# load the environment variable
 prefix = os.getenv('SPYFFIDATA')
 
-# if that path doesn't exist, complain!
-if not os.path.exists(prefix):
-	print ("""
-			UH-OH! SPyFFI is trying to use '{}' as its base directory.
-			However, it seems that directory doesn't exists. Please make
-			your SPYFFIDATA environment variable to a real directory,
-			or enter the absolute path to such a directory here (although
-			you will have to do this every time, so it's probably better
-			just to set your environemnt variable).
-			""")
+# start with the defaults
+if prefix is not None:
+    print("$SPYFFIDATA is set to {}".format(prefix))
+else:
+    prefix = os.path.join(os.path.abspath('.'), 'data/')
 
-	prefix = raw_input('[enter SPyFFI data path]:')
-	assert(os.path.exists(prefix))
+    print('''
+            The environment variable $SPYFFIDATA does not seem to be set;
+            defaulting to "data/" inside your current working directory:
+            {}
+
+            '''.format(prefix))
+
+    assert(('n' in raw_input('''Please type "n" if that's not okay.''')) == False)
+    zachopy.utils.mkdir(prefix)
 
 # create dirs that will store inputs and outputs
-dirs = dict(	plots=prefix + 'plots/',
-				inputs=prefix + 'inputs/',
-				outputs=prefix + 'outputs/',
-				intermediates=prefix + 'intermediates/')
+dirs = dict(	plots=os.path.join(prefix, 'plots/'),
+				inputs=os.path.join(prefix, 'inputs/'),
+				outputs=os.path.join(prefix, 'outputs/'),
+				intermediates=os.path.join(prefix, 'intermediates/'))
 
 # make sure all those directories exist
 for k in dirs.keys():

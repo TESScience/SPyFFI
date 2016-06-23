@@ -48,7 +48,7 @@ class Catalog(Talker):
     # decide whether or not this Catalog is chatty
     Talker.__init__(self, mute=False, pithy=False)
     self.directory = 'catalogs/'
-    zachopy.utils.mkdir(settings.intermediates + self.directory)
+    zachopy.utils.mkdir(os.path.join(settings.intermediates, self.directory))
 
   def addLCs(self, fainteststarwithlc=None, fractionofstarswithlc=1.0, seed=None, **kw):
     '''
@@ -369,9 +369,8 @@ class UCAC4(Catalog):
     self.temperature = temperatures[ok]
     self.epoch = 2000.0
 
-
 class Trimmed(Catalog):
-  '''a trimed catalog, created by removing elements from another catalog'''
+  '''a trimmed catalog, created by removing elements from another catalog'''
   def __init__(self, inputcatalog, keep):
     '''inputcatalog = the catalog to start with
     keep = an array indices indicating which elements of inputcatalog to use'''

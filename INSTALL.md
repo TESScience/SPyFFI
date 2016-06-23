@@ -13,8 +13,7 @@ Make sure you have recent versions of the following astronomy-related libraries 
     pip install numpy --upgrade  
     pip install astropy --upgrade  
     pip install astroquery --upgrade
-    pip install git+https://github.com/ericmandel/pyds9.git#egg=pyds9 --upgrade
-    (the last of these allows you to connect to ds9 directly from Python. If you don't have ds9, get it!)
+
 
 ### SpyFFI Python scripts
 Change to the directory into which you want to install SPyFFI (e.g. ~/code/). From, here clone this git repository with

@@ -13,7 +13,7 @@ inputs = default
 
 
 # provide a label, that sets the directory in which outputs will be stored
-inputs['camera']['label'] = 'quickstarttest'
+inputs['camera']['label'] = 'demonstration'
 
 # what is the commanded central ra and dec of the field?
 #inputs['camera']['ra'] = 82.0
@@ -23,7 +23,7 @@ inputs['camera']['label'] = 'quickstarttest'
 #   create a square subarray, with that many pixels on a side
 # if subarray = None,
 #   simply creating four separate CCDs, with their default sizes
-inputs['camera']['subarray'] = 100
+inputs['camera']['subarray'] = None
 
 
 '''
@@ -32,11 +32,11 @@ inputs['camera']['subarray'] = 100
 ------------_--------------_--------------_--------------_--------------_-------
 '''
 # if the catalog name is set to 'sky', draw stars from the real sky (UCAC4)
-inputs['catalog']['name'] = 'sky'
+#inputs['catalog']['name'] = 'sky'
 #inputs['catalog']['skykw']['faintlimit'] = 10.0
 
 # if the catalog name is set to 'testpattern', create a uniformly space grid
-#inputs['catalog']['name'] = 'testpattern'
+inputs['catalog']['name'] = 'testpattern'
 
 
 '''
@@ -57,7 +57,7 @@ of the PSF library.
 inputs['jitter']['jitterrms'] = None
 
 # this will amplify the jitter between exposures (without reblurring the PSFs)
-inputs['jitter']['amplifyinterexposurejitter'] = 10.0
+inputs['jitter']['amplifyinterexposurejitter'] = 100.0
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -90,7 +90,13 @@ inputs['expose']['skipcosmics'] = True
 inputs['expose']['correctcosmics'] = True
 
 # should we display images in ds9, as they're created?
-inputs['expose']['display'] = True
+inputs['expose']['display'] = False
+
+# don't write out any images -- this requires you to catch the images as created
+inputs['expose']['writesimulated'] = False
+inputs['expose']['writenoiseless'] = False
+inputs['expose']['writecosmics'] = False
+
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -100,15 +106,16 @@ inputs['expose']['display'] = True
 
 # cadencestodo should be a dictionary of cadences to expose, for example:
 # "{2:3, 120:3, 1800:3}" generates (3 each of 2s, 120s, 1800s exposures)
-inputs['observation']['cadencestodo'] = {1800:1, 2:1, 120:1}
+inputs['observation']['cadencestodo'] = {2:10}
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
 finally, create an observation object, using all these inputs, and make images!
 ------------_--------------_--------------_--------------_--------------_-------
 '''
+
 # generate the observation object
 o = Observation(inputs)
 
 # use that object to perform all the exposures
-o.create()
+#o.create()

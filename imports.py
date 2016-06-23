@@ -8,7 +8,7 @@ import os, copy, subprocess, glob
 import scipy.ndimage, scipy.signal, scipy.interpolate
 
 # lots from astropy
-import astropy.io, astropy.units, astropy.coordinates, astropy.wcs
+import astropy.io, astropy.units, astropy.coordinates, astropy.wcs, astropy.table
 
 # general tools from my library
 import zachopy.utils, zachopy.borrowed.crossfield, zachopy.spherical, zachopy.oned, zachopy.star

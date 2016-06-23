@@ -16,15 +16,14 @@ inputs = default
 inputs['camera']['label'] = 'demonstration'
 
 # what is the commanded central ra and dec of the field?
-inputs['camera']['ra'] = 82.0
-inputs['camera']['dec'] = 1.0
+#inputs['camera']['ra'] = 82.0
+#inputs['camera']['dec'] = 1.0
 
 # if subarray = an integer number
 #   create a square subarray, with that many pixels on a side
 # if subarray = None,
 #   simply creating four separate CCDs, with their default sizes
 inputs['camera']['subarray'] = None
-
 
 
 '''
@@ -58,14 +57,7 @@ of the PSF library.
 inputs['jitter']['jitterrms'] = None
 
 # this will amplify the jitter between exposures (without reblurring the PSFs)
-inputs['jitter']['amplifyinterexposurejitter'] = 1.0
-
-# differential velocity aberration will be included. if you want to make
-# the smooth positional trends associated with DVA larger, then you can
-# set warpspaceandtime=0.1 to slow down the speed of light by a factor of 10X,
-# thereby making the aberration 10X larger
-# if warpspaceandtime is set to False, the aberration will be as expected
-inputs['camera']['warpspaceandtime'] = False
+inputs['jitter']['amplifyinterexposurejitter'] = 100.0
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -95,15 +87,10 @@ inputs['expose']['smear'] = False
 inputs['expose']['skipcosmics'] = True
 
 # should we pretend cosmics don't exist?
-# (if skipcosmics is false and correctcosmics is true,
-#  a cosmic ray image will be made but not added to the final image)
 inputs['expose']['correctcosmics'] = True
 
 # should we display images in ds9, as they're created?
 inputs['expose']['display'] = False
-
-# should we compress certain image sizes?
-inputs['expose']['compress']={2:True, 120:False, 1800:False, 20:True}
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------
@@ -113,27 +100,7 @@ inputs['expose']['compress']={2:True, 120:False, 1800:False, 20:True}
 
 # cadencestodo should be a dictionary of cadences to expose, for example:
 # "{2:3, 120:3, 1800:3}" generates (3 each of 2s, 120s, 1800s exposures)
-inputs['observation']['cadencestodo'] = {1800:3, 2:3, 120:3}
-
-# (this links closely to cadences to do)
-# stamps should be a dictionary, with cadences as keys
-# if a cadence's entry is:
-#   None        -- a full-frame image will be produced
-#   an integer  -- this number of postage stamps will be randomly places
-#   a string    -- this will be interpreted as a filename pointing to a
-#                   three-column ascii text file to define where the stamps
-#                   should be placed. the columns should be:
-#                       [1] RA (in degrees)
-#                       [2] Dec (in degrees)
-#                       [3] radius (in pixels) of postage stamp
-inputs['camera']['stamps'] = {2:None, 120:20, 1800:None}
-
-# a dictionary, like those above
-# should exposures of a particular cadence be compressed?
-inputs['expose']['compress'] = {2:True, 120:True, 1800:False}
-
-
-
+inputs['observation']['cadencestodo'] = {1800:10, 2:10, 120:10}
 
 '''
 ------------_--------------_--------------_--------------_--------------_-------

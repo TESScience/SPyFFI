@@ -52,7 +52,7 @@ class Observation(Talker):
 
         # create one exposure, by looping over the CCDs
         #   (the last CCD will update the counter)
-        for i, c in self.camera.ccds:
+        for i, c in enumerate(self.camera.ccds):
             c.expose(**self.inputs['expose'])
 
     def create(self, **kwargs):
