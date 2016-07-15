@@ -52,8 +52,7 @@ illustrations/
 *.x86_64
 *.hex
 
-##############################
-# ignore JetBrains stuff
-##############################
-
 .idea/
+*.egg-info/
+build/
+dist/

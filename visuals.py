@@ -1,5 +1,5 @@
 import Cube
-import Photometer
+
 c = Cube.Cube(subject='HD 36486', cadence=120, n=60, size=170, jitter=True)
 c.load()
 c.display()

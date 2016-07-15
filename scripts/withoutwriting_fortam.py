@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from SPyFFI.Observation import Observation, default
+from ..Observation import Observation, default
 
 # initialize to default settings
 inputs = default

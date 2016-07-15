@@ -1,8 +1,9 @@
 '''Tools to generate simulated TESS images.'''
 # import necessary packages
-import settings
 from imports import *
-import Cosmics, Catalogs, Stamper
+import Cosmics
+import Stamper
+
 
 # setup basic output options for this Python session
 np.set_printoptions(threshold = 1e6, linewidth = 300)

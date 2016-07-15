@@ -1,23 +1,26 @@
-'''Wrappers to create a stack of observations,
+"""Wrappers to create a stack of observations,
 of any size
 of any cadence
 of any length
-of either the sky or a test pattern.'''
+of either the sky or a test pattern."""
 
-
-import Camera, Catalogs
+import Camera
+import Catalogs
+from debug import DebugDict
 from imports import *
 from defaults import inputs as default
 
-class Observation(Talker):
-    '''an observation object handles a simulated group of observations,
-        using the same general pointing, the same stars, the same lightcurves'''
 
-    def __init__(self, inputs=default):
-        '''initialize a basic observation object'''
+class Observation(Talker):
+    """an observation object handles a simulated group of observations,
+        using the same general pointing, the same stars, the same lightcurves"""
+
+    def __init__(self, inputs=default, debug=False):
+        """initialize a basic observation object"""
+        from documentation.input import documented_keywords
 
         # store the dictionary of dictionaries of inputs
-        self.inputs = inputs
+        self.inputs = inputs if not debug else DebugDict(inputs, documented_keywords)
 
         # initialize the talker
         Talker.__init__(self)
@@ -30,7 +33,7 @@ class Observation(Talker):
                 self.speak('     {:>30s}:{}'.format(l, inputs[k][l]))
 
         # setup the basics of the observation
-        self.setupObservation()
+        self.setup()
 
         # create the camera
         self.createCamera()
@@ -38,8 +41,8 @@ class Observation(Talker):
         # create the catalog
         self.createCatalog()
 
-    def setupObservation(self):
-        '''set up the basics of this observation set'''
+    def setup(self):
+        """set up the basics of this observation set"""
         kw = self.inputs['observation']
         self.cadencestodo = kw['cadencestodo']
         self.collate = kw['collate']
@@ -48,16 +51,16 @@ class Observation(Talker):
         self.testpattern = name == 'testpattern'
 
     def expose(self):
-        '''execute one exposure of this observation, looping through all CCDs'''
+        """execute one exposure of this observation, looping through all CCDs"""
 
         # create one exposure, by looping over the CCDs
         #   (the last CCD will update the counter)
         for i, c in enumerate(self.camera.ccds):
             c.expose(**self.inputs['expose'])
 
-    def create(self, **kwargs):
-        '''make *all* the exposures for this observation,
-           looping through all CCD's, either collating or not'''
+    def create(self):
+        """make *all* the exposures for this observation,
+           looping through all CCD's, either collating or not"""
 
         # loop over the cadences that need to be done
         for k in self.cadencestodo.keys():
@@ -66,7 +69,6 @@ class Observation(Talker):
             np.save(self.camera.directory + 'observationdictionary.npy', self.inputs)
             # reset the counter
             self.camera.counter = 0
-
 
             if self.collate:
                 # if collating, loop through exposure numbers, exposing all CCDs
@@ -90,42 +92,41 @@ class Observation(Talker):
         self.speak('setting up the camera for this Observation.')
         kw = self.inputs['camera']
         self.camera = Camera.Camera(testpattern=self.testpattern, **kw)
-        #try:
+        # try:
         #    self.camera.label = kw['label']
-        #except KeyError:
+        # except KeyError:
         #    pass
 
     def createCatalogFromStars(self):
         # determine the catalog purview from the camera object
         ra, dec = self.camera.ra, self.camera.dec
-        radius = self.camera.effective_fov*1.01
+        radius = self.camera.effective_fov * 1.01
         kw = self.inputs['catalog']['skykw']
 
         self.speak('creating catalog from "real" stars')
         self.camera.catalog = Catalogs.UCAC4(
-                                ra=ra, dec=dec, radius=radius,
-                                lckw=self.inputs['catalog']['lckw'],
-                                **kw)
+            ra=ra, dec=dec, radius=radius,
+            lckw=self.inputs['catalog']['lckw'],
+            **kw)
 
     def createCatalogWithTestPattern(self):
         # determine the catalog purview from the camera object
         ra, dec = self.camera.ra, self.camera.dec
-        size = 2*self.camera.effective_fov*1.01*3600.0
+        size = 2 * self.camera.effective_fov * 1.01 * 3600.0
 
         self.speak('creating catalog representing a test pattern of stars')
         kw = self.inputs['catalog']['testpatternkw']
         self.camera.catalog = Catalogs.TestPattern(
-                                ra=ra, dec=dec, size=size,
-                                lckw=self.inputs['catalog']['lckw'],
-                                **kw)
+            ra=ra, dec=dec, size=size,
+            lckw=self.inputs['catalog']['lckw'],
+            **kw)
 
     def createCatalog(self):
         try:
             self.speak('setting up catalog based on '
-                'camera centered at {x.ra:.2f}, {x.dec:.2f}'.format(x=self.camera))
+                       'camera centered at {x.ra:.2f}, {x.dec:.2f}'.format(x=self.camera))
         except AttributeError:
             raise RuntimeError('createCamera must be run before createCatalog')
-
 
         if self.testpattern:
             self.createCatalogWithTestPattern()
