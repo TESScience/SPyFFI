@@ -1,5 +1,9 @@
 documented_keywords = {
-    'catalog': {'name': 'Name of catalog to use'},
-    'observation': {'cadencetodo': '???',
-                    'collate': '???'}
+    'catalog': {'name': 'Name of catalog to use',
+                    'skykw': '???',
+                    'lckw': '???'},
+    'observation': {'cadencestodo': '???',
+                    'collate': '???'},
+    'camera' : {},
+    'expose' : {}
 }
