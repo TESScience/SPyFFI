@@ -20,8 +20,8 @@ $(SPYFFIDATA):
 
 $(SPYFFIDATA)/inputs: $(SPYFFIDATA)
 	(cd $(SPYFFIDATA); \
-		wget https://www.dropbox.com/s/0e4c2uk34phv4qx/SPyFFI_coreinputs.tar.gz; \
-		tar xzf SPyFFI_coreinputs.tar.gz )
+		wget -qO- https://www.dropbox.com/s/0e4c2uk34phv4qx/SPyFFI_coreinputs.tar.gz | \
+		tar xzv)
 
 clean:
 	rm -rf $(SPYFFIDATA)
