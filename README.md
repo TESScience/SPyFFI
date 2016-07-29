@@ -14,6 +14,4 @@ Once you have it installed, you should be able to start to play, either through 
 ### other information
 
 For installation instructions, please see
-[`INSTALL.md`](https://github.com/zkbt/SPyFFI/blob/master/INSTALL.md)
-
-For a more introduction on how to use this github repository, please see [`git_tutorial.md`](https://github.com/zkbt/SPyFFI/blob/master/git_tutorial.md).
+[`INSTALL.md`](https://github.com/TESScience/SPyFFI/blob/master/INSTALL.md)
