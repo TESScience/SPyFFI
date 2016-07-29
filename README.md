@@ -15,3 +15,6 @@ Once you have it installed, you should be able to start to play, either through 
 
 For installation instructions, please see
 [`INSTALL.md`](https://github.com/TESScience/SPyFFI/blob/master/INSTALL.md)
+
+For additional details, please see the 
+[`User Manual`](https://docs.google.com/document/d/1EYwhLq8iRSLVoeTKls7dGEf4LrJ14vA-9UyhfDGhnVA/edit?usp=sharing)
