@@ -1,0 +1,4 @@
+/SPyFFIdata/
+*.out
+!/reference/*
+/venv/
