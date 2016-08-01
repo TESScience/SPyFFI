@@ -39,18 +39,18 @@ def get_transit_table():
 
 def draw_rotation(seed=None):
     """Return a random sine curve, drawn from McQuillan rotation periods"""
-    np.random.seed(seed)
-    row = np.random.choice(get_rotationtable())
+    prng = np.random.RandomState(seed)
+    row = prng.choice(get_rotationtable())
     # noinspection PyTypeChecker
     return Sinusoid(P=row['PRot'],
-                    E=np.random.uniform(0, row['PRot']),
+                    E=prng.uniform(0, row['PRot']),
                     A=row['Rper'] / 1.0e6)
 
 
 def draw_transit(seed=None):
     """Draw a random transit from the Kepler TCE list"""
-    np.random.seed(seed)
-    row = np.random.choice(get_transit_table())
+    prng = np.random.RandomState(seed)
+    row = prng.choice(get_transit_table())
     T14 = row['tce_duration'] / 24.0
     return Trapezoid(P=row['tce_period'],
                      E=row['tce_time0bk'] + 2545833.0,
@@ -129,10 +129,11 @@ def random(options=('trapezoid', 'sin'),
 
 def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, seed=None):
     """generate a random lightcurve, from a cartoonish population"""
-    np.random.seed(seed)
+
+    prng = np.random.RandomState(seed)
     if extreme:
-        opens = ['sin']
-    name = np.random.choice(options)
+        options = ['sin']
+    name = prng.choice(options)
     if name == 'sin':
         if extreme:
             p = [0.1, 30.0]
@@ -141,9 +142,9 @@ def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, seed=None):
             p = [0.1, 30.0]
             a = [0.0001, 0.02]
 
-        P = 10 ** np.random.uniform(*np.log10(p))
-        E = np.random.uniform(0, P)
-        A = 10 ** np.random.uniform(*np.log10(a))
+        P = 10 ** prng.uniform(*np.log10(p))
+        E = prng.uniform(0, P)
+        A = 10 ** prng.uniform(*np.log10(a))
 
         # noinspection PyTypeChecker
         return Sinusoid(P=P, E=E, A=A)
@@ -155,17 +156,17 @@ def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, seed=None):
         else:
             p = [0.1, 30.0]
             d = [0.0001, 0.01]
-        P = 10 ** np.random.uniform(*np.log10(p))
-        E = np.random.uniform(0, P)
+        P = 10 ** prng.uniform(*np.log10(p))
+        E = prng.uniform(0, P)
 
-        mass = np.random.uniform(0.1, 1.5)
+        mass = prng.uniform(0.1, 1.5)
         radius = mass
         stellar_density = 3 * mass * u.Msun / (4 * np.pi * (radius * u.Rsun) ** 3)
         rsovera = (3 * np.pi / u.G / (P * u.day) ** 2 / stellar_density) ** (1.0 / 3.0)
         T14 = rsovera * P / np.pi
         # noinspection PyTypeChecker
-        T23 = np.random.uniform(0, T14)
-        D = 10 ** np.random.uniform(*np.log10(d))
+        T23 = prng.uniform(0, T14)
+        D = 10 ** prng.uniform(*np.log10(d))
 
         # noinspection PyTypeChecker
         return Trapezoid(P=P, E=E, D=D, T23=T23, T14=T14)
