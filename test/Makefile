@@ -38,12 +38,13 @@ fix-matplotlib-config: $(SITE_PACKAGES)/matplotlib
 		echo 'backend: agg' >> $(MATPLOTLIBRC); \
 	fi
 
-
 $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	make fix-matplotlib-config
 	make pre-install
 	(cd ..; $(PYTHON) setup.py install)
-
+	rm -f $@
+	[ -d "$(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg)" ]
+	ln -s "$(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg)" $@
 
 $(SITE_PACKAGES)/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	$(PIP) install --quiet $(notdir $@)
