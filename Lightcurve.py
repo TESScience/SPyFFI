@@ -75,6 +75,7 @@ def generate(code):
 
 
 # TODO: Support Custom
+# TODO: This should not have a **kw splat
 def random(options=('trapezoid', 'sin'),
            fractionwithextremelc=0.01, fractionwithrotation=None,
            fractionwithtrapezoid=None, fractionwithcustom=0.0, **kw):
