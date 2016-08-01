@@ -24,12 +24,12 @@ $(SITE_PACKAGES)/numpy: $(VIRTUAL_ENV)
 fix-matplotlib-config:
 	mkdir -p $(dir $(MATPLOTLIBRC))
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
-	@if [ "$(shell uname)" == "Darwin" ]; then \
+	@if [ "$(shell uname)" = "Darwin" ] ; then \
 		echo "Writing 'backend: TkAgg' to $(MATPLOTLIBRC)"; \
 		echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
 	fi
 	@# Hack to deal with http://stackoverflow.com/a/3054314/586893
-	@if [ "$(shell uname)" == "Linux" ]; then \
+	@if [ "$(shell uname)" = "Linux" ] ; then \
 		echo "Writing 'backend: Agg' to $(MATPLOTLIBRC)"; \
 		echo 'backend: Agg' >> $(MATPLOTLIBRC); \
 	fi
