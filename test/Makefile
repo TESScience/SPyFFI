@@ -6,7 +6,7 @@ test: clear-tests $(TEST_OUT) light_curve_tests
 
 ###################### Virtual Environment ######################
 
-.PHONY: install pre-install uninstall reinstall
+.PHONY: install pre-install uninstall reinstall fix-matplotlib-config
 VIRTUAL_ENV=$(CURDIR)/venv
 PYTHON=$(VIRTUAL_ENV)/bin/python2.7
 PIP=$(VIRTUAL_ENV)/bin/pip2.7
@@ -21,25 +21,24 @@ $(VIRTUAL_ENV):
 $(SITE_PACKAGES)/numpy: $(VIRTUAL_ENV)
 	$(PIP) install $(notdir $@)
 
-$(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
-	make pre-install
-	(cd ..; $(PYTHON) setup.py install)
+fix-matplotlib-config:
+	mkdir -p $(dir $(MATPLOTLIBRC))
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
 	@if [ "$(shell uname)" == "Darwin" ]; then \
-		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: TkAgg' $(MATPLOTLIBRC))" ]; then \
-			echo "Writing 'backend: TkAgg' to $(MATPLOTLIBRC)"; \
-			mkdir -p $(dir $(MATPLOTLIBRC)); \
-			echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
-		fi ; \
+		echo "Writing 'backend: TkAgg' to $(MATPLOTLIBRC)"; \
+		echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
 	fi
 	@# Hack to deal with http://stackoverflow.com/a/3054314/586893
 	@if [ "$(shell uname)" == "Linux" ]; then \
-		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: Agg' $(MATPLOTLIBRC))" ]; then \
-			echo "Writing 'backend: Agg' to $(MATPLOTLIBRC)"; \
-			mkdir -p $(dir $(MATPLOTLIBRC)); \
-			echo 'backend: Agg' >> $(MATPLOTLIBRC); \
-		fi ; \
+		echo "Writing 'backend: Agg' to $(MATPLOTLIBRC)"; \
+		echo 'backend: Agg' >> $(MATPLOTLIBRC); \
 	fi
+
+
+$(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
+	make fix-matplotlib-config
+	make pre-install
+	(cd ..; $(PYTHON) setup.py install)
 
 
 $(VIRTUAL_ENV)/lib/python2.7/site-packages/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
