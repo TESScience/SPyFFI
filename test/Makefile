@@ -19,7 +19,7 @@ $(VIRTUAL_ENV):
 	virtualenv --python=python2.7 $@
 
 $(SITE_PACKAGES)/numpy: $(VIRTUAL_ENV)
-	$(PIP) install $(notdir $@)
+	$(PIP) --quiet install $(notdir $@)
 
 fix-matplotlib-config:
 	mkdir -p $(dir $(MATPLOTLIBRC))
@@ -45,8 +45,8 @@ $(VIRTUAL_ENV)/lib/python2.7/site-packages/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_E
 	$(PIP) install $(notdir $@)
 
 pre-install: $(SITE_PACKAGES)/numpy
-	$(PIP) install -U pip setuptools
-	$(PIP) install -r requirements.txt
+	$(PIP) install -U --quiet pip setuptools
+	$(PIP) install -r --quiet requirements.txt
 
 install: $(INSTALL)
 
