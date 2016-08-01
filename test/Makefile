@@ -27,6 +27,7 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
 	@if [ "$(shell uname)" == "Darwin" ]; then \
 		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: TkAgg' $(MATPLOTLIBRC))" ]; then \
+			echo "Writing 'backend: TkAgg' to $(MATPLOTLIBRC)"; \
 			mkdir -p $(dir $(MATPLOTLIBRC)); \
 			echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
 		fi ; \
@@ -34,6 +35,7 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	@# Hack to deal with http://stackoverflow.com/a/3054314/586893
 	@if [ "$(shell uname)" == "Linux" ]; then \
 		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: Agg' $(MATPLOTLIBRC))" ]; then \
+			echo "Writing 'backend: Agg' to $(MATPLOTLIBRC)"; \
 			mkdir -p $(dir $(MATPLOTLIBRC)); \
 			echo 'backend: Agg' >> $(MATPLOTLIBRC); \
 		fi ; \
