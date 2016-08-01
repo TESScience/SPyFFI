@@ -16,9 +16,13 @@ INSTALL=$(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7.egg
 
 $(VIRTUAL_ENV):
 	virtualenv --python=python2.7 $@
+	@[ -d $@ ]
+	touch $@
 
 $(SITE_PACKAGES)/numpy: $(VIRTUAL_ENV)
 	$(PIP) install --quiet $(notdir $@)
+	@[ -d $@ ]
+	touch $@
 
 fix-matplotlib-config: $(SITE_PACKAGES)/matplotlib
 	$(eval \
@@ -43,11 +47,13 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	make pre-install
 	(cd ..; $(PYTHON) setup.py install)
 	rm -f $@
-	[ -d "$(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg)" ]
-	ln -s "$(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg)" $@
+	@[ -d "$(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg)" ]
+	ln -s $(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg) $@
 
 $(SITE_PACKAGES)/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	$(PIP) install --quiet $(notdir $@)
+	@[ -d $@ ]
+	touch $@
 
 pre-install: $(SITE_PACKAGES)/numpy
 	$(PIP) install -U --quiet pip setuptools
