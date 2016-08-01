@@ -3,5 +3,8 @@ language: python
 python:
   - "2.7"
 
+install:
+  - make -C test install
+
 script:
   - make -C test

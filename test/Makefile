@@ -26,8 +26,7 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	(cd ..; $(PYTHON) setup.py install)
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
 	@if [ "$(shell uname)" == "Darwin" ]; then \
-		if [ ! -f $(MATPLOTLIBRC) ] || \
-		   [ -z "$(shell grep 'backend: TkAgg' $(MATPLOTLIBRC))" ]; then \
+		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: TkAgg' $(MATPLOTLIBRC))" ]; then \
 			echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
 		fi ; \
 	fi
