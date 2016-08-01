@@ -35,6 +35,7 @@ $(VIRTUAL_ENV)/lib/python2.7/site-packages/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_E
 	$(PIP) install $(notdir $@)
 
 pre-install: $(SITE_PACKAGES)/numpy
+	$(PIP) install -U pip setuptools
 	$(PIP) install -r requirements.txt
 
 install: $(INSTALL)
