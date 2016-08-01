@@ -1,12 +1,12 @@
 .PHONY: test clean
 
 TEST_OUT=SPyFFIdata/outputs/18h00m00s+66d33m39s_smallone/1800s/sub400x400/simulated_18h00m00s+66d33m39s_sub400x400_000000.fits
-test: $(TEST_OUT) light_curve_tests
+test: clear-tests $(TEST_OUT) light_curve_tests
 
 
 ###################### Virtual Environment ######################
 
-.PHONY: install pre-install
+.PHONY: install pre-install uninstall reinstall
 VIRTUAL_ENV=$(CURDIR)/venv
 PYTHON=$(VIRTUAL_ENV)/bin/python2.7
 PIP=$(VIRTUAL_ENV)/bin/pip2.7
@@ -20,9 +20,6 @@ $(VIRTUAL_ENV):
 
 $(SITE_PACKAGES)/numpy: $(VIRTUAL_ENV)
 	$(PIP) install $(notdir $@)
-
-$(SITE_PACKAGES)/pyds9.py: $(VIRTUAL_ENV)
-	$(PIP) install git+https://github.com/ericmandel/pyds9.git
 
 $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	make pre-install
@@ -38,12 +35,18 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 $(VIRTUAL_ENV)/lib/python2.7/site-packages/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	$(PIP) install $(notdir $@)
 
-pre-install: $(addprefix $(SITE_PACKAGES)/, numpy matplotlib astropy astroquery scipy pyds9.py)
+pre-install: $(SITE_PACKAGES)/numpy
+	$(PIP) install -r requirements.txt
 
 install: $(INSTALL)
 
 uninstall: $(INSTALL)
 	echo y | $(PIP) uninstall SPyFFI
+
+reinstall:
+	rm -rf $(VIRTUAL_ENV)
+	make -C .. clean
+	make install
 
 
 ###################### Testing ######################
@@ -54,17 +57,20 @@ SPyFFIdata/inputs:
 	mkdir -p $(dir $@)
 	wget -qO- https://www.dropbox.com/s/0e4c2uk34phv4qx/SPyFFI_coreinputs.tar.gz | tar xzv -C $(dir $@)
 
-$(TEST_OUT): SPyFFIdata/inputs
+$(TEST_OUT): SPyFFIdata/inputs $(INSTALL)
 	# PYTHONPATH: Where the Python scripts can be found (i.e. the directory containing SPyFFI/ and zachopy/)
 	# SPYFFIPATH: The root directory of SPyFFI (needed for some file-finding by the code)
 	# SPYFFIDATA: The directory where you want to store TESS data (inputs/intermediates/outputs)
-	PYTHONPATH=$(CURDIR)/../.. SPYFFIPATH=$(CURDIR)/.. SPYFFIDATA=$(CURDIR)/SPyFFIdata/ ./smallone.py
+	SPYFFIPATH=$(CURDIR)/.. SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) ./smallone.py
 
 light_curve_%_test: light_curve_%.out
 	cmp --quiet $< reference/$<
 
 light_curve_%.out: light_curve_%.py $(INSTALL)
 	$(PYTHON) $< > $@
+
+clear-tests:
+	rm -rf SPyFFIdata/outputs *.out
 
 clean:
 	rm -rf SPyFFIdata $(VIRTUAL_ENV)

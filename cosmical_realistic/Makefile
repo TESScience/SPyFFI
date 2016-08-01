@@ -1,9 +1,9 @@
 .PHONY: all clean
 
-all: _cosmical.so
+all: cosmical.so
 
-_cosmical.so:
-	python setup.py build_ext --inplace
+cosmical.so:
+	python compile_module build_ext --inplace
 
 clean:
 	rm -rf build/ *.so
