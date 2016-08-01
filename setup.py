@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 import numpy.distutils.misc_util
 
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 
 setup(
     name='SPyFFI',
@@ -32,5 +32,5 @@ setup(
                             "cosmical_realistic/seed_tw_ran.c"],
                            include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs())],
     # Uncomment this if there's a tagged release that's the same as VERSION, and SPyFFI is publicly released
-    # download_url = 'https://github.com/TESScience/SPyFFI/tarball/{}'.format(VERSION),
+    download_url = 'https://github.com/TESScience/SPyFFI/tarball/{}'.format(VERSION),
 )
