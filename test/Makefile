@@ -27,9 +27,18 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
 	@if [ "$(shell uname)" == "Darwin" ]; then \
 		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: TkAgg' $(MATPLOTLIBRC))" ]; then \
+			mkdir -p $(dir $(MATPLOTLIBRC)); \
 			echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
 		fi ; \
 	fi
+	@# Hack to deal with http://stackoverflow.com/a/3054314/586893
+	@if [ "$(shell uname)" == "Linux" ]; then \
+		if  [ -z "$(shell [ ! -f $(MATPLOTLIBRC) ] || grep 'backend: Agg' $(MATPLOTLIBRC))" ]; then \
+			mkdir -p $(dir $(MATPLOTLIBRC)); \
+			echo 'backend: Agg' >> $(MATPLOTLIBRC); \
+		fi ; \
+	fi
+
 
 $(VIRTUAL_ENV)/lib/python2.7/site-packages/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	$(PIP) install $(notdir $@)
