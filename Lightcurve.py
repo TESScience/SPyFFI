@@ -1,7 +1,9 @@
 """Simulate some toy model light curves."""
-
-from imports import *
+import numpy as np
+import matplotlib.pyplot as plt
 import zachopy.units as u
+from zachopy.Talker import Talker
+
 
 rotation_table = None
 
