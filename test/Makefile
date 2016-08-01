@@ -13,15 +13,19 @@ PIP=$(VIRTUAL_ENV)/bin/pip2.7
 SITE_PACKAGES=$(VIRTUAL_ENV)/lib/python2.7/site-packages
 VERSION=$(shell python -c "$(shell grep '^VERSION' $(CURDIR)/../setup.py) ; print VERSION")
 INSTALL=$(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7.egg
-MATPLOTLIBRC=~/.matplotlib/matplotlibrc
 
 $(VIRTUAL_ENV):
 	virtualenv --python=python2.7 $@
 
 $(SITE_PACKAGES)/numpy: $(VIRTUAL_ENV)
-	$(PIP) --quiet install $(notdir $@)
+	$(PIP) install --quiet $(notdir $@)
 
-fix-matplotlib-config:
+fix-matplotlib-config: $(SITE_PACKAGES)/matplotlib
+	$(eval \
+	MATPLOTLIBRC:=$(shell $(PYTHON) -c \
+		"import matplotlib as mpl ; \
+		 import os.path ; \
+		 print os.path.join(mpl.get_configdir(),'matplotlibrc')"))
 	mkdir -p $(dir $(MATPLOTLIBRC))
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
 	@if [ "$(shell uname)" = "Darwin" ] ; then \
@@ -30,8 +34,8 @@ fix-matplotlib-config:
 	fi
 	@# Hack to deal with http://stackoverflow.com/a/3054314/586893
 	@if [ "$(shell uname)" = "Linux" ] ; then \
-		echo "Writing 'backend: Agg' to $(MATPLOTLIBRC)"; \
-		echo 'backend: Agg' >> $(MATPLOTLIBRC); \
+		echo "Writing 'backend: agg' to $(MATPLOTLIBRC)"; \
+		echo 'backend: agg' >> $(MATPLOTLIBRC); \
 	fi
 
 
@@ -41,8 +45,8 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	(cd ..; $(PYTHON) setup.py install)
 
 
-$(VIRTUAL_ENV)/lib/python2.7/site-packages/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
-	$(PIP) install $(notdir $@)
+$(SITE_PACKAGES)/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
+	$(PIP) install --quiet $(notdir $@)
 
 pre-install: $(SITE_PACKAGES)/numpy
 	$(PIP) install -U --quiet pip setuptools
