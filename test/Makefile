@@ -65,9 +65,6 @@ install: $(INSTALL)
 uninstall: $(INSTALL)
 	echo y | $(PIP) uninstall SPyFFI
 
-reinstall:
-	rm -rf venv/
-	make install
 
 ###################### Testing ######################
 
@@ -81,13 +78,13 @@ $(TEST_OUT): SPyFFIdata/inputs $(INSTALL)
 	# PYTHONPATH: Where the Python scripts can be found (i.e. the directory containing SPyFFI/ and zachopy/)
 	# SPYFFIPATH: The root directory of SPyFFI (needed for some file-finding by the code)
 	# SPYFFIDATA: The directory where you want to store TESS data (inputs/intermediates/outputs)
-	SPYFFIPATH=$(CURDIR)/.. SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) ./smallone.py
+	LOG=INFO SPYFFIPATH=$(CURDIR)/.. SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) ./smallone.py
 
-light_curve_%_test: light_curve_%.out
-	cmp --quiet $< reference/$<
+light_curve_%_test: light_curve_%.json
+	./json_diff $< reference/$<
 
-light_curve_%.out: light_curve_%.py $(INSTALL)
-	$(PYTHON) $< > $@
+light_curve_%.json: light_curve_%.py $(INSTALL)
+	LOG=INFO $(PYTHON) $< > $@
 
 clear-tests:
 	rm -rf SPyFFIdata/outputs *.out

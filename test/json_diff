@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+from __future__ import print_function
+import argparse
+import json
+import sys
+
+
+class Different(Exception):
+    pass
+
+
+def different_message(msg, json1, json2):
+    from pprint import pformat
+    return '''{msg}
+
+First:
+
+{obj1}
+
+Second:
+
+{obj2}'''.format(msg=msg,
+                 obj1=pformat(json1),
+                 obj2=pformat(json2))
+
+
+def check_same(json1, json2, tolerance=1e-7):
+    from collections import Sized
+    t = type(json1)
+    if t is not type(json2):
+        raise Different()
+    if t is int or isinstance(json1, basestring) or t is type(None):
+        if json1 != json2:
+            raise Different(
+                different_message(
+                    "Objects do not have the same type.",
+                    json1,
+                    json2))
+    elif t is float:
+        if abs(json1 - json2) > tolerance:
+            raise Different(
+                different_message(
+                    "Values differ by more than tolerance ({}).".format(tolerance),
+                    json1,
+                    json2))
+    elif t is dict:
+        keys1 = sorted(json1.keys)
+        keys2 = sorted(json2.keys)
+        if keys1 != keys2:
+            raise Different(
+                different_message(
+                    "Keys for dictionaries are different.",
+                    keys1,
+                    keys2))
+        for k in keys1:
+            check_same(json1[k], json2[k])
+    elif isinstance(json1, Sized) and hasattr(json1, '__getitem__'):
+        if len(json1) != len(json2):
+            raise Different(
+                different_message(
+                    "Objects do not have the same length.",
+                    json1,
+                    json2))
+        for i in range(len(json1)):
+            # noinspection PyUnresolvedReferences
+            check_same(json1[i], json2[i])
+    else:
+        raise Different(
+            different_message(
+                "Cannot compare objects.",
+                json1,
+                json2))
+    return True
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Check if two JSON files of differ by a set tolerance')
+    parser.add_argument("JSON1", help="The first JSON to compare")
+    parser.add_argument("JSON2", help="The second JSON to compare")
+    parser.add_argument("-t", "--tolerance",
+                        type=float,
+                        default=1e-7,
+                        help="The tolerance to compare floating point values to")
+    args = parser.parse_args()
+
+    with open(args.JSON1) as json_file1:
+        with open(args.JSON2) as json_file2:
+            try:
+                check_same(json.load(json_file1),
+                           json.load(json_file2),
+                           args.tolerance)
+            except Different as diff:
+                print(diff.message, file=sys.stderr)
+                sys.exit(1)
+
+    sys.exit(0)
