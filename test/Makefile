@@ -30,16 +30,16 @@ fix-matplotlib-config: $(SITE_PACKAGES)/matplotlib
 		"import matplotlib as mpl ; \
 		 import os.path ; \
 		 print os.path.join(mpl.get_configdir(),'matplotlibrc')"))
-	mkdir -p $(dir $(MATPLOTLIBRC))
+	mkdir -p "$(dir $(MATPLOTLIBRC))"
 	@# Hack to deal with http://stackoverflow.com/a/21789908/586893
 	@if [ "$(shell uname)" = "Darwin" ] ; then \
 		echo "Writing 'backend: TkAgg' to $(MATPLOTLIBRC)"; \
-		echo 'backend: TkAgg' >> $(MATPLOTLIBRC); \
+		echo 'backend: TkAgg' > $(MATPLOTLIBRC); \
 	fi
 	@# Hack to deal with http://stackoverflow.com/a/3054314/586893
 	@if [ "$(shell uname)" = "Linux" ] ; then \
 		echo "Writing 'backend: agg' to $(MATPLOTLIBRC)"; \
-		echo 'backend: agg' >> $(MATPLOTLIBRC); \
+		echo 'backend: agg' > $(MATPLOTLIBRC); \
 	fi
 
 $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
@@ -47,8 +47,9 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	make pre-install
 	(cd ..; $(PYTHON) setup.py install)
 	rm -f $@
-	@[ -d "$(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg)" ]
-	ln -s $(shell ls -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg) $@
+	@[ -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg ]
+	ln -s $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg $@
+	@[ -L $@ ] && [ -d $@ ]
 
 $(SITE_PACKAGES)/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	$(PIP) install --quiet $(notdir $@)
@@ -64,6 +65,9 @@ install: $(INSTALL)
 uninstall: $(INSTALL)
 	echo y | $(PIP) uninstall SPyFFI
 
+reinstall:
+	rm -rf venv/
+	make install
 
 ###################### Testing ######################
 
