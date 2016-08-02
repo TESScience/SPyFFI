@@ -64,11 +64,6 @@ install: $(INSTALL)
 uninstall: $(INSTALL)
 	echo y | $(PIP) uninstall SPyFFI
 
-reinstall:
-	rm -rf $(VIRTUAL_ENV)
-	make -C .. clean
-	make install
-
 
 ###################### Testing ######################
 

@@ -37,9 +37,8 @@ def get_transit_table():
     return transit_table
 
 
-def draw_rotation(seed=None):
+def draw_rotation(prng=np.random):
     """Return a random sine curve, drawn from McQuillan rotation periods"""
-    prng = np.random.RandomState(seed)
     row = prng.choice(get_rotationtable())
     # noinspection PyTypeChecker
     return Sinusoid(P=row['PRot'],
@@ -47,9 +46,8 @@ def draw_rotation(seed=None):
                     A=row['Rper'] / 1.0e6)
 
 
-def draw_transit(seed=None):
+def draw_transit(prng=np.random):
     """Draw a random transit from the Kepler TCE list"""
-    prng = np.random.RandomState(seed)
     row = prng.choice(get_transit_table())
     T14 = row['tce_duration'] / 24.0
     return Trapezoid(P=row['tce_period'],
@@ -127,10 +125,9 @@ def random(options=('trapezoid', 'sin'),
     return constant()
 
 
-def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, seed=None):
+def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, prng=np.random):
     """generate a random lightcurve, from a cartoonish population"""
 
-    prng = np.random.RandomState(seed)
     if extreme:
         options = ['sin']
     name = prng.choice(options)
