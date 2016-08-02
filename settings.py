@@ -1,41 +1,34 @@
-'''global settings required needed for TESS SPyFFI simulations.'''
-
-from imports import *
+"""Global settings required needed for TESS SPyFFI simulations."""
+import os
+import logging
 
 # okay, so, we need to specify where all the SPyFFI data will be
 # this will...
 #  ...first try to find an environment variable $SPYFFIDATA
-#  ...then default to the current working directory
+#  ...then default to "~/.tess/spyffi"
 # if those directories don't contain the required input data, it will complain!
 
 # load the environment variable
-prefix = os.getenv('SPYFFIDATA')
+prefix = os.getenv('SPYFFIDATA', os.path.expanduser("~/.tess/spyffi"))
+if not os.path.exists(prefix):
+    os.makedirs(prefix)
 
-# start with the defaults
-if prefix is not None:
-    print("$SPYFFIDATA is set to {}".format(prefix))
-else:
-    prefix = os.path.join(os.path.abspath('.'), 'data/')
 
-    print('''
-            The environment variable $SPYFFIDATA does not seem to be set;
-            defaulting to "data/" inside your current working directory:
-            {}
+logging.basicConfig(
+    format="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
+    datefmt="%H:%M:%S",
+    level=getattr(logging, os.getenv('LOG', 'WARNING').upper()))
 
-            '''.format(prefix))
-
-    assert(('n' in raw_input('''Please type "n" if that's not okay.''')) == False)
-    zachopy.utils.mkdir(prefix)
+log_file_handler = logging.FileHandler(os.getenv('LOG_FILE', os.path.join(prefix, 'SPyFFI.log')))
 
 # create dirs that will store inputs and outputs
-dirs = dict(	plots=os.path.join(prefix, 'plots/'),
-				inputs=os.path.join(prefix, 'inputs/'),
-				outputs=os.path.join(prefix, 'outputs/'),
-				intermediates=os.path.join(prefix, 'intermediates/'))
+dirs = {'plots': os.path.join(prefix, 'plots/'), 'inputs': os.path.join(prefix, 'inputs/'),
+        'outputs': os.path.join(prefix, 'outputs/'), 'intermediates': os.path.join(prefix, 'intermediates/')}
 
 # make sure all those directories exist
-for k in dirs.keys():
-	zachopy.utils.mkdir(dirs[k])
+for d in dirs.values():
+    if not os.path.exists(d):
+        os.makedirs(d)
 
 # shortcuts
 plots = dirs['plots']

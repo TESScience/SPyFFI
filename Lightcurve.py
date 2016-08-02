@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import zachopy.units as u
 from zachopy.Talker import Talker
+import logging
+from settings import log_file_handler
+
+logger = logging.getLogger(__name__)
+logger.addHandler(log_file_handler)
 
 
 rotation_table = None
@@ -14,7 +19,7 @@ def get_rotationtable():
     import pkgutil
     global rotation_table
     if rotation_table is None:
-        print "[lightcurve.py] reading McQuillan rotation table"
+        logger.info("Reading McQuillan rotation table")
         rotation_table = ascii.read(pkgutil.get_data(__name__, 'data/rotation_McQuillan.txt'))
     return rotation_table
 
@@ -32,7 +37,7 @@ def get_transit_table():
     import pkgutil
     global transit_table
     if transit_table is None:
-        print "[lightcurve.py] reading Kepler TCE table"
+        logger.info("Reading Kepler TCE table")
         transit_table = ascii.read(pkgutil.get_data(__name__, 'data/keplerTCE_DR24.txt'))
     return transit_table
 
@@ -166,23 +171,6 @@ def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, prng=np.random):
 
         # noinspection PyTypeChecker
         return Trapezoid(P=P, E=E, D=D, T23=T23, T14=T14)
-
-
-def testplot(n=100, step=0.01, **kw):
-    """make a plot testing random light curves,
-        keywords will be passed to "random()\""""
-    plt.ion()
-    plt.cla()
-    f = plt.figure(figsize=(5, 10))
-    ax = plt.subplot()
-    o = 0
-    for i in range(n):
-        lc = random(**kw)
-        print lc
-        lc.demo(offset=o, ax=ax)
-        o += step
-    ax.set_ylim(step * n, 0)
-    plt.draw()
 
 
 class LightCurve(Talker):
