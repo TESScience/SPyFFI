@@ -1,6 +1,6 @@
 import numpy as np
 import astropy.coordinates
-import zachopy.borrowed
+import zachopy.borrowed.crossfield as crossfield
 import logging
 from settings import log_file_handler
 
@@ -268,7 +268,7 @@ class celestial(position):
 
     @property
     def ecliptic(self):
-        elon, elat = zachopy.borrowed.crossfield.euler(self.ra, self.dec, select=3)
+        elon, elat = crossfield.euler(self.ra, self.dec, select=3)
         return ecliptic(elon, elat, self.cartographer)
 
 
@@ -303,7 +303,7 @@ class ecliptic(position):
     # use properties to define conversions (at least celestial and self)
     @property
     def celestial(self):
-        ra, dec = zachopy.borrowed.crossfield.euler(self.elon, self.elat, select=4)
+        ra, dec = crossfield.euler(self.elon, self.elat, select=4)
         return celestial(ra, dec, self.cartographer)
 
     @property
