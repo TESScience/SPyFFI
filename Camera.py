@@ -1,3 +1,10 @@
+import logging
+
+import numpy as np
+import zachopy.utils
+import astropy.io.fits
+import zachopy.spherical
+
 import settings
 import Catalogs
 from PSF import PSF
@@ -5,10 +12,6 @@ from Cartographer import Cartographer
 from CCD import CCD
 from Jitter import Jitter
 from Focus import Focus
-import numpy as np
-import zachopy.utils
-import astropy.io.fits
-import logging
 from settings import log_file_handler
 
 logger = logging.getLogger(__name__)
