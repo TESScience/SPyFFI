@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 import numpy.distutils.misc_util
 
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 
 setup(
     name='SPyFFI',
