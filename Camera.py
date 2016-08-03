@@ -1,15 +1,23 @@
-from imports import *
-import settings, Catalogs
+import settings
+import Catalogs
 from PSF import PSF
 from Cartographer import Cartographer
 from CCD import CCD
 from Jitter import Jitter
 from Focus import Focus
+import numpy as np
+import zachopy.utils
+import astropy.io.fits
+import logging
+from settings import log_file_handler
+
+logger = logging.getLogger(__name__)
+logger.addHandler(log_file_handler)
 
 
 # define a camera class
-class Camera(Talker):
-    '''Keep track of one camera's entire field of view.'''
+class Camera(object):
+    """Keep track of one camera's entire field of view."""
 
     def __init__(self,
                  cadence=1800,  # what cadence for exposures?
@@ -29,10 +37,7 @@ class Camera(Talker):
                  jitterkw={},
                  focuskw={}
                  ):
-        '''Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern.'''
-
-        # decide whether or not this Camera is chatty
-        Talker.__init__(self)
+        """Initialize camera, fill it with CCDs, and point it at the sky or at a testpattern."""
 
         self.psfkw, self.jitterkw, self.focuskw = psfkw, jitterkw, focuskw
 
@@ -46,8 +51,8 @@ class Camera(Talker):
         # keep track of which exposure is being simulated
         self.counter = 0
 
-        # [self.speak will only report for this object if mute and pithy are turned off]
-        self.speak("turning on a new TESS camera object.")
+        # [logger.info will only report for this object if mute and pithy are turned off]
+        logger.info("turning on a new TESS camera object.")
 
         # keep track of any special features with this Camera
         self.subarray = subarray
@@ -55,13 +60,13 @@ class Camera(Talker):
 
         # will this camera see a test pattern?
         self.testpattern = testpattern
-        self.speak('the camera expects the stars to be drawn from {}'.format(
+        logger.info('the camera expects the stars to be drawn from {}'.format(
             {True: 'the sky', False: 'a test pattern'}[self.testpattern]))
 
         # warping time (for enhanced aberration)
         self.warpspaceandtime = warpspaceandtime
         if self.warpspaceandtime:
-            self.speak('the camera will warp space and time by slowing '
+            logger.info('the camera will warp space and time by slowing '
                        'the speed of light to {}c'.format(self.warpspaceandtime))
 
         # should positions be aberrated?
@@ -73,14 +78,14 @@ class Camera(Talker):
         # speeding up time
         self.counterstep = counterstep
         if self.counterstep > 1:
-            self.speak('the camera will speed up time'
+            logger.info('the camera will speed up time'
                        ' by a factor of {}'.format(self.counterstep))
 
 
         # if real stars, use the input (ra, dec)
         self.ra = ra
         self.dec = dec
-        self.speak('the camera FOV is centered at (ra,dec) = {:.2f}, {:.2f} deg.'.format(
+        logger.info('the camera FOV is centered at (ra,dec) = {:.2f}, {:.2f} deg.'.format(
             self.ra, self.dec))
 
 
@@ -109,29 +114,27 @@ class Camera(Talker):
         if self.subarray is None:
             # if we're not dealing with a subarray, then turn on CCD's 1,2,3,4
             self.ccdnumbers = np.arange(4) + 1
-            self.speak("populating camera with 4 CCDs")
+            logger.info("populating camera with 4 CCDs")
         else:
             # if this is a subarray, then turn on one (imaginary) CCD and call it 0
             self.ccdnumbers = np.arange(1)
-            self.speak("populating camera with one, centered, CCD subarray")
+            logger.info("populating camera with one, centered, CCD subarray")
         self.ccds = [CCD(n, subarray=self.subarray, camera=self) for n in self.ccdnumbers]
 
         # assign a cartographer to this Camera and start it out on the first CCD
         self.cartographer = Cartographer(camera=self, ccd=self.ccds[0])
-
 
         # start the camera out unjittered from its nominal position
         self.nudge = {'x': 0.0, 'y': 0.0, 'z': 0.0}  # nudge relative to nominal spacecraft pointing (arcsec)
 
         self.setCadence(cadence)  # seconds
 
-
         # point the Camera
         self.point(self.ra, self.dec)
 
     @property
     def fielddirectory(self):
-        '''define the field directory for this camera'''
+        """define the field directory for this camera"""
         if self.label == '':
             d = settings.prefix + 'outputs/{dirprefix}{pos}/'.format(pos=self.pos_string(), dirprefix=self.dirprefix)
         else:
@@ -147,12 +150,12 @@ class Camera(Talker):
         return d
 
     def expose(self, **kwargs):
-        '''Take an exposure on all the available CCD's.'''
+        """Take an exposure on all the available CCD's."""
         for c in self.ccds:
             c.expose(**kwargs)
 
     def populateHeader(self):
-        '''Populate the header structure with information about the Camera, and its WCS.'''
+        """Populate the header structure with information about the Camera, and its WCS."""
 
         # create an empty header
         self.header = astropy.io.fits.Header()
@@ -171,7 +174,7 @@ class Camera(Talker):
         self.header['FOCUS'] = (None, 'distance from optimal focus (microns)')
         if self.subarray is not None:
             self.header['SUBARRAY'] = (
-            self.subarray, 'THIS IMAGE IS JUST {0}x{1} POSTAGE STAMP!'.format(self.subarray, self.subarray))
+                self.subarray, 'THIS IMAGE IS JUST {0}x{1} POSTAGE STAMP!'.format(self.subarray, self.subarray))
 
         # fill it with the WCS information
         self.header['WCS'] = ''
@@ -185,11 +188,11 @@ class Camera(Talker):
         self.header['JITTERY'] = (0, '["] jitter-induced nudge')
 
     def setCadence(self, cadence=1800.0):
-        '''Set the cadence of this Camera, in seconds.'''
+        """Set the cadence of this Camera, in seconds."""
 
         # set the cadence
         self.cadence = cadence
-        self.speak(
+        logger.info(
             "setting cadence to {0} seconds = {1:.0f} reads.".format(self.cadence, self.cadence / self.singleread))
 
         #
@@ -213,7 +216,7 @@ class Camera(Talker):
         return self.bjd0 + counter * self.cadence / 24.0 / 60.0 / 60.0
 
     def point(self, ra=None, dec=None):
-        '''Point this Camera at the sky, by using the field-specified (ra,dec) and (if active) the jitter nudge for this exposure.'''
+        """Point this Camera at the sky, by using the field-specified (ra,dec) and (if active) the jitter nudge for this exposure."""
 
         # if (ra,dec) given, then point the whole Camera there
         if ra is not None and dec is not None:
@@ -223,7 +226,7 @@ class Camera(Talker):
         try:
             self.ra
             self.dec
-            self.speak('pointing the camera at (ra,dec) = {0:.6f},{1:.6f}'.format(self.ra, self.dec))
+            logger.info('pointing the camera at (ra,dec) = {0:.6f},{1:.6f}'.format(self.ra, self.dec))
         except:
             self.report("Please point your telescope somewhere. No RA or DEC defined.")
 
@@ -254,7 +257,7 @@ class Camera(Talker):
         # self.populateHeader()
 
     def pos_string(self):
-        '''Return the position string for this field.'''
+        """Return the position string for this field."""
         if self.testpattern:
             try:
                 return self.catalog.name
@@ -270,11 +273,11 @@ class Camera(Talker):
                                                                         np.int(np.abs(coords.dec.dms[2].round())))
 
     def advanceCounter(self):
-        '''Take one step forward in time with this Camera.'''
+        """Take one step forward in time with this Camera."""
         self.counter += self.counterstep
 
     def populateCatalog(self, **kwargs):
-        '''Create a catalog of stars that are visible with this Camera.'''
+        """Create a catalog of stars that are visible with this Camera."""
 
         # figure out how wide we need to search for stars
         if self.subarray is None:
@@ -291,7 +294,7 @@ class Camera(Talker):
 
     @property
     def effective_fov(self):
-        '''return the radius (degrees) needed to reach the detector corners'''
+        """return the radius (degrees) needed to reach the detector corners"""
 
         # is it a subarray or no?
         if self.subarray is None:

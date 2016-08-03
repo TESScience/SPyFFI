@@ -32,7 +32,6 @@ def cosmicImage(exptime=1800.0, size=2048, rate=5.0, gradient=False, diffusion=F
         image = scipy.signal.convolve2d(image, kernal, mode='same')
 
     good_image = image[buffer_size:-buffer_size, buffer_size:-buffer_size] if buffer_size > 0 else image[:, :]
-    del image
 
     # return the image
     return good_image

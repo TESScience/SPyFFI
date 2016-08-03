@@ -1,22 +1,23 @@
-from imports import *
+import numpy as np
+import matplotlib.pylab as plt
+import matplotlib.gridspec as gridspec
+import logging
+from settings import log_file_handler
+
+logger = logging.getLogger(__name__)
+logger.addHandler(log_file_handler)
 
 
-class Aperture(Talker):
+class Aperture(object):
 
     def __init__(self, name=None, **kwargs):
-
-        # decide whether or not this Aperture is chatty
-        Talker.__init__(self, **kwargs)
-
         self.name = name
 
     def create(self, images, x, y, mag, plot=False):
-        '''Using some input images and a catalog entry, define the pixel aperture for a star.'''
+        """Using some input images and a catalog entry, define the pixel aperture for a star."""
 
         # keep track of the basics of this aperture
         self.x, self.y, self.mag = x, y, mag
-
-
 
         # figure out which label in the labeled image is relevant to this star
         label = images['labeled'][np.round(y), np.round(x)]
@@ -41,7 +42,7 @@ class Aperture(Talker):
             if plot:
                 fi = plt.figure('selecting an aperture', figsize=(10,3), dpi=100)
                 fi.clf()
-                gs = plt.matplotlib.gridspec.GridSpec(3,2,width_ratios=[1,.1], wspace=0.1, hspace=0.01, top=0.9, bottom=0.2)
+                gs = gridspec.GridSpec(3,2,width_ratios=[1,.1], wspace=0.1, hspace=0.01, top=0.9, bottom=0.2)
                 ax_line = plt.subplot(gs[:,0])
                 ax_image = plt.subplot(gs[0,1])
                 ax_ok = plt.subplot(gs[1,1])
@@ -68,13 +69,13 @@ class Aperture(Talker):
                 plt.draw()
                 self.input('hmmm?')
         self.n = len(self.row)
-        self.speak('created {0}'.format(self))
+        logger.info('created {0}'.format(self))
 
     def __str__(self):
         return 'aperture for a {mag:.2f} magnitude star at ({x:.1f},{y:.1f})'.format(**self.__dict__)
 
     def measure(self, cube, plot=True):
-        self.speak('calculating lightcurve for {0}'.format(self))
+        logger.info('calculating lightcurve for {0}'.format(self))
         shape = (len(self.row), 1)
         self.mitigated = np.sum(cube.photons[self.row, self.col, :] - cube.background[self.row, self.col].reshape(shape), 0)
         self.unmitigated = np.sum(cube.unmitigated[self.row, self.col, :] - cube.background[self.row, self.col].reshape(shape), 0)

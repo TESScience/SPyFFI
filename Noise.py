@@ -9,6 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.io.ascii
 import scipy.interpolate
+import logging
+from settings import log_file_handler
+
+logger = logging.getLogger(__name__)
+logger.addHandler(log_file_handler)
 
 import Cartographer
 
@@ -99,33 +104,31 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0,
     if ra is not None and dec is not None:
         elon, elat = carto.point(ra, dec, 'celestial').ecliptic.tuple
 
-    if verbose:
-        print 'imag = ', imag
-        print 'tmag = ', tmag
-        print 'tmag0 = ', tmag0
-        print 'exptime = ', exptime
-        print 'teff = ', teff
-        print 'elon = ', elon
-        print 'elat = ', elat
-        print 'npix_aper = ', npix_aper
-        print 'frac_aper = ', frac_aper
-        print 'subexptime = ', subexptime
-        print 'n_exposures = ', n_exposures
-        print 'e_pix_ro = ', e_pix_ro
-        print 'effective_area = ', effective_area
-        print 'pix_scale = ', pix_scale
-        print 'omega_pix = ', omega_pix
-        print 'sys_limit = ', sys_limit
-        print 'e_star = ', e_star
+    logger.debug('imag = {}'.format(imag))
+    logger.debug('tmag = {}'.format(tmag))
+    logger.debug('tmag0 = {}'.format(tmag0))
+    logger.debug('exptime = {}'.format(exptime))
+    logger.debug('teff = {}'.format(teff))
+    logger.debug('elon = {}'.format(elon))
+    logger.debug('elat = {}'.format(elat))
+    logger.debug('npix_aper = {}'.format(npix_aper))
+    logger.debug('frac_aper = {}'.format(frac_aper))
+    logger.debug('subexptime = {}'.format(subexptime))
+    logger.debug('n_exposures = {}'.format(n_exposures))
+    logger.debug('e_pix_ro = {}'.format(e_pix_ro))
+    logger.debug('effective_area = {}'.format(effective_area))
+    logger.debug('pix_scale = {}'.format(pix_scale))
+    logger.debug('omega_pix = {}'.format(omega_pix))
+    logger.debug('sys_limit = {}'.format(sys_limit))
+    logger.debug('e_star = {}'.format(e_star))
 
     # photoelectrons/pixel from zodiacal light
     dlat = (np.abs(elat) - 90.) / 90.
     vmag_zodi = 23.345 - 1.148 * dlat ** 2.
     e_pix_zodi = 10.0 ** (-0.4 * (vmag_zodi - 22.8)) * 2.39e-3 * effective_area * omega_pix * exptime
 
-    if verbose:
-        print 'vmag_zodi = ', vmag_zodi
-        print 'e_pix_zodi = ', e_pix_zodi
+    logger.debug('vmag_zodi = {}'.format(vmag_zodi))
+    logger.debug('e_pix_zodi = {}'.format(e_pix_zodi))
 
     # photoelectrons/pixel from background stars
     try:
@@ -136,8 +139,7 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0,
     glon = np.array([glon])
     glat = np.array([glat])
 
-    if verbose:
-        print 'glon, glat = ', glon, glat
+    logger.debug('glon = {GLON}, glat = {GLAT}'.format(GLON=glon, GLAT=glat))
 
     dlat = np.abs(glat) / 40.0
     dlon = glon
@@ -148,9 +150,9 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0,
     imag_bgstars = p[0] + p[1] * dlat + p[2] * dlon ** (p[3])
     e_pix_bgstars = 10.0 ** (-0.4 * imag_bgstars) * 1.7e6 * effective_area * omega_pix * exptime
 
-    if verbose:
-        print 'imag_bgstars = ', imag_bgstars
-        print 'e_pix_bgstars = ', e_pix_bgstars
+
+    logger.debug('imag_bgstars = {}'.format(imag_bgstars))
+    logger.debug('e_pix_bgstars = {}'.format(e_pix_bgstars))
 
     noise_star = np.sqrt(e_star) / e_star
     noise_sky = np.sqrt(npix_aper * (e_pix_zodi + e_pix_bgstars)) / e_star
@@ -159,11 +161,11 @@ def noise(imag=10.0, exptime=1800.0, teff=5000.0,
     noise = np.sqrt(noise_star ** 2. + noise_sky ** 2. + noise_ro ** 2. + noise_sys ** 2.)
 
     '''if verbose:
-        print 'noise_star [ppm] = ', noise_star*1e6
-        print 'noise_sky  [ppm] = ', noise_sky*1e6
-        print 'noise_ro   [ppm] = ', noise_ro*1e6
-        print 'noise_sys  [ppm] = ', noise_sys*1e6
-        print 'noise      [ppm] = ', noise*1e6
+        logger.debug('noise_star [ppm] = ', noise_star*1e6
+        logger.debug('noise_sky  [ppm] = ', noise_sky*1e6
+        logger.debug('noise_ro   [ppm] = ', noise_ro*1e6
+        logger.debug('noise_sys  [ppm] = ', noise_sys*1e6
+        logger.debug('noise      [ppm] = ', noise*1e6
         '''
     return noise
 
