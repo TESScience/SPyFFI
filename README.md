@@ -27,6 +27,7 @@ SPyFFI was created by Zach Berta-Thompson.
 
 Other contributors include:
 
+  - Jacobi Kosiarek
   - Al Levine
   - Peter Sullivan
   - Deb Woods
