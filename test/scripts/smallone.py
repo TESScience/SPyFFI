@@ -12,6 +12,8 @@ inputs['catalog']['name'] = 'sky'
 inputs['expose']['skipcosmics'] = True
 inputs['expose']['writenoiseless'] = True
 inputs['observation']['cadencestodo'] = {1800:1}
+inputs['expose']['skipcosmics'] = False
+inputs['expose']['correctcosmics'] = False
 o = Observation(inputs)
 
 o.create()
