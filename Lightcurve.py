@@ -2,7 +2,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import zachopy.units as u
-from zachopy.Talker import Talker
 import logging
 from settings import log_file_handler
 
@@ -173,13 +172,13 @@ def cartoonrandom(options=('trapezoid', 'sin'), extreme=False, prng=np.random):
         return Trapezoid(P=P, E=E, D=D, T23=T23, T14=T14)
 
 
-class LightCurve(Talker):
+class LightCurve(object):
     """The LightCurve class defines the basics of a light curve object, which can
         injected into TESS simulations. It handles basic functionality, like
         (importantly), integrating a light curve over a finite exposure time."""
 
     def __init__(self):
-        Talker.__init__(self)
+        super(LightCurve, self).__init__()
 
     def demo(self, tmin=0, tmax=27.4, cadence=30.0 / 60.0 / 24.0, offset=0, raw=False, ax=None):
         """make a plot of a light curve, to show what it looks like"""

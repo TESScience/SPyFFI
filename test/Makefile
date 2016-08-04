@@ -46,10 +46,10 @@ $(INSTALL): $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	make fix-matplotlib-config
 	make pre-install
 	(cd ..; $(PYTHON) setup.py install)
+	[ -e $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg ]
 	rm -f $@
-	@[ -d $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg ]
 	ln -s $(SITE_PACKAGES)/SPyFFI-$(VERSION)-py2.7-*.egg $@
-	@[ -L $@ ] && [ -d $@ ]
+	[ -L $@ ]
 
 $(SITE_PACKAGES)/%: $(SITE_PACKAGES)/numpy $(VIRTUAL_ENV)
 	$(PIP) install --quiet $(notdir $@)
