@@ -43,8 +43,11 @@
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include "twister.h"
 #include "seed_tw_ran.h"
+#include "fmemopen.h"
+#include "st_dat.h"
 
 #define DR (M_PI/180.0)
 #define NELEC_MICRON 80.0
@@ -66,9 +69,11 @@ double xlen, xi, xlam, delta, capi, lnepp;
 
 double origin[3], dx[3], ccddim[3];   // CCD geometric parameters
 // The 'difker' array contains the values for rssq = 5.0 microns.
-double difker[3][3] = { 0.0034, 0.0516, 0.0034,
-                        0.0516, 0.7798, 0.0516,
-                        0.0034, 0.0516, 0.0034 };
+double difker[3][3] = {
+  {0.0034, 0.0516, 0.0034},
+  {0.0516, 0.7798, 0.0516},
+  {0.0034, 0.0516, 0.0034}
+};
 int npix[3];   // Set to NX, NY, 1 in initialization
 int ncr;
 double ncrmn, rfac;
@@ -95,9 +100,6 @@ void usage(char *prog)
   fprintf(stderr,"     'idodif' = 0  => do NOT do diffusion\n");
   fprintf(stderr,"              = 1  => do diffusion\n");
   fprintf(stderr,"\n");
-  fprintf(stderr,"This code also needs to read the function defined via a table\n");
-  fprintf(stderr,"in the file \"st.dat\" (which must be available in the working\n");
-  fprintf(stderr,"directory).\n");
   exit(-1);
 }
 
@@ -105,24 +107,24 @@ void usage(char *prog)
 // ZKBT says this function was copied and pasted from gasdev2t.c
 double gasdev()
 {
-	static int iset=0;
-	static double gset;
-	double fac,r,v1,v2;
+  static int iset=0;
+  static double gset;
+  double fac,r,v1,v2;
 
-	if  (iset == 0) {
-		do {
-			v1=2.0*ranMT()-1.0;
-			v2=2.0*ranMT()-1.0;
-			r=v1*v1+v2*v2;
-		} while (r >= 1.0);
-		fac=sqrt(-2.0*log(r)/r);
-		gset=v1*fac;
-		iset=1;
-		return v2*fac;
-	} else {
-		iset=0;
-		return gset;
-	}
+  if  (iset == 0) {
+    do {
+      v1=2.0*ranMT()-1.0;
+      v2=2.0*ranMT()-1.0;
+      r=v1*v1+v2*v2;
+    } while (r >= 1.0);
+    fac=sqrt(-2.0*log(r)/r);
+    gset=v1*fac;
+    iset=1;
+    return v2*fac;
+  } else {
+    iset=0;
+    return gset;
+  }
 }
 
 /******************************************************************************/
@@ -130,7 +132,7 @@ double gammln(double xx)
 {
   double x,tmp,ser;
   static double cof[6]={76.18009173,-86.50532033,24.01409822,
-			-1.231739516,0.120858003e-2,-0.536382e-5};
+                        -1.231739516,0.120858003e-2,-0.536382e-5};
   int j;
 
   x=xx-1.0;
@@ -172,8 +174,8 @@ double poidev(double xm)
     }
     do {
       do {
-	y=tan(M_PI*ranMT());
-	em=sq*y+xm;
+        y=tan(M_PI*ranMT());
+        em=sq*y+xm;
       } while (em < 0.0);
       em=floor(em);
       t=0.9*(1.0+y*y)*exp(em*alxm-gammln(em+1.0)-g);
@@ -212,10 +214,10 @@ double get_lambda_random()
       cumdif = phicum[i+1] - phicum[i];
       lamdif = lamb[i+1] - lamb[i];
       if (cumdif > 0.0) {
-	xlam = lamb[i] + (lamdif*(x - phicum[i])/cumdif);
+        xlam = lamb[i] + (lamdif*(x - phicum[i])/cumdif);
       }
       else {
-	xlam = lamb[i];
+        xlam = lamb[i];
       }
       break;
     }
@@ -285,7 +287,7 @@ double get_num_elect(double delta)
  */
 
 void line_plane(double v0[3], double a[3], int iplax, double plval,
-		int *nint, double pt[3])
+        int *nint, double pt[3])
 {
   int iax;
 
@@ -297,7 +299,7 @@ void line_plane(double v0[3], double a[3], int iplax, double plval,
                    /* Ignore these cases for now.
                     * The right thing to do may be to get intersection points
                     * with edges of the rectangle (not to done in this function).
-		    */
+            */
     else
       *nint = 0;
   }
@@ -306,9 +308,9 @@ void line_plane(double v0[3], double a[3], int iplax, double plval,
     *nint = 1;
     for(iax=0;iax<3;++iax) {
       if (iax == iplax)
-	pt[iax] = plval;
+    pt[iax] = plval;
       else
-	pt[iax] = v0[iax] + ((a[iax]/a[iplax])*(plval - v0[iplax]));
+    pt[iax] = v0[iax] + ((a[iax]/a[iplax])*(plval - v0[iplax]));
     }
   }
 
@@ -316,10 +318,10 @@ void line_plane(double v0[3], double a[3], int iplax, double plval,
 
 /******************************************************************************/
 void line_box(double v0[3], double a[3], double corn[2][3], int *npts,
-	      double pts[2][3])
+          double pts[2][3])
 {
 
-  int i, iax, iax2, iax3, ip, nint[2][3], np;
+  int iax, iax2, iax3, ip, nint[2][3], np;
   double pt[3];
 
   np = 0;
@@ -332,15 +334,15 @@ void line_box(double v0[3], double a[3], double corn[2][3], int *npts,
       iax3 = (iax2 + 1)% 3;
       if (nint[ip][iax] == 1) {
 
-	if ( (pt[iax2] >= corn[0][iax2]) && (pt[iax2] < corn[1][iax2]) &&
-	     (pt[iax3] >= corn[0][iax3]) && (pt[iax3] < corn[1][iax3]) ) {
-	  pts[np][iax] = pt[iax];
-	  pts[np][iax2] = pt[iax2];
-	  pts[np][iax3] = pt[iax3];
-	  ++np;
-	  if (np >= 2)
-	    break;
-	}
+    if ( (pt[iax2] >= corn[0][iax2]) && (pt[iax2] < corn[1][iax2]) &&
+         (pt[iax3] >= corn[0][iax3]) && (pt[iax3] < corn[1][iax3]) ) {
+      pts[np][iax] = pt[iax];
+      pts[np][iax2] = pt[iax2];
+      pts[np][iax3] = pt[iax3];
+      ++np;
+      if (np >= 2)
+        break;
+    }
 
       }
 
@@ -401,7 +403,7 @@ double path_len(double pts[2][3])
 void do_cosmic_ray(double v0[3], double a[3], long NX, long NY)
 {
   double corn[2][3], ptsccd[2][3], ptscol[2][3], ptspix[2][3];
-  double xr[2], yr[2], xrc[2], yrc[2], plen, nelec, nelecmn;
+  double xr[2], yr[2], xrc[2], yrc[2], plen, nelec;
   int i, j, iax, npts, ixa, ixb, iya, iyb, jya, jyb;
 
   for(iax=0;iax<3;++iax) {
@@ -460,16 +462,16 @@ void do_cosmic_ray(double v0[3], double a[3], long NX, long NY)
 
       line_box(v0,a,corn,&npts,ptspix);  // pixel i, j
       if (npts != 2) {
-	continue;
+        continue;
       }
 
       plen = path_len(ptspix);
 
       /*  Inaccurate old ionization simulation
-      nelecmn = NELEC_MICRON*plen;
-      nelec = 0.0;
-      if (nelecmn > 0.0)
-	nelec = nelecmn + gasdev()*SQRT_FANO_SI*sqrt(nelecmn);
+          nelecmn = NELEC_MICRON*plen;
+          nelec = 0.0;
+          if (nelecmn > 0.0)
+          nelec = nelecmn + gasdev()*SQRT_FANO_SI*sqrt(nelecmn);
       */
 
       // New ionization simulation ala Landau, Bichsel, et al.
@@ -481,13 +483,11 @@ void do_cosmic_ray(double v0[3], double a[3], long NX, long NY)
       delta = get_energy_loss(beta,xi,xlam,lnepp);
       nelec = get_num_elect(delta);
       /* fprintf(stdout,"xlen,xi,xlam,delta,nelec = %f %f %f %f %f\n\n",
-	 xlen,xi,xlam,delta,nelec); */
+         xlen,xi,xlam,delta,nelec); */
 
       *(image + i*NY + j) += nelec;
     }
-
   }
-
 }
 
 /******************************************************************************/
@@ -527,12 +527,12 @@ void get_ran_cr(double origin[3], double v0[3], double a[3], double ratefac)
       y = x;
     else {
       if ( (x >= 0.0) && ( x < 1.0) ) {
-	xc = x/c1;
-	y = 2.0*xc/(1.0 + sqrt(1.0 + (2.0*c2*xc/c1)));
+    xc = x/c1;
+    y = 2.0*xc/(1.0 + sqrt(1.0 + (2.0*c2*xc/c1)));
       }
       else {
-	fprintf(stderr,"get_ran_cr(): error x = %lf\n",x);
-	y = x;
+    fprintf(stderr,"get_ran_cr(): error x = %lf\n",x);
+    y = x;
       }
     }
     v0[i] = origin[i] + (y*ccddim[i]);
@@ -562,11 +562,9 @@ void do_diffusion(long NX, long NY)
 
   // Swap 'image' and 'imaged' so the final results are in 'image'.
 
-  fprintf(stderr,"%d %d\n",image,imaged);
   temp = image;
   image = imaged;
   imaged = temp;
-  fprintf(stderr,"%d %d\n",image,imaged);
 
   for(j=0;j<NY;++j) {
     jl = j - 1;
@@ -581,20 +579,13 @@ void do_diffusion(long NX, long NY)
       if (im == NX) im = NX - 1;
 
       for(jp=jl;jp<=jm;++jp) {
-	for(ip=il;ip<=im;++ip) {
-	  ximg = imaged[ip*NY + jp];
-	  image[i*NY + j] += difker[ip-i+1][jp-j+1]*ximg;
-	  /* if (ximg != 0.0) {
-	    fprintf(stderr,"jp,ip,ximg,image = %d %d %f %f\n",
-		    jp,ip,ximg,image[i*NY + j]);
-	  }
-	  */
-	}
+          for(ip=il;ip<=im;++ip) {
+              ximg = imaged[ip*NY + jp];
+              image[i*NY + j] += difker[ip-i+1][jp-j+1]*ximg;
+          }
       }
-
     }
   }
-
 }
 
 /******************************************************************************/
@@ -622,13 +613,7 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY,
   double exptm, tot;
   int ip, jp;
   unsigned long seed;
-  FILE *fpin;
-  char *path = getenv("SPYFFIPATH");
-  char *file = "cosmical_realistic/st.dat";
-  char *completepath;
-  asprintf(&completepath, "%s/%s", path, file);
-  //printf("%s\n", completepath);
-  fpin = fopen(completepath,"r");
+  FILE *fpin = fmemopen(phi_lambda_data, strlen(phi_lambda_data), "r");
   read_phi_lambda(fpin);
   fclose(fpin);
 
@@ -671,13 +656,13 @@ void cosmical_setup(double crfl, double exptm1, double exptm2, long NX, long NY,
     tot = 0.0;
     for(jp=0;jp<3;++jp) {
       for(ip=0;ip<3;++ip) {
-	tot += difker[ip][jp];
+    tot += difker[ip][jp];
       }
     }
     for(jp=0;jp<3;++jp) {
       for(ip=0;ip<3;++ip) {
-	difker[ip][jp] /= tot;
-	fprintf(stderr,"difker[%d][%d] = %f\n",ip,jp,difker[ip][jp]);
+    difker[ip][jp] /= tot;
+    fprintf(stderr,"difker[%d][%d] = %f\n",ip,jp,difker[ip][jp]);
       }
     }
   }
@@ -712,7 +697,7 @@ double * cosmical(double crfl, double exptm1, double exptm2, long NX, long NY, i
 {
   cosmical_setup(crfl, exptm1, exptm2, NX, NY, idodif);
 
-  double v0[3], a[3], th, ph, exptm, rfac;
+  double v0[3], a[3], rfac;
   int i, j, icr;
   rfac = exptm2/exptm1;
 
@@ -751,7 +736,7 @@ int main(int argc, char *argv[])
 {
   char fileout[64];
   double exptm1, exptm2, crfl;
-  int i, iimg, nimg, idodif;
+  int iimg, nimg, idodif;
   long NX, NY;
   //FILE *fp;
   clock_t t;
@@ -784,7 +769,6 @@ int main(int argc, char *argv[])
     //print_image(NX,NY,fp);
     //fclose(fp);
     t = clock() - t;
-    fprintf(stderr," added %ld cosmic rays in %f seconds \n",ncr,((float)t)/CLOCKS_PER_SEC);
   }
 }
 

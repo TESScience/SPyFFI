@@ -14,7 +14,7 @@
 
 unsigned long get_tw_seed()
 {
-  time_t tp, tr;
+  time_t tr;
 
   tr = clock();
   if ( (tr % 2) == 0)
