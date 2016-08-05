@@ -637,7 +637,7 @@ class CCD(object):
 
         # use Al's code to generate cosmic ray image of the correct size
         image = Cosmics.cosmicImage(exptime=self.camera.cadence, size=self.npix,
-                                    gradient=gradient, version=version, diffusion=diffusion, rate=rate)
+                                    gradient=gradient, diffusion=diffusion, rate=rate)
 
         # (optionally), write cosmic ray image
         if write:

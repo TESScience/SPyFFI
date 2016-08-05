@@ -75,10 +75,8 @@ SPyFFIdata/inputs:
 	wget -qO- https://www.dropbox.com/s/0e4c2uk34phv4qx/SPyFFI_coreinputs.tar.gz | tar xzv -C $(dir $@)
 
 $(TEST_OUT): SPyFFIdata/inputs $(INSTALL)
-	# PYTHONPATH: Where the Python scripts can be found (i.e. the directory containing SPyFFI/ and zachopy/)
-	# SPYFFIPATH: The root directory of SPyFFI (needed for some file-finding by the code)
 	# SPYFFIDATA: The directory where you want to store TESS data (inputs/intermediates/outputs)
-	LOG=INFO SPYFFIPATH=$(CURDIR)/.. SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) ./scripts/smallone.py
+	LOG=INFO SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) ./scripts/smallone.py
 
 light_curve_%_test: light_curve_%.json
 	./scripts/json_diff $< reference/$<

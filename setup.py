@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 import numpy.distutils.misc_util
 
-VERSION = '0.1.2'
+VERSION = '0.1.3'
 
 setup(
     name='SPyFFI',
@@ -22,14 +22,13 @@ setup(
     author='Zach Berta-Thompson',
     author_email='zkbt@mit.edu',
     url='https://github.com/TESScience/SPyFFI',
-    # TODO: Version bump this when zachopy has a new release
-    install_requires=['zachopy==0.1.2', 'matplotlib', 'numpy', 'astropy==1.1.2', 'astroquery'],
-    dependency_links=['git+https://github.com/TESScience/zachopy.git@0.1.2#egg=zachopy-0.1.2'],
+    install_requires=['zachopy', 'matplotlib', 'numpy', 'astropy==1.1.2', 'astroquery'],
     ext_modules=[Extension("SPyFFI.cosmical_realistic._cosmical",
                            ["cosmical_realistic/_cosmical.c",
                             "cosmical_realistic/cosmical.c",
                             "cosmical_realistic/twister.c",
-                            "cosmical_realistic/seed_tw_ran.c"],
+                            "cosmical_realistic/seed_tw_ran.c",
+			    "cosmical_realistic/fmemopen.c"],
                            include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs())],
     # Uncomment this if there's a tagged release that's the same as VERSION, and SPyFFI is publicly released
     download_url = 'https://github.com/TESScience/SPyFFI/tarball/{}'.format(VERSION),
