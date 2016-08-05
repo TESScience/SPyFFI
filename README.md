@@ -6,6 +6,12 @@ SPyFFI
 The *Spiffy Python for Full Frame Images* package is a collection of
 tools for simulating TESS images.
 
+### Testing
+
+Change to the [`test/`](test/) directory and type:
+
+    make
+
 ### Basic usage
 
 Once you have it installed, you should be able to start to play,
