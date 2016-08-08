@@ -70,11 +70,7 @@ uninstall: $(INSTALL)
 
 light_curve_tests: light_curve_draw_rotation_test light_curve_draw_transit_test
 
-SPyFFIdata/inputs:
-	mkdir -p $(dir $@)
-	wget -qO- https://www.dropbox.com/s/0e4c2uk34phv4qx/SPyFFI_coreinputs.tar.gz | tar xzv -C $(dir $@)
-
-$(TEST_OUT): SPyFFIdata/inputs $(INSTALL)
+$(TEST_OUT): $(INSTALL)
 	# SPYFFIDATA: The directory where you want to store TESS data (inputs/intermediates/outputs)
 	LOG=INFO SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) ./scripts/smallone.py
 
@@ -82,7 +78,7 @@ light_curve_%_test: light_curve_%.json
 	./scripts/json_diff $< reference/$<
 
 light_curve_%.json: ./scripts/light_curve_%.py $(INSTALL)
-	LOG=INFO $(PYTHON) $< > $@
+	LOG=INFO SPYFFIDATA=$(CURDIR)/SPyFFIdata/ $(PYTHON) $< > $@
 
 clear-tests:
 	rm -rf SPyFFIdata/outputs *.out

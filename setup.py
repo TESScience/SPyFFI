@@ -22,7 +22,7 @@ setup(
     author='Zach Berta-Thompson',
     author_email='zkbt@mit.edu',
     url='https://github.com/TESScience/SPyFFI',
-    install_requires=['zachopy', 'matplotlib', 'numpy', 'astropy==1.1.2', 'astroquery'],
+    install_requires=['zachopy', 'matplotlib', 'numpy', 'astropy==1.1.2', 'astroquery', 'sh'],
     ext_modules=[Extension("SPyFFI.cosmical_realistic._cosmical",
                            ["cosmical_realistic/_cosmical.c",
                             "cosmical_realistic/cosmical.c",
