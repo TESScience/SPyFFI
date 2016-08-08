@@ -3,6 +3,7 @@ of any size
 of any cadence
 of any length
 of either the sky or a test pattern."""
+import os
 
 import Camera
 import Catalogs
@@ -61,7 +62,7 @@ class Observation(object):
         for k in self.cadencestodo.keys():
             # set the cadence to this one
             self.camera.setCadence(k)
-            np.save(self.camera.directory + 'observationdictionary.npy', self.inputs)
+            np.save(os.path.join(self.camera.directory, 'observationdictionary.npy'), self.inputs)
             # reset the counter
             self.camera.counter = 0
 

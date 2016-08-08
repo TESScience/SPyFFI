@@ -62,7 +62,8 @@ class PSF(object):
         self.debfiles = []
         for focus in self.focus_toinclude:
             self.debfiles.extend(
-                glob.glob(settings.inputs + self.debprefix + '_hx*_hy*_foc{:.0f}umPRFs.mat'.format(focus)))
+                glob.glob(os.path.join(settings.inputs,
+                                       self.debprefix + '_hx*_hy*_foc{:.0f}umPRFs.mat'.format(focus))))
         logger.info(
             'there are {} files from Deb, spanning focus of {}'.format(len(self.debfiles), self.focus_toinclude))
         assert (len(self.debfiles) > 0)

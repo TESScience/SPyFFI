@@ -39,7 +39,7 @@ def makeCartoon(seed=1):
         d[k] = v / np.std(v) * rmsat2s1d
 
     table = astropy.table.Table(d, names=['t', 'x', 'y'])
-    table.write(settings.inputs + 'cartoon.jitter', format='ascii.fixed_width', bookend=False)
+    table.write(os.path.join(settings.inputs, 'cartoon.jitter'), format='ascii.fixed_width', bookend=False)
 
 
 class Jitter(object):
@@ -56,7 +56,7 @@ class Jitter(object):
 
         # set up the initial raw jitter file
         # (this one cam from Roland, some time ago)
-        self.rawfile = settings.prefix + "inputs/" + rawjitterbasename
+        self.rawfile = os.path.join(settings.inputs, rawjitterbasename)
 
         # what do you want the RMS to be rescaled to?
         self.jitterrms = jitterrms
@@ -111,7 +111,7 @@ class Jitter(object):
         zachopy.utils.mkdir(directory)
 
         # define the filename
-        return directory + self.basename + '.processed.npy'
+        return os.path.join(directory, self.basename + '.processed.npy')
 
     def loadProcessedJitterball(self):
         """load a pre-processed jitterball, from the intermediates directory"""
@@ -190,7 +190,7 @@ class Jitter(object):
 
 
         # create the plot of the timeseries
-        plotdirectory = settings.plots + self.directory
+        plotdirectory = os.path.join(settings.plots, self.directory)
         zachopy.utils.mkdir(plotdirectory)
         bkw = dict(alpha=0.5, color='black')
         rkw = dict(linewidth=2, alpha=0.5, marker='o', color='red')
@@ -205,7 +205,8 @@ class Jitter(object):
         ax[0].set_ylabel('x (")')
         ax[1].set_ylabel('y (")')
         ax[1].set_xlabel('Time (seconds)')
-        fi.savefig(plotdirectory + self.basename + '_timeseries.pdf')
+        fi.savefig(os.path.join(plotdirectory,
+                                self.basename + '_timeseries.pdf'))
 
         # make interpolators to keep track of the running smooth means
         ikw = dict(kind='nearest', fill_value=0, bounds_error=False)
@@ -241,7 +242,7 @@ class Jitter(object):
                    title='TESS Pointing Jitter over {0}s'.format(
                        self.camera.cadence),
                    xtitle='Pixels', ytitle='Pixels',
-                   filename=plotdirectory + self.basename + '_jittermap.pdf')
+                   filename=os.path.join(plotdirectory, self.basename + '_jittermap.pdf'))
 
         # save the necessary jitter files
         logger.info('saving the jitter files to {0}'.format(self.processedfile))

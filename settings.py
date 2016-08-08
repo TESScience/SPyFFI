@@ -11,7 +11,7 @@ from sh import wget, tar, rm, shasum
 # if those directories don't contain the required input data, it will complain!
 
 # load the environment variable
-prefix = os.getenv('SPYFFIDATA', os.path.expanduser("~/.tess/spyffi/"))
+prefix = os.path.expanduser(os.getenv('SPYFFIDATA', "~/.tess/spyffi"))
 if not os.path.exists(prefix):
     os.makedirs(prefix)
 

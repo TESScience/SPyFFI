@@ -152,10 +152,11 @@ class CCD(object):
         self.header['CCDNOTE'] = ('', 'Details of this individual image')
         self.header['EXPTIME'] = (self.camera.cadence, '[s] exposure time ')
         self.header['NREADS'] = (
-        np.round(self.camera.cadence / self.camera.singleread).astype(np.int), '# of reads summed')
+            np.round(self.camera.cadence / self.camera.singleread).astype(np.int), '# of reads summed')
         self.header['SUBEXPTI'] = (self.camera.singleread, '[s] exposure in a single subexposure')
         self.header['SATURATE'] = (
-        self.camera.saturation * self.camera.cadence / self.camera.singleread, '[e-] saturation level in this image')
+            self.camera.saturation * self.camera.cadence / self.camera.singleread,
+            '[e-] saturation level in this image')
         self.header['READNOIS'] = (self.camera.read_noise, '[e-] read noise (per individual read)')
         self.header['READTIME'] = (self.camera.readouttime, '[s] time to transer to frame store')
         self.header['CCDNUM'] = (self.number, 'CCD number (1,2,3,4 or 0=fake subarray)')
@@ -517,7 +518,7 @@ class CCD(object):
       self.ax_prf.set_xlim(-self.psf.dx_pixels, self.psf.dy_pixels)
       self.ax_prf.set_ylim(-self.psf.dx_pixels, self.psf.dy_pixels)
       self.ax_prf.set_aspect(1)
-      self.ax_prf.figure.savefig(settings.prefix + 'plots/prnu_demo.pdf')
+      self.ax_prf.figure.savefig(os.path.join(settings.plots, 'prnu_demo.pdf'))
       plt.draw()'''
 
         ok = (xindex >= self.xmin) * (xindex < self.xsize) * (yindex >= self.ymin) * (yindex < self.ysize)
@@ -822,9 +823,9 @@ class CCD(object):
         """Add read noise to image."""
         logger.info("adding read noise")
         logger.info("    = quadrature sum of {2:.0f} reads with {3} e- each.".format(self.camera.cadence,
-                                                                                    self.camera.singleread,
-                                                                                    self.camera.cadence / self.camera.singleread,
-                                                                                    self.camera.read_noise))
+                                                                                     self.camera.singleread,
+                                                                                     self.camera.cadence / self.camera.singleread,
+                                                                                     self.camera.read_noise))
 
         # calculate the variance due to read noise
         noise_variance = self.camera.cadence / self.camera.singleread * self.camera.read_noise ** 2
@@ -844,7 +845,7 @@ class CCD(object):
         """Smear the image along the readout direction."""
         logger.info("adding readout smear")
         logger.info("    assuming {0} second readout times on {1} second exposures.".format(self.camera.readouttime,
-                                                                                           self.camera.singleread))
+                                                                                            self.camera.singleread))
 
         untouched = self.image + 0.0
         mean = np.mean(self.image, 0).reshape(1, self.image.shape[0]) * self.ones()
@@ -1046,7 +1047,7 @@ class Aberrator(object):
             if i == 1:
                 plt.xlabel('residuals')
 
-        plt.savefig(self.ccd.directory + 'aberrationgeometry.pdf')
+        plt.savefig(os.path.join(self.ccd.directory, 'aberrationgeometry.pdf'))
 
     def plotPossibilities(self, n=100):
         x, y = np.random.uniform(0, self.ccd.xsize, n), np.random.uniform(0, self.ccd.ysize, n)
@@ -1093,8 +1094,9 @@ class Aberrator(object):
         plt.axvline(27.4, color='gray', alpha=1)
         plt.xlim(-1 + min(bjds), max(bjds) + 1)
         plt.xlabel('Time (days)')
-        plt.savefig(self.ccd.directory + 'aberrationoveroneyear.pdf')
-        logger.info('saved a plot of the aberration over one year to {}'.format(self.ccd.directory))
+        path = os.path.join(self.ccd.directory, 'aberrationoveroneyear.pdf')
+        plt.savefig(path)
+        logger.info('saved a plot of the aberration over one year to {}'.format(path))
 
 
 def gauss(x, y, xcenter, ycenter):

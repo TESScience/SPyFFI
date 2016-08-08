@@ -1,4 +1,5 @@
 import logging
+import os
 
 import numpy as np
 import zachopy.utils
@@ -46,7 +47,7 @@ class Camera(object):
 
         # in case you want everything stored in its own directory
         self.dirprefix = dirprefix
-        zachopy.utils.mkdir(settings.prefix + 'outputs/{}'.format(self.dirprefix))
+        zachopy.utils.mkdir(os.path.join(settings.outputs, self.dirprefix))
 
         # KLUDGE (or is it?)
         self.stamps = stamps
@@ -70,7 +71,7 @@ class Camera(object):
         self.warpspaceandtime = warpspaceandtime
         if self.warpspaceandtime:
             logger.info('the camera will warp space and time by slowing '
-                       'the speed of light to {}c'.format(self.warpspaceandtime))
+                        'the speed of light to {}c'.format(self.warpspaceandtime))
 
         # should positions be aberrated?
         self.aberrate = aberrate
@@ -82,7 +83,7 @@ class Camera(object):
         self.counterstep = counterstep
         if self.counterstep > 1:
             logger.info('the camera will speed up time'
-                       ' by a factor of {}'.format(self.counterstep))
+                        ' by a factor of {}'.format(self.counterstep))
 
 
         # if real stars, use the input (ra, dec)
@@ -139,10 +140,13 @@ class Camera(object):
     def fielddirectory(self):
         """define the field directory for this camera"""
         if self.label == '':
-            d = settings.prefix + 'outputs/{dirprefix}{pos}/'.format(pos=self.pos_string(), dirprefix=self.dirprefix)
+            d = os.path.join(settings.outputs,
+                             '{dirprefix}{pos}'.format(pos=self.pos_string(), dirprefix=self.dirprefix))
         else:
-            d = settings.prefix + 'outputs/{dirprefix}{pos}_{label}/'.format(pos=self.pos_string(), label=self.label,
-                                                                             dirprefix=self.dirprefix)
+            d = os.path.join(settings.outputs,
+                             '{dirprefix}{pos}_{label}'.format(pos=self.pos_string(),
+                                                               label=self.label,
+                                                               dirprefix=self.dirprefix))
         zachopy.utils.mkdir(d)
         return d
 
