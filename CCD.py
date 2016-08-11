@@ -126,7 +126,7 @@ class CCD(object):
     @property
     def directory(self):
         """Directory for saving all images from this CCD."""
-        d = self.camera.directory + self.name + '/'
+        d = os.path.join(self.camera.directory, self.name)
         zachopy.utils.mkdir(d)
         return d
 
@@ -296,7 +296,7 @@ class CCD(object):
 
         # make filename for this image
         self.note = 'simulated_' + self.fileidentifier
-        finalfilename = self.directory + self.note + '.fits' + zipsuffix
+        finalfilename = os.path.join(self.directory, self.note + '.fits' + zipsuffix)
 
         # write the image to FITS
         logger.info('saving simulated exposure {} for {}'.format(
@@ -306,7 +306,7 @@ class CCD(object):
         # optionally, write some other outputs too!
         if lean == False:
             self.note = 'withoutbackground_{0:06.0f}'.format(self.camera.counter)
-            self.writeToFITS(self.image - self.backgroundimage, self.directory + self.note + '.fits')
+            self.writeToFITS(self.image - self.backgroundimage, os.path.join(self.directory, self.note + '.fits'))
 
     def stampify(self):
         if self.stamps is not None:
@@ -358,16 +358,19 @@ class CCD(object):
     def writeIngredients(self):
 
         # write the catalog out to a text file
-        outfile = self.directory + 'catalog_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string,
-                                                                                        name=self.name,
-                                                                                        epoch=self.epoch)
+        outfile = os.path.join(self.directory,
+                               'catalog_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string,
+                                                                                    name=self.name,
+                                                                                    epoch=self.epoch))
         self.camera.catalog.writeProjected(ccd=self, outfile=outfile)
 
-        jitteroutfile = self.directory + 'jitternudges_{cadence:.0f}s_{name}.txt'.format(cadence=self.camera.cadence,
-                                                                                         name=self.name)
+        jitteroutfile = os.path.join(
+            self.directory, 'jitternudges_{cadence:.0f}s_{name}.txt'.format(cadence=self.camera.cadence,
+                                                                            name=self.name))
         self.camera.jitter.writeNudges(jitteroutfile)
 
-        focusoutfile = self.directory + 'focustimeseries_{name}.txt'.format(name=self.name)
+        focusoutfile = os.path.join(
+            self.directory, 'focustimeseries_{name}.txt'.format(name=self.name))
         self.camera.focus.writeModel(focusoutfile)
 
     def projectCatalog(self, write=True):
@@ -540,7 +543,7 @@ class CCD(object):
         try:
             assert (remake == False)
             self.note = 'starsbrighterthan{0}'.format(np.max(magnitude_thresholds))
-            starsfilename = self.directory + self.note + '.fits'
+            starsfilename = os.path.join(self.directory, self.note + '.fits')
             try:
                 self.starimage
             except:
@@ -559,7 +562,7 @@ class CCD(object):
 
                 # define a filename for this magnitude range
                 self.note = 'starsbrighterthan{0:02d}'.format(magnitudethreshold)
-                starsfilename = self.directory + self.note + '.fits'
+                starsfilename = os.path.join(self.directory, self.note + '.fits')
 
                 # load the existing stellar image, if possible
                 try:
@@ -643,7 +646,7 @@ class CCD(object):
         # (optionally), write cosmic ray image
         if write:
             self.note = 'cosmics_' + self.fileidentifier
-            cosmicsfilename = self.directory + self.note + '.fits' + zipsuffix
+            cosmicsfilename = os.path.join(self.directory, self.note + '.fits' + zipsuffix)
             self.writeToFITS(image, cosmicsfilename)
 
         # add the cosmics into the running image
@@ -746,7 +749,7 @@ class CCD(object):
             stilloversaturated = (self.image > saturation_limit).any() and count < 10
 
         self.note = 'saturation_{0}K'.format(self.camera.saturation).replace('.', 'p')
-        saturationfilename = self.directory + self.note + '.fits'
+        saturationfilename = os.path.join(self.directory, self.note + '.fits')
         if not os.path.exists(saturationfilename):
             self.writeToFITS(self.image - untouched, saturationfilename)
 
@@ -759,7 +762,7 @@ class CCD(object):
 
         # set up filenames for saving background, if need be
         self.note = 'backgrounds'
-        backgroundsfilename = self.directory + self.note + '.fits'
+        backgroundsfilename = os.path.join(self.directory, self.note + '.fits')
         logger.info("adding backgrounds")
 
         # if the background image already exists, just load it
@@ -813,7 +816,7 @@ class CCD(object):
         self.noiseimage = noise
 
         self.note = 'photonnoise'
-        noisefilename = self.directory + self.note + '.fits'
+        noisefilename = os.path.join(self.directory, self.note + '.fits')
         if not os.path.exists(noisefilename):
             self.writeToFITS(noise, noisefilename)
         self.addInputLabels()
@@ -852,7 +855,7 @@ class CCD(object):
         self.image += mean * self.camera.readouttime / self.camera.singleread
 
         self.note = 'readoutsmear'
-        smearfilename = self.directory + self.note + '.fits'
+        smearfilename = os.path.join(self.directory, self.note + '.fits')
         if not os.path.exists(smearfilename):
             self.writeToFITS(self.image - untouched, smearfilename)
 
@@ -915,7 +918,7 @@ class CCD(object):
         if writenoiseless:
             # make filename for this image
             self.note = 'noiseless_' + self.fileidentifier
-            noiselessfilename = self.directory + self.note + '.fits' + zipsuffix
+            noiselessfilename = os.path.join(self.directory, self.note + '.fits' + zipsuffix)
 
             # write the image to FITS
             logger.info('saving noiseless TESS image')

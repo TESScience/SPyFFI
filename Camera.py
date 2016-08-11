@@ -152,7 +152,7 @@ class Camera(object):
 
     @property
     def directory(self):
-        d = self.fielddirectory + '{0:d}s/'.format(self.cadence)
+        d = os.path.join(self.fielddirectory, '{0:d}s/'.format(self.cadence))
         zachopy.utils.mkdir(d)
         return d
 

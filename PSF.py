@@ -30,7 +30,6 @@ class PSF(object):
                  nsubpixelsperpixel=101, npixels=21,
                  npositions_toinclude=21, noffsets_toinclude=11):
 
-
         # link this PSF to a Camera (hopefully one with a Cartographer)
         self.setCamera(camera)
 
@@ -71,16 +70,17 @@ class PSF(object):
     @property
     def deblibrarydirectory(self):
         f = '{:.0f}'.format
-        d = self.versiondirectory + 'focus{}_stellartemp{}/'.format(
-            'and'.join(map(f, self.focus_toinclude)),
-            'and'.join(map(f, self.stellartemp_toinclude)))
+        d = os.path.join(self.versiondirectory,
+                         'focus{}_stellartemp{}/'.format(
+                             'and'.join(map(f, self.focus_toinclude)),
+                             'and'.join(map(f, self.stellartemp_toinclude))))
         zachopy.utils.mkdir(d)
         return d
 
     def populateUnjitteredPSFLibrary(self):
         """populate (from scratch), a library of Deb's PRFs"""
 
-        filename = self.deblibrarydirectory + 'originaldeblibrary.npy'
+        filename = os.path.join(self.deblibrarydirectory, 'originaldeblibrary.npy')
         try:
             self.psflibrary = np.load(filename)[0]
             logger.info('loaded original Deb library from {0}'.format(filename))
@@ -210,7 +210,7 @@ class PSF(object):
 
     @property
     def quickloadingdirectory(self):
-        d = self.versiondirectory + 'scratch/'
+        d = os.path.join(self.versiondirectory, 'scratch')
         zachopy.utils.mkdir(d)
         return d
 
@@ -220,8 +220,10 @@ class PSF(object):
 
         logger.info('loading PSF from {}'.format(debfile))
 
-        quicksummaryfilename = self.quickloadingdirectory + os.path.basename(debfile) + '.summary.npy'
-        quickPSFfilename = self.quickloadingdirectory + os.path.basename(debfile) + '.PSF.npy'
+        quicksummaryfilename = os.path.join(self.quickloadingdirectory,
+                                            os.path.basename(debfile) + '.summary.npy')
+        quickPSFfilename = os.path.join(self.quickloadingdirectory,
+                                        os.path.basename(debfile) + '.PSF.npy')
         try:
             logger.info('trying to load quickfile from {}'.format(quickPSFfilename))
             stellartemps, focuss, fieldxs, fieldys = np.load(quicksummaryfilename)
@@ -339,21 +341,21 @@ class PSF(object):
     @property
     def basedirectory(self):
         """the directory in which all processed PSF data will be stored"""
-        d = settings.intermediates + 'psfs/'
+        d = os.path.join(settings.intermediates, 'psfs')
         zachopy.utils.mkdir(d)
         return d
 
     @property
     def versiondirectory(self):
         """the directory for this particular version of the PSFs"""
-        d = self.basedirectory + self.version + '/'
+        d = os.path.join(self.basedirectory, self.version)
         zachopy.utils.mkdir(d)
         return d
 
     @property
     def plotdirectory(self):
         """the directory where plots should be stored"""
-        d = self.versiondirectory + 'plots/'
+        d = os.path.join(self.versiondirectory, 'plots')
         zachopy.utils.mkdir(d)
         return d
 
@@ -382,7 +384,8 @@ class PSF(object):
     def populateJitteredPSFLibrary(self):
         """convolve Deb's PSFs with a jittermap, at the camera's cadence"""
         logger.info('populating the jittered PSF library')
-        jitteredfilename = self.deblibrarydirectory + 'jitteredlibrary_{}.npy'.format(self.camera.jitter.basename)
+        jitteredfilename = os.path.join(
+            self.deblibrarydirectory, 'jitteredlibrary_{}.npy'.format(self.camera.jitter.basename))
 
         try:
             self.psflibrary
@@ -761,10 +764,12 @@ class PSF(object):
 
         self.setupPixelArrays()
 
-        binned_filename = self.deblibrarydirectory + 'pixelizedlibrary_{jitter}_{intrapixel}_{npositions:02.0f}positions_{noffsets:02.0f}offsets.npy'.format(
-            jitter=self.camera.jitter.basename, intrapixel=self.intrapixel.name,
-            npositions=self.npositions, noffsets=self.noffsets
-        )
+        binned_filename = \
+            os.path.join(self.deblibrarydirectory,
+                         'pixelizedlibrary_{jitter}_{intrapixel}_'
+                         '{npositions:02.0f}positions_{noffsets:02.0f}offsets.npy'.format(
+                             jitter=self.camera.jitter.basename, intrapixel=self.intrapixel.name,
+                             npositions=self.npositions, noffsets=self.noffsets))
         try:
             logger.info('trying to load PSFs from {0}'.format(binned_filename))
             self.binned, self.binned_axes = np.load(binned_filename)
