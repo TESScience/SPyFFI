@@ -31,6 +31,7 @@ setup(
     description="Spiffy Python for Full Frame Images (tools for simulating TESS images, calibrations, and light curves)",
     author='Zach Berta-Thompson',
     author_email='zkbt@mit.edu',
+    license='MIT',
     url='https://github.com/TESScience/SPyFFI',
     setup_requires=['numpy'],
     install_requires=['zachopy', 'matplotlib', 'numpy', 'astropy==1.1.2', 'astroquery', 'sh'],
