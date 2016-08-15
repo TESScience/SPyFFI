@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
-VERSION = '1.0.1'
+VERSION = '1.0.3'
 
 class numpy_build_options(build_ext):
     """We can't important numpy directly because it's not ready yet."""
@@ -41,8 +41,7 @@ setup(
                             "cosmical_realistic/cosmical.c",
                             "cosmical_realistic/twister.c",
                             "cosmical_realistic/seed_tw_ran.c",
-			    "cosmical_realistic/fmemopen.c"],
-                          )],
+			    "cosmical_realistic/fmemopen.c"])],
     # Uncomment this if there's a tagged release that's the same as VERSION, and SPyFFI is publicly released
     download_url = 'https://github.com/TESScience/SPyFFI/tarball/{}'.format(VERSION),
 )
