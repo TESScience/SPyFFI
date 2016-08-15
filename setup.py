@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
-VERSION = '1.0.3'
+VERSION = '1.0.4'
 
 class numpy_build_options(build_ext):
     """We can't important numpy directly because it's not ready yet."""

@@ -2,3 +2,4 @@ include cosmical_realistic/twister.h
 include cosmical_realistic/fmemopen.h
 include cosmical_realistic/cosmical.h
 include cosmical_realistic/st_dat.h
+include cosmical_realistic/seed_tw_ran.h
