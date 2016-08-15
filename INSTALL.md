@@ -1,11 +1,11 @@
 Installing SPyFFI
 =================
 
-These are instructions for installing SPyFFI and its (many) dependencies. One of these days, I will learn how to package this installation more cleanly!
+These are instructions for installing SPyFFI and its (many) dependencies.
 
 ### Python 2.7
 
-If you don't have a relatively modern Python 2.7 distribution, download and install [`anaconda`](). It's an easy way to get a self-managed Python distribution, where you have easy control over the libraries and can install packages with something like `pip`.
+If you don't have a relatively modern Python 2.7 distribution, download and install [`anaconda`](https://www.continuum.io/downloads). It's an easy way to get a self-managed Python distribution, where you have easy control over the libraries and can install packages with something like `pip`.
 
 ### Installing The Latest Release
 
