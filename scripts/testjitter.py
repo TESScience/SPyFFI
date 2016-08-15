@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # create an observation centered at the north ecliptic pole (midlatitude)
-from ..Observation import Observation, default
+# noinspection PyUnresolvedReferences
+from SPyFFI.Observation import Observation, default
 
 # start from the default settings
 inputs = default

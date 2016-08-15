@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-from ..Observation import Observation, default
+
+# noinspection PyUnresolvedReferences
+from SPyFFI.Observation import Observation, default
 
 # initialize to default settings
 inputs = default
