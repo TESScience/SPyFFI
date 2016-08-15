@@ -1,3 +1,4 @@
+import os
 import Catalogs
 import numpy as np
 import astropy
@@ -45,8 +46,9 @@ class Stamper(object):
         t = astropy.table.Table([self.ra, self.dec, self.radii], names=('ra', 'dec', 'radius'))
 
         # write it out
-        f = self.ccd.directory + 'postagestamptargets_{pos}_{name}.txt'.format(pos=self.ccd.pos_string,
-                                                                               name=self.ccd.name)
+        f = os.path.join(
+            self.ccd.directory, 'postagestamptargets_{pos}_{name}.txt'.format(pos=self.ccd.pos_string,
+                                                                              name=self.ccd.name))
 
         t.write(f, format='ascii.fixed_width', delimiter='|', bookend=False)
         logger.info('wrote stamp definition catalog to {}'.format(f))
@@ -79,8 +81,9 @@ class Stamper(object):
 
         # weight stars inversely to their abundance, to give roughly uniform distribution of magnitudes
         weights = \
-        (1.0 / dndmag(self.camera.catalog.tmag) * (self.camera.catalog.tmag >= 6) * (self.camera.catalog.tmag <= 16))[
-            onccd]
+            (1.0 / dndmag(self.camera.catalog.tmag) * (self.camera.catalog.tmag >= 6) * (
+            self.camera.catalog.tmag <= 16))[
+                onccd]
         weights /= np.sum(weights)
         itargets = np.random.choice(onccd.nonzero()[0],
                                     size=np.minimum(nstamps, np.sum(weights != 0)),
@@ -163,5 +166,5 @@ class Stamper(object):
 
         self.ccd.stampimage = mask
         self.ccd.note = 'stampdefinition'
-        stampfilename = self.ccd.directory + self.ccd.note + '.fits'
+        stampfilename = os.path.join(self.ccd.directory, self.ccd.note + '.fits')
         self.ccd.writeToFITS(self.ccd.stampimage, stampfilename)

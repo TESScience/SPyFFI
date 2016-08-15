@@ -1,4 +1,5 @@
 '''Handy relations, mostly interpolations out of paper tables.'''
+import os
 import settings
 import astropy.io.ascii
 import scipy.interpolate
@@ -8,7 +9,7 @@ import numpy.polynomial.polynomial as polynomial
 
 # convert colors, using the Sloan stellar locus
 def davenport(color, input='r-J', output='r-i'):
-    data = astropy.io.ascii.read(settings.prefix + 'inputs/davenport_table1.txt',
+    data = astropy.io.ascii.read(os.path.join(settings.inputs, 'davenport_table1.txt'),
                                  names=['g-i', '#', 'u-g', 'eu-g', 'g-r', 'eg-r', 'r-i', 'er-i', 'i-z', 'ei-z', 'z-J',
                                         'ez-J', 'J-H', 'eJ-H', 'H-K', 'eH-K'])
     if input == 'r-J':
@@ -27,7 +28,7 @@ def davenport(color, input='r-J', output='r-i'):
 # spit out the Pickles temperature associated with an input color
 def pickles(color, input='R-J'):
     # assuming
-    data = astropy.io.ascii.read(settings.prefix + 'inputs/pickles_table2.txt')
+    data = astropy.io.ascii.read(os.path.join(settings.inputs, 'pickles_table2.txt'))
     ok = data['[Fe/H]'] == 0
     if input == 'R-J':
         x = data['V-J'][ok] - data['V-R'][ok]

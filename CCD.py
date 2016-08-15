@@ -126,7 +126,7 @@ class CCD(object):
     @property
     def directory(self):
         """Directory for saving all images from this CCD."""
-        d = self.camera.directory + self.name + '/'
+        d = os.path.join(self.camera.directory, self.name)
         zachopy.utils.mkdir(d)
         return d
 
@@ -152,10 +152,11 @@ class CCD(object):
         self.header['CCDNOTE'] = ('', 'Details of this individual image')
         self.header['EXPTIME'] = (self.camera.cadence, '[s] exposure time ')
         self.header['NREADS'] = (
-        np.round(self.camera.cadence / self.camera.singleread).astype(np.int), '# of reads summed')
+            np.round(self.camera.cadence / self.camera.singleread).astype(np.int), '# of reads summed')
         self.header['SUBEXPTI'] = (self.camera.singleread, '[s] exposure in a single subexposure')
         self.header['SATURATE'] = (
-        self.camera.saturation * self.camera.cadence / self.camera.singleread, '[e-] saturation level in this image')
+            self.camera.saturation * self.camera.cadence / self.camera.singleread,
+            '[e-] saturation level in this image')
         self.header['READNOIS'] = (self.camera.read_noise, '[e-] read noise (per individual read)')
         self.header['READTIME'] = (self.camera.readouttime, '[s] time to transer to frame store')
         self.header['CCDNUM'] = (self.number, 'CCD number (1,2,3,4 or 0=fake subarray)')
@@ -295,7 +296,7 @@ class CCD(object):
 
         # make filename for this image
         self.note = 'simulated_' + self.fileidentifier
-        finalfilename = self.directory + self.note + '.fits' + zipsuffix
+        finalfilename = os.path.join(self.directory, self.note + '.fits' + zipsuffix)
 
         # write the image to FITS
         logger.info('saving simulated exposure {} for {}'.format(
@@ -305,7 +306,7 @@ class CCD(object):
         # optionally, write some other outputs too!
         if lean == False:
             self.note = 'withoutbackground_{0:06.0f}'.format(self.camera.counter)
-            self.writeToFITS(self.image - self.backgroundimage, self.directory + self.note + '.fits')
+            self.writeToFITS(self.image - self.backgroundimage, os.path.join(self.directory, self.note + '.fits'))
 
     def stampify(self):
         if self.stamps is not None:
@@ -357,16 +358,19 @@ class CCD(object):
     def writeIngredients(self):
 
         # write the catalog out to a text file
-        outfile = self.directory + 'catalog_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string,
-                                                                                        name=self.name,
-                                                                                        epoch=self.epoch)
+        outfile = os.path.join(self.directory,
+                               'catalog_{pos}_{name}_atepoch{epoch:.3f}.txt'.format(pos=self.pos_string,
+                                                                                    name=self.name,
+                                                                                    epoch=self.epoch))
         self.camera.catalog.writeProjected(ccd=self, outfile=outfile)
 
-        jitteroutfile = self.directory + 'jitternudges_{cadence:.0f}s_{name}.txt'.format(cadence=self.camera.cadence,
-                                                                                         name=self.name)
+        jitteroutfile = os.path.join(
+            self.directory, 'jitternudges_{cadence:.0f}s_{name}.txt'.format(cadence=self.camera.cadence,
+                                                                            name=self.name))
         self.camera.jitter.writeNudges(jitteroutfile)
 
-        focusoutfile = self.directory + 'focustimeseries_{name}.txt'.format(name=self.name)
+        focusoutfile = os.path.join(
+            self.directory, 'focustimeseries_{name}.txt'.format(name=self.name))
         self.camera.focus.writeModel(focusoutfile)
 
     def projectCatalog(self, write=True):
@@ -517,7 +521,7 @@ class CCD(object):
       self.ax_prf.set_xlim(-self.psf.dx_pixels, self.psf.dy_pixels)
       self.ax_prf.set_ylim(-self.psf.dx_pixels, self.psf.dy_pixels)
       self.ax_prf.set_aspect(1)
-      self.ax_prf.figure.savefig(settings.prefix + 'plots/prnu_demo.pdf')
+      self.ax_prf.figure.savefig(os.path.join(settings.plots, 'prnu_demo.pdf'))
       plt.draw()'''
 
         ok = (xindex >= self.xmin) * (xindex < self.xsize) * (yindex >= self.ymin) * (yindex < self.ysize)
@@ -539,7 +543,7 @@ class CCD(object):
         try:
             assert (remake == False)
             self.note = 'starsbrighterthan{0}'.format(np.max(magnitude_thresholds))
-            starsfilename = self.directory + self.note + '.fits'
+            starsfilename = os.path.join(self.directory, self.note + '.fits')
             try:
                 self.starimage
             except:
@@ -558,7 +562,7 @@ class CCD(object):
 
                 # define a filename for this magnitude range
                 self.note = 'starsbrighterthan{0:02d}'.format(magnitudethreshold)
-                starsfilename = self.directory + self.note + '.fits'
+                starsfilename = os.path.join(self.directory, self.note + '.fits')
 
                 # load the existing stellar image, if possible
                 try:
@@ -642,7 +646,7 @@ class CCD(object):
         # (optionally), write cosmic ray image
         if write:
             self.note = 'cosmics_' + self.fileidentifier
-            cosmicsfilename = self.directory + self.note + '.fits' + zipsuffix
+            cosmicsfilename = os.path.join(self.directory, self.note + '.fits' + zipsuffix)
             self.writeToFITS(image, cosmicsfilename)
 
         # add the cosmics into the running image
@@ -745,7 +749,7 @@ class CCD(object):
             stilloversaturated = (self.image > saturation_limit).any() and count < 10
 
         self.note = 'saturation_{0}K'.format(self.camera.saturation).replace('.', 'p')
-        saturationfilename = self.directory + self.note + '.fits'
+        saturationfilename = os.path.join(self.directory, self.note + '.fits')
         if not os.path.exists(saturationfilename):
             self.writeToFITS(self.image - untouched, saturationfilename)
 
@@ -758,7 +762,7 @@ class CCD(object):
 
         # set up filenames for saving background, if need be
         self.note = 'backgrounds'
-        backgroundsfilename = self.directory + self.note + '.fits'
+        backgroundsfilename = os.path.join(self.directory, self.note + '.fits')
         logger.info("adding backgrounds")
 
         # if the background image already exists, just load it
@@ -812,7 +816,7 @@ class CCD(object):
         self.noiseimage = noise
 
         self.note = 'photonnoise'
-        noisefilename = self.directory + self.note + '.fits'
+        noisefilename = os.path.join(self.directory, self.note + '.fits')
         if not os.path.exists(noisefilename):
             self.writeToFITS(noise, noisefilename)
         self.addInputLabels()
@@ -822,9 +826,9 @@ class CCD(object):
         """Add read noise to image."""
         logger.info("adding read noise")
         logger.info("    = quadrature sum of {2:.0f} reads with {3} e- each.".format(self.camera.cadence,
-                                                                                    self.camera.singleread,
-                                                                                    self.camera.cadence / self.camera.singleread,
-                                                                                    self.camera.read_noise))
+                                                                                     self.camera.singleread,
+                                                                                     self.camera.cadence / self.camera.singleread,
+                                                                                     self.camera.read_noise))
 
         # calculate the variance due to read noise
         noise_variance = self.camera.cadence / self.camera.singleread * self.camera.read_noise ** 2
@@ -844,14 +848,14 @@ class CCD(object):
         """Smear the image along the readout direction."""
         logger.info("adding readout smear")
         logger.info("    assuming {0} second readout times on {1} second exposures.".format(self.camera.readouttime,
-                                                                                           self.camera.singleread))
+                                                                                            self.camera.singleread))
 
         untouched = self.image + 0.0
         mean = np.mean(self.image, 0).reshape(1, self.image.shape[0]) * self.ones()
         self.image += mean * self.camera.readouttime / self.camera.singleread
 
         self.note = 'readoutsmear'
-        smearfilename = self.directory + self.note + '.fits'
+        smearfilename = os.path.join(self.directory, self.note + '.fits')
         if not os.path.exists(smearfilename):
             self.writeToFITS(self.image - untouched, smearfilename)
 
@@ -914,7 +918,7 @@ class CCD(object):
         if writenoiseless:
             # make filename for this image
             self.note = 'noiseless_' + self.fileidentifier
-            noiselessfilename = self.directory + self.note + '.fits' + zipsuffix
+            noiselessfilename = os.path.join(self.directory, self.note + '.fits' + zipsuffix)
 
             # write the image to FITS
             logger.info('saving noiseless TESS image')
@@ -1046,7 +1050,7 @@ class Aberrator(object):
             if i == 1:
                 plt.xlabel('residuals')
 
-        plt.savefig(self.ccd.directory + 'aberrationgeometry.pdf')
+        plt.savefig(os.path.join(self.ccd.directory, 'aberrationgeometry.pdf'))
 
     def plotPossibilities(self, n=100):
         x, y = np.random.uniform(0, self.ccd.xsize, n), np.random.uniform(0, self.ccd.ysize, n)
@@ -1093,8 +1097,9 @@ class Aberrator(object):
         plt.axvline(27.4, color='gray', alpha=1)
         plt.xlim(-1 + min(bjds), max(bjds) + 1)
         plt.xlabel('Time (days)')
-        plt.savefig(self.ccd.directory + 'aberrationoveroneyear.pdf')
-        logger.info('saved a plot of the aberration over one year to {}'.format(self.ccd.directory))
+        path = os.path.join(self.ccd.directory, 'aberrationoveroneyear.pdf')
+        plt.savefig(path)
+        logger.info('saved a plot of the aberration over one year to {}'.format(path))
 
 
 def gauss(x, y, xcenter, ycenter):
