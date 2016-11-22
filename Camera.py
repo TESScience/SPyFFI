@@ -186,6 +186,8 @@ class Camera(object):
         # fill it with the WCS information
         self.header['WCS'] = ''
         self.header['WCSNOTE'] = ('', 'World Cooridinate System for this image')
+        self.header['EQUINOX'] = 2000.0, '[year] the equinox of the coordinates'
+
         self.header.extend(self.wcs.to_header())
 
         # note the jitter motions that have been applied to this image
